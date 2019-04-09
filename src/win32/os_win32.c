@@ -1,11 +1,14 @@
+#include "../os.h"
+#include "../editor.h"
+#include "../types.h"
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #include <stdlib.h>
 
-#include "../types.h"
-
 HWND window_handle;
+Editor editor;
 
 void* os_get_window_handle() {
 	return window_handle;
@@ -27,6 +30,12 @@ typedef enum PROCESS_DPI_AWARENESS {
 
 typedef HRESULT(*Set_Process_DPI_Awareness)(PROCESS_DPI_AWARENESS value);
 
+static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_param) {
+	
+	
+	return DefWindowProc(handle, message, w_param, l_param);
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show) {
 	HMODULE dll_handle = LoadLibrary(TEXT("Shcore.dll"));
 	if (dll_handle) {
@@ -41,7 +50,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	WNDCLASSEX window_class;
 	memset(&window_class, 0, sizeof(window_class));
 	window_class.cbSize = sizeof(WNDCLASSEX);
-	window_class.lpfnWndProc = DefWindowProc;
+	window_class.lpfnWndProc = window_proc;
 	window_class.hInstance = instance;
 	window_class.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 	window_class.lpszClassName = TEXT("class");
@@ -61,11 +70,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	const u32 pos_y = monitor_height / 2 - window_height / 2;
 
 	window_handle = CreateWindow(window_class.lpszClassName, TEXT("text_editor"), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
+
+	editor_init(&editor);
 	ShowWindow(window_handle, SW_SHOW);
-	bool is_running = true;
-	while (is_running) {
-		os_poll_window_events();
-	}
+	editor_loop(&editor);
+	editor_shutdown(&editor);
 
 	return 0;
 }
