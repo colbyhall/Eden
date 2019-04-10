@@ -33,7 +33,7 @@ void editor_draw(Editor* editor) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClearColor(0.f, 0.f, 0.f, 1.f);
 
-	draw_rect(0.f, 0.f, 1000.f, 1000.f, vec4_color(0xFF00FF));
+	draw_rect(100.f, 100.f, 200.f, 200.f, vec4_color(0xFF0000));
 
 	gl_swap_buffers();
 }

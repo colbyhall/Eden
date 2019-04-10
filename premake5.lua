@@ -1,6 +1,6 @@
-workspace "text_editor"
+workspace "YEET"
     architecture "x64"
-    startproject "editor"
+    startproject "YEET"
     
     configurations
     {
@@ -8,9 +8,9 @@ workspace "text_editor"
         "Release"
     }
 
-project "editor"
+project "YEET"
     kind "WindowedApp"
-    language "C++"
+    language "C"
 
     targetdir ("bin")
     objdir ("bin")

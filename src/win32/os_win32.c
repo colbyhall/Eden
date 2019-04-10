@@ -122,3 +122,33 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	return 0;
 }
+
+String os_load_file_into_memory(const char* path) {
+	HANDLE file_handle = CreateFile(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	String result;
+
+	// NOTE(Colby): Should we throw an assert here?
+	if (file_handle == INVALID_HANDLE_VALUE) {
+		result.length = 0;
+		result.allocated = 0;
+		result.data = NULL;
+	}
+
+	SetFilePointer(file_handle, NULL, NULL, FILE_BEGIN);
+
+	const DWORD file_size = GetFileSize(file_handle, NULL);
+
+	u8* buffer = (u8*)malloc(file_size + 1);
+
+	ReadFile(file_handle, buffer, file_size, 0, NULL);
+	buffer[file_size] = 0;
+
+	CloseHandle(file_handle);
+
+	result.data = buffer;
+	result.length = file_size;
+	result.allocated = file_size + 1;
+
+	return result;
+}
