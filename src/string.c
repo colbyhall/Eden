@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 String make_string(const char* str) {
 	String result;
@@ -85,4 +86,12 @@ void string_eat_whitespace(String* str) {
 	while (str->length > 0 && is_whitespace(str->data[0])) {
 		advance_string(str, 1);
 	}
+}
+
+void free_string(String* str) {
+	free(str->data);
+
+	str->allocated = 0;
+	str->length = 0;
+	str->data = NULL;
 }

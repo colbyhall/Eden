@@ -61,27 +61,20 @@ void parse_shader_source(String* fd, Shader_Type type, String* out_source) {
 	out_source->data[out_source->length] = 0;
 }
 
-Shader shader_load_from_file(const char* path) {
+Shader shader_load_from_file(const char* frag, const char* vert) {
 	Shader result;
 	GLuint program_id = glCreateProgram();
 
 	GLuint vertex_id = glCreateShader(GL_VERTEX_SHADER);
 	GLuint frag_id = glCreateShader(GL_FRAGMENT_SHADER);
 
-	FILE* f;
-	fopen_s(&f, path, "rb");
-	fseek(f, 0, SEEK_END);
-	size_t fsize = ftell(f);
-	fseek(f, 0, SEEK_SET);
+	String vert_source = os_load_file_into_memory(vert);
+	String frag_source = os_load_file_into_memory(frag);
 
-	String fd;
-	fd.data = (u8*)malloc(fsize + 1);
-	fd.allocated = fsize + 1;
-	fd.length = fsize;
-	fread(fd.data, 1, fsize, f);
-	fclose(f);
-
-	fd.data[fsize] = 0;
+#if 0
+	String shader_source = os_load_file_into_memory(path);
+	// @NOTE(Colby): copy so we can free
+	String fd = shader_source;
 
 	u8* buffer = (u8*)malloc(fd.length * 2 + 2);
 
@@ -97,6 +90,7 @@ Shader shader_load_from_file(const char* path) {
 
 	parse_shader_source(&fd, ST_VERT, &vert_source);
 	parse_shader_source(&fd, ST_FRAG, &frag_source);
+#endif
 
 	glShaderSource(vertex_id, 1, (const char**)&vert_source.data, 0);
 	glShaderSource(frag_id, 1, (const char**)&frag_source.data, 0);
@@ -106,6 +100,7 @@ Shader shader_load_from_file(const char* path) {
 
 	glAttachShader(program_id, vertex_id);
 	glAttachShader(program_id, frag_id);
+
 	glLinkProgram(program_id);
 
 	glValidateProgram(program_id);
@@ -134,15 +129,14 @@ Shader shader_load_from_file(const char* path) {
 	result.view_to_projection_loc = glGetUniformLocation(program_id, "view_to_projection");
 	result.world_to_view_loc = glGetUniformLocation(program_id, "world_to_view");
 	result.texture_loc = glGetUniformLocation(program_id, "ftex");
-
-	result.position_loc = glGetAttribLocation(program_id, "position");
-	result.color_loc = glGetAttribLocation(program_id, "color");
-	result.uv_loc = glGetAttribLocation(program_id, "uv");
+	result.position_loc = 0;
+	result.color_loc = 1;
+	result.uv_loc = 2;
 
 	// @Cleanup: Why can't we free this
 	// p_delete[] buffer;
-	free(fd.data);
-	free(buffer);
+	// free_string(&shader_source);
+	// free(buffer);
 
 	return result;
 }
@@ -160,12 +154,14 @@ void init_renderer() {
 	view_to_projection = m4_identity();
 	world_to_view = m4_identity();
 
+	render_right_handed();
+
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 	glEnable(GL_MULTISAMPLE);
 
 	{
-		solid_shape_shader = shader_load_from_file("res/shaders/solid_shape.glsl");
+		solid_shape_shader = shader_load_from_file("data\\shaders\\solid_shape.frag", "data\\shaders\\solid_shape.vert");
 	}
 
 	{
@@ -443,7 +439,6 @@ void init_renderer() {
 }
 #endif
 
-inline
 void refresh_transformation() {
     if (!current_shader) return;
     

@@ -19,12 +19,12 @@ typedef enum Shader_Type {
 typedef struct Shader {
 	GLuint program_id;
 
-	GLuint view_to_projection_loc;
-	GLuint world_to_view_loc;
+	GLint view_to_projection_loc;
+	GLint world_to_view_loc;
 
-	GLuint position_loc;
-	GLuint color_loc;
-	GLuint uv_loc;
+	GLint position_loc;
+	GLint color_loc;
+	GLint uv_loc;
 
 	GLuint texture_loc;
 } Shader;

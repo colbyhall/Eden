@@ -15,3 +15,5 @@ void append_cstring(String* str, const char* app);
 void append_string(String* str, String* app);
 String string_eat_line(String* str);
 void string_eat_whitespace(String* str);
+
+void free_string(String* str);

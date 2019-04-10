@@ -1,7 +1,5 @@
 #version 330 core
 
-#if VERT
-
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec2 uv;
@@ -17,18 +15,3 @@ void main() {
 	out_color = color;
 	out_uv = uv;
 }
-
-#elif FRAG
-
-out vec4 frag_color;
-
-in vec4 out_color;
-in vec2 out_uv;
-
-uniform sampler2D ftex;
-
-void main() {
-	frag_color = out_color;
-}
-
-#endif

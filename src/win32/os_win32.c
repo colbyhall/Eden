@@ -41,7 +41,30 @@ typedef HRESULT(*Set_Process_DPI_Awareness)(PROCESS_DPI_AWARENESS value);
 
 static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_param) {
 	
-	
+	switch (message) {
+	case WM_SIZE: {
+		RECT rect;
+		GetClientRect(handle, &rect);
+
+		const u32 old_width = window_width;
+		const u32 old_height = window_height;
+
+		window_width = rect.right - rect.left;
+		window_height = rect.bottom - rect.top;
+
+		editor_on_window_resized(&editor, old_width, old_height);
+		// game_state->on_window_resized(old_width, old_height);
+	} break;
+
+	case WM_DESTROY: {
+		// game_state->on_exit_requested();
+		editor.is_running = false;
+	} break;
+	case WM_SIZING: {
+		editor_draw(&editor);
+	} break;
+	}
+
 	return DefWindowProc(handle, message, w_param, l_param);
 }
 
