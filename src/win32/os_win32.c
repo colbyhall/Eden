@@ -1,14 +1,15 @@
 #include "../os.h"
 #include "../editor.h"
-#include "../types.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shlwapi.h>
 
 #include <stdlib.h>
 
 HWND window_handle;
 Editor editor;
+u32 window_width, window_height;
 
 void* os_get_window_handle() {
 	return window_handle;
@@ -20,6 +21,14 @@ void os_poll_window_events() {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
+}
+
+u32 os_window_width() {
+	return window_width;
+}
+
+u32 os_window_height() {
+	return window_height;
 }
 
 typedef enum PROCESS_DPI_AWARENESS {
@@ -70,6 +79,18 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	const u32 pos_y = monitor_height / 2 - window_height / 2;
 
 	window_handle = CreateWindow(window_class.lpszClassName, TEXT("text_editor"), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
+
+#if 0
+	{
+		// @NOTE(Colby): This sucks really bad. I just wanted to set my working direction to parent directory of the exe's directory
+		char exe_path[MAX_PATH];
+		GetModuleFileName(NULL, exe_path, MAX_PATH);
+		// HACK(Colby): This is deprecated but oh well
+		PathRemoveFileSpec(exe_path);
+		SetCurrentDirectory(exe_path);
+		SetCurrentDirectory(TEXT(".."));
+	}
+#endif
 
 	editor_init(&editor);
 	ShowWindow(window_handle, SW_SHOW);
