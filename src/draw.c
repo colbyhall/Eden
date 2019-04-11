@@ -1,6 +1,5 @@
 #include "draw.h"
 #include "os.h"
-#include "string.h"
 
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
@@ -21,12 +20,18 @@ Shader* current_shader;
 Shader solid_shape_shader;
 Shader font_shader;
 
-#if 0
-Framebuffer back_buffer;
-#endif
+typedef enum Shader_Type {
+	ST_NONE,
+	ST_FRAG,
+	ST_VERT,
+} Shader_Type;
 
 void bind_shader(Shader* shader) {
-	glUseProgram(shader->program_id);
+	if (shader == NULL) {
+		glUseProgram(0);
+	} else {
+		glUseProgram(shader->program_id);
+	}
 	current_shader = shader;
 }
 
@@ -61,36 +66,32 @@ void parse_shader_source(String* fd, Shader_Type type, String* out_source) {
 	out_source->data[out_source->length] = 0;
 }
 
-Shader shader_load_from_file(const char* frag, const char* vert) {
+Shader shader_load_from_file(const char* path) {
 	Shader result;
 	GLuint program_id = glCreateProgram();
 
 	GLuint vertex_id = glCreateShader(GL_VERTEX_SHADER);
 	GLuint frag_id = glCreateShader(GL_FRAGMENT_SHADER);
 
-	String vert_source = os_load_file_into_memory(vert);
-	String frag_source = os_load_file_into_memory(frag);
-
-#if 0
 	String shader_source = os_load_file_into_memory(path);
 	// @NOTE(Colby): copy so we can free
-	String fd = shader_source;
 
-	u8* buffer = (u8*)malloc(fd.length * 2 + 2);
+	u8* buffer = (u8*)malloc(shader_source.length * 2 + 2);
 
 	String vert_source;
 	vert_source.length = 0;
-	vert_source.allocated = fd.length + 1;
+	vert_source.allocated = shader_source.length + 1;
 	vert_source.data = buffer;
 
 	String frag_source;
 	frag_source.length = 0;
-	frag_source.allocated = fd.length + 1;
-	frag_source.data = buffer + fd.length + 1;
+	frag_source.allocated = shader_source.length + 1;
+	frag_source.data = buffer + shader_source.length + 1;
 
+	String fd = shader_source;
 	parse_shader_source(&fd, ST_VERT, &vert_source);
+	fd = shader_source;
 	parse_shader_source(&fd, ST_FRAG, &frag_source);
-#endif
 
 	glShaderSource(vertex_id, 1, (const char**)&vert_source.data, 0);
 	glShaderSource(frag_id, 1, (const char**)&frag_source.data, 0);
@@ -160,13 +161,8 @@ void init_renderer() {
 	glEnable(GL_BLEND);
 	glEnable(GL_MULTISAMPLE);
 
-	{
-		solid_shape_shader = shader_load_from_file("data\\shaders\\solid_shape.frag", "data\\shaders\\solid_shape.vert");
-	}
-
-	{
-		// font_shader.load_from_file("res/shaders/font.glsl");
-	}
+	solid_shape_shader = shader_load_from_file("data\\shaders\\solid_shape.glsl");
+	font_shader = shader_load_from_file("data\\shaders\\font.glsl");
 }
 
 void immediate_begin() {
@@ -252,6 +248,50 @@ void draw_rect(float x0, float y0, float x1, float y1, Vector4 color) {
     immediate_begin();
     immediate_quad(x0, y0, x1, y1, color);
     immediate_flush();
+}
+
+void draw_string(String* str, float x, float y, float font_height, Font* font) {
+	const float ratio = font_height / FONT_SIZE;
+
+	const float original_x = x;
+	y += font_height - font->line_gap * ratio;
+
+	bind_shader(&font_shader);
+	refresh_transformation();
+	glUniform1i(font_shader.texture_loc, 0);
+
+	glBindTexture(GL_TEXTURE_2D, font->texture_id);
+	glActiveTexture(GL_TEXTURE0);
+
+	immediate_begin();
+
+	for (size_t i = 0; i < str->length; i++) {
+		Font_Glyph glyph = font->characters[str->data[i] - 32];
+
+		Vector4 color = vec4_color(0xFFFFFF);
+
+		float x0 = x + glyph.bearing_x * ratio;
+		float y0 = y + glyph.bearing_y * ratio;
+		float x1 = x0 + glyph.width * ratio;
+		float y1 = y0 + glyph.height * ratio;
+
+		Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+		Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+		Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+		Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+
+		immediate_vertex(x0, y0, color, top_left);
+		immediate_vertex(x0, y1, color, top_right);
+		immediate_vertex(x1, y0, color, bottom_left);
+
+		immediate_vertex(x0, y1, color, top_right);
+		immediate_vertex(x1, y1, color, bottom_right);
+		immediate_vertex(x1, y0, color, bottom_left);
+
+		x += glyph.advance * ratio;
+	}
+
+	immediate_flush();
 }
 
 #if 0

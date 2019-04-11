@@ -1,8 +1,12 @@
 #pragma once
 #include "types.h"
+#include "font.h"
+
+#define WINDOW_TITLE "YEET"
 
 typedef struct {
 	bool is_running;
+	Font font;
 } Editor;
 
 void editor_init(Editor* editor);

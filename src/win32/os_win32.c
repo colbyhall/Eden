@@ -101,7 +101,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	const u32 pos_x = monitor_width / 2 - window_width / 2;
 	const u32 pos_y = monitor_height / 2 - window_height / 2;
 
-	window_handle = CreateWindow(window_class.lpszClassName, TEXT("text_editor"), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
+	window_handle = CreateWindow(window_class.lpszClassName, TEXT(WINDOW_TITLE), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
 
 #if 0
 	{
@@ -135,7 +135,7 @@ String os_load_file_into_memory(const char* path) {
 		result.data = NULL;
 	}
 
-	SetFilePointer(file_handle, NULL, NULL, FILE_BEGIN);
+	SetFilePointer(file_handle, 0, NULL, FILE_BEGIN);
 
 	const DWORD file_size = GetFileSize(file_handle, NULL);
 
