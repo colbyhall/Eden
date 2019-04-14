@@ -8,7 +8,6 @@
 #include <stdlib.h>
 
 HWND window_handle;
-Editor editor;
 u32 window_width, window_height;
 
 void* os_get_window_handle() {
@@ -52,16 +51,16 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 		window_width = rect.right - rect.left;
 		window_height = rect.bottom - rect.top;
 
-		editor_on_window_resized(&editor, old_width, old_height);
+		editor_on_window_resized(old_width, old_height);
 		// game_state->on_window_resized(old_width, old_height);
 	} break;
 
 	case WM_DESTROY: {
 		// game_state->on_exit_requested();
-		editor.is_running = false;
+		is_running = false;
 	} break;
 	case WM_SIZING: {
-		editor_draw(&editor);
+		editor_draw();
 	} break;
 	}
 
@@ -115,10 +114,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	}
 #endif
 
-	editor_init(&editor);
+	editor_init();
 	ShowWindow(window_handle, SW_SHOW);
-	editor_loop(&editor);
-	editor_shutdown(&editor);
+	editor_loop();
+	editor_shutdown();
 
 	return 0;
 }
@@ -151,4 +150,8 @@ String os_load_file_into_memory(const char* path) {
 	result.allocated = file_size + 1;
 
 	return result;
+}
+
+u64 os_get_ms_time() {
+	return (u64)GetTickCount64();
 }

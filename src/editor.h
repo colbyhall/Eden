@@ -5,15 +5,15 @@
 #define WINDOW_TITLE "YEET"
 
 extern Font font;
+extern u32 fps;
+extern float delta_time;
+extern bool is_running;
 
-typedef struct {
-	bool is_running;
-} Editor;
 
-void editor_init(Editor* editor);
-void editor_loop(Editor* editor);
-void editor_shutdown(Editor* editor);
+void editor_init();
+void editor_loop();
+void editor_shutdown();
 
-void editor_on_window_resized(Editor* editor, u32 old_width, u32 old_height);
+void editor_on_window_resized(u32 old_width, u32 old_height);
 
-void editor_draw(Editor* editor);
+void editor_draw();

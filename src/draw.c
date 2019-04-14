@@ -23,7 +23,8 @@ Shader solid_shape_shader;
 Shader font_shader;
 
 u32 draw_calls;
-u32 verts_uploaded;
+u32 verts_drawn;
+u32 verts_culled;
 
 typedef enum Shader_Type {
 	ST_NONE,
@@ -210,7 +211,7 @@ void immediate_flush() {
     
     glDrawArrays(GL_TRIANGLES, 0, imm_vertex_count);
 	draw_calls += 1;
-	verts_uploaded += imm_vertex_count;
+	verts_drawn += imm_vertex_count;
     
     glDisableVertexAttribArray(position_loc);
     glDisableVertexAttribArray(color_loc);
@@ -277,12 +278,20 @@ void draw_string(String* str, float x, float y, float font_height, Font* font) {
 	immediate_begin();
 
 	for (size_t i = 0; i < str->length; i++) {
-		Font_Glyph glyph = font->characters[str->data[i] - 32];
 
 		if (str->data[i] == '\n') {
 			y += font_height;
 			x = original_x;
+			continue;
 		}
+
+		if (str->data[i] == 9) {
+			Font_Glyph space_glyph = font->characters[' ' - 32];
+			x += space_glyph.advance * ratio * 4.f;
+			continue;
+		}
+
+		Font_Glyph glyph = font->characters[str->data[i] - 32];
 
 		if (!is_whitespace(str->data[i])) {
 			Vector4 color = vec4_color(0xFFFFFF);
@@ -291,6 +300,11 @@ void draw_string(String* str, float x, float y, float font_height, Font* font) {
 			float y0 = y + glyph.bearing_y * ratio;
 			float x1 = x0 + glyph.width * ratio;
 			float y1 = y0 + glyph.height * ratio;
+
+			if (x0 > os_window_width() || x1 < 0.f || y0 > os_window_height() || y1 < 0.f) {
+				verts_culled += 6;
+				continue;
+			}
 
 			Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
 			Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
@@ -306,7 +320,7 @@ void draw_string(String* str, float x, float y, float font_height, Font* font) {
 			immediate_vertex(x1, y0, color, bottom_left);
 		}
 
-		x += glyph.advance *ratio;
+		x += glyph.advance * ratio;
 	}
 
 	immediate_flush();
@@ -372,7 +386,8 @@ void render_right_handed() {
 
 void render_frame_begin() {
 	draw_calls = 0;
-	verts_uploaded = 0;
+	verts_drawn = 0;
+	verts_culled = 0;
 	glClear(GL_COLOR_BUFFER_BIT);
 }
 
@@ -382,7 +397,7 @@ void render_frame_end() {
 	{
 
 		char buffer[256];
-		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts_Uploaded: %i", draw_calls, verts_uploaded);
+		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %i", draw_calls, verts_drawn, verts_culled, fps);
 		String debug_string;
 		debug_string.data = (u8*)&buffer;
 		debug_string.allocated = 256;
