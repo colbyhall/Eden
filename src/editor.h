@@ -4,9 +4,10 @@
 
 #define WINDOW_TITLE "YEET"
 
+extern Font font;
+
 typedef struct {
 	bool is_running;
-	Font font;
 } Editor;
 
 void editor_init(Editor* editor);

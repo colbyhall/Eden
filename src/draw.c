@@ -1,12 +1,14 @@
 #include "draw.h"
 #include "os.h"
+#include "parsing.h"
+#include "editor.h"
 
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
-#define MAX_VERTICES 4000
+#define MAX_VERTICES 30000
 
 GLuint imm_vao;
 GLuint imm_vbo;
@@ -19,6 +21,9 @@ Shader* current_shader;
 
 Shader solid_shape_shader;
 Shader font_shader;
+
+u32 draw_calls;
+u32 verts_uploaded;
 
 typedef enum Shader_Type {
 	ST_NONE,
@@ -204,12 +209,15 @@ void immediate_flush() {
     }
     
     glDrawArrays(GL_TRIANGLES, 0, imm_vertex_count);
+	draw_calls += 1;
+	verts_uploaded += imm_vertex_count;
     
     glDisableVertexAttribArray(position_loc);
     glDisableVertexAttribArray(color_loc);
     glDisableVertexAttribArray(uv_loc);
     
     glBindVertexArray(0);
+
 }
 
 Vertex* get_next_vertex_ptr() {
@@ -217,7 +225,10 @@ Vertex* get_next_vertex_ptr() {
 }
 
 void immediate_vertex(float x, float y, Vector4 color, Vector2 uv) {
-    if (imm_vertex_count >= MAX_VERTICES) immediate_flush();
+	if (imm_vertex_count >= MAX_VERTICES) {
+		immediate_flush();
+		immediate_begin();
+	}
     
     Vertex* vertex = get_next_vertex_ptr();
     
@@ -268,216 +279,72 @@ void draw_string(String* str, float x, float y, float font_height, Font* font) {
 	for (size_t i = 0; i < str->length; i++) {
 		Font_Glyph glyph = font->characters[str->data[i] - 32];
 
-		Vector4 color = vec4_color(0xFFFFFF);
+		if (str->data[i] == '\n') {
+			y += font_height;
+			x = original_x;
+		}
+
+		if (!is_whitespace(str->data[i])) {
+			Vector4 color = vec4_color(0xFFFFFF);
+
+			float x0 = x + glyph.bearing_x * ratio;
+			float y0 = y + glyph.bearing_y * ratio;
+			float x1 = x0 + glyph.width * ratio;
+			float y1 = y0 + glyph.height * ratio;
+
+			Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+
+			immediate_vertex(x0, y0, color, top_left);
+			immediate_vertex(x0, y1, color, top_right);
+			immediate_vertex(x1, y0, color, bottom_left);
+
+			immediate_vertex(x0, y1, color, top_right);
+			immediate_vertex(x1, y1, color, bottom_right);
+			immediate_vertex(x1, y0, color, bottom_left);
+		}
+
+		x += glyph.advance *ratio;
+	}
+
+	immediate_flush();
+}
+
+Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
+	const float ratio = font_height / FONT_SIZE;
+
+	float y = 0.f;
+	float x = 0.f;
+
+	float largest_x = x;
+	float largest_y = y;
+	const float original_x = x;
+	y += font_height - font->line_gap * ratio;
+
+	for (size_t i = 0; i < str->length; i++) {
+		Font_Glyph glyph = font->characters[str->data[i] - 32];
+
+		if (str->data[i] == '\n') {
+			y += font_height;
+			x = original_x;
+		}
 
 		float x0 = x + glyph.bearing_x * ratio;
 		float y0 = y + glyph.bearing_y * ratio;
 		float x1 = x0 + glyph.width * ratio;
 		float y1 = y0 + glyph.height * ratio;
 
-		Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-		Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-		Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-		Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-
-		immediate_vertex(x0, y0, color, top_left);
-		immediate_vertex(x0, y1, color, top_right);
-		immediate_vertex(x1, y0, color, bottom_left);
-
-		immediate_vertex(x0, y1, color, top_right);
-		immediate_vertex(x1, y1, color, bottom_right);
-		immediate_vertex(x1, y0, color, bottom_left);
+		if (y1 > largest_y) largest_y = y1;
 
 		x += glyph.advance * ratio;
+
+		if (x1 > largest_x) largest_x = x1;
 	}
 
-	immediate_flush();
+	return vec2(largest_x, largest_y);
 }
-
-#if 0
-
-void draw_font_atlas(float x0, float y0, float x1, float y1, Font* font) {
-    font_shader.bind();
-    refresh_transformation();
-
-    glUniform1i(font_shader.texture_loc, 0);
-    
-    glBindTexture(GL_TEXTURE_2D, font->texture_id);
-    glActiveTexture(GL_TEXTURE0);
-    
-    immediate_begin();
-    immediate_quad(x0, y0, x1, y1, 1.f);
-    immediate_flush();
-}
-
-void draw_string(const String& str, float x, float y, float font_height, Font* font) {
-    const float ratio = font_height / FONT_SIZE;
-    
-    const float original_x = x;
-    y += font_height - font->line_gap * ratio;
-    
-    font_shader.bind();
-    refresh_transformation();
-    glUniform1i(font_shader.texture_loc, 0);
-    
-    glBindTexture(GL_TEXTURE_2D, font->texture_id);
-    glActiveTexture(GL_TEXTURE0);
-    
-    immediate_begin();
-    
-    for(size_t i = 0; i < str.count; i++) {
-        Font_Glyph& glyph = font->characters[str[i] - 32];
-        
-        Vector4 color = 1.f;
-        
-        float x0 = x + glyph.bearing_x * ratio;
-        float y0 = y + glyph.bearing_y * ratio;
-        float x1 = x0 + glyph.width * ratio;
-        float y1 = y0 + glyph.height * ratio;
-        
-        Vector2 bottom_right = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-        Vector2 bottom_left  = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-        Vector2 top_right    = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-        Vector2 top_left     = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-        
-        immediate_vertex(x0, y0, color, top_left);
-        immediate_vertex(x0, y1, color, top_right);
-        immediate_vertex(x1, y0, color, bottom_left);
-        
-        immediate_vertex(x0, y1, color, top_right);
-        immediate_vertex(x1, y1, color, bottom_right);
-        immediate_vertex(x1, y0, color, bottom_left);
-        
-        x += glyph.advance * ratio;
-    }
-    
-    immediate_flush();
-}
-
-void draw_framebuffer(const Framebuffer& fb, float x0, float y0, float x1, float y1) {
-    back_buffer_shader.bind();
-    refresh_transformation();
-
-    glUniform1i(back_buffer_shader.texture_loc, 0);
-
-    glBindTexture(GL_TEXTURE_2D, fb.color);
-    glActiveTexture(GL_TEXTURE0);
-
-    const Vector4 color = 1.f;
-
-    immediate_begin();
-
-    immediate_vertex(x0, y0, color, Vector2(0.f, 1.f));
-    immediate_vertex(x0, y1, color, Vector2(0.f, 0.f));
-    immediate_vertex(x1, y0, color, Vector2(1.f, 1.f));
-    
-    immediate_vertex(x0, y1, color, Vector2(0.f, 0.f));
-    immediate_vertex(x1, y1, color, Vector2(1.f, 0.f));
-    immediate_vertex(x1, y0, color, Vector2(1.f, 1.f));
-
-    immediate_flush();
-}
-
-void draw_gap_buffer(Gap_Buffer* buffer, float x, float y, float width, float height, float font_height, Font* font) {
-    float ratio = font_height / FONT_SIZE;
-    
-    draw_rect(x, y, x + width, y + height, Vector4(0.2f, 0.5f, 0.1f, 0.2f));
-    
-    float original_x = x;
-    y += font_height - font->line_gap * ratio;
-    
-    font_shader.bind();
-    refresh_transformation();
-    glUniform1i(font_shader.texture_loc, 0);
-    
-    glBindTexture(GL_TEXTURE_2D, font->texture_id);
-    glActiveTexture(GL_TEXTURE0);
-    
-    immediate_begin();
-    
-    u64 size = buffer->allocated;
-    for(int i = 0; i < size; i++) {
-        
-        Font_Glyph& glyph = font->characters[buffer->data[i] - 32];
-        
-        if (buffer->data[i] == '\n' || x + glyph.width * ratio >= width) {
-            y += font_height - font->line_gap * ratio;
-            x = original_x;
-            
-            continue;
-        }
-        
-        Vector4 color = 1.f;
-        
-        if (buffer->data + i == buffer->cursor) {
-            immediate_flush();
-            
-            float x0 = x;
-            float y0 = y - font->ascent * ratio;
-            float x1 = x0 + glyph.advance * ratio; 
-            if (buffer->cursor == buffer->gap) {
-                
-                Font_Glyph& space_glyph = font->characters[' ' - 32];
-                
-                x1 = x0 + space_glyph.advance * ratio;
-                
-            }
-            float y1 = y - ratio * font->descent;
-            
-            draw_rect(x0, y0, x1, y1, Vector4(0.3f, 0.3f, 1.f, 1.f));
-            
-            immediate_begin();
-            
-            font_shader.bind();
-            refresh_transformation();
-            glUniform1i(font_shader.texture_loc, 0);
-            
-            glBindTexture(GL_TEXTURE_2D, font->texture_id);
-            glActiveTexture(GL_TEXTURE0);
-        }
-        
-        if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->gap + buffer->gap_size) {
-            
-            continue;
-        }
-        
-        float x0 = x + glyph.bearing_x * ratio;
-        float y0 = y + glyph.bearing_y * ratio;
-        float x1 = x0 + glyph.width * ratio;
-        float y1 = y0 + glyph.height * ratio;
-        
-        Vector2 bottom_right = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-        Vector2 bottom_left  = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-        Vector2 top_right    = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-        Vector2 top_left     = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-        
-        immediate_vertex(x0, y0, color, top_left);
-        immediate_vertex(x0, y1, color, top_right);
-        immediate_vertex(x1, y0, color, bottom_left);
-        
-        immediate_vertex(x0, y1, color, top_right);
-        immediate_vertex(x1, y1, color, bottom_right);
-        immediate_vertex(x1, y0, color, bottom_left);
-        
-        x += glyph.advance * ratio;
-    }
-    
-    immediate_flush();
-}
-
-
-void init_renderer() {
-    init_immediate();
-    
-    {
-        solid_shape_shader.load_from_file("res/shaders/solid_shape.glsl");
-    }
-    
-    {
-        font_shader.load_from_file("res/shaders/font.glsl");
-    }
-}
-#endif
 
 void refresh_transformation() {
     if (!current_shader) return;
@@ -501,4 +368,47 @@ void render_right_handed() {
     world_to_view      = m4_translate(vec2(-width / 2.f, ortho_size));
     
     refresh_transformation();
+}
+
+void render_frame_begin() {
+	draw_calls = 0;
+	verts_uploaded = 0;
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+void render_frame_end() {
+
+	if (BUILD_DEBUG)
+	{
+
+		char buffer[256];
+		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts_Uploaded: %i", draw_calls, verts_uploaded);
+		String debug_string;
+		debug_string.data = (u8*)&buffer;
+		debug_string.allocated = 256;
+		debug_string.length = strlen(buffer);
+
+		float x = 0.f;
+		float y = 0.f;
+
+		Vector2 padding = vec2s(10.f);
+		{
+			Vector2 string_size = get_draw_string_size(&debug_string, 20.f, &font);
+
+			float x0 = x;
+			float y0 = y;
+			float x1 = x0 + string_size.x + padding.x;
+			float y1 = y0 + string_size.y + padding.y;
+
+			draw_rect(x0, y0, x1, y1, vec4_color(0xAAAAAA));
+		}
+
+		{
+			float x0 = 0.f + padding.x / 2.f;
+			float y0 = 0.f + padding.y / 2.f;
+			draw_string(&debug_string, x0, y0, 20.f, &font);
+		}
+	}
+
+	gl_swap_buffers();
 }

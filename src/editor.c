@@ -6,11 +6,13 @@
 
 #include <assert.h>
 
+Font font;
+
 void editor_init(Editor* editor) {
 	assert(gl_init());
 	init_renderer();
 
-	editor->font = load_font("data\\fonts\\Consolas.ttf");
+	font = load_font("data\\fonts\\Consolas.ttf");
 
 	editor->is_running = true;
 }
@@ -33,7 +35,7 @@ void editor_on_window_resized(Editor* editor, u32 old_width, u32 old_height) {
 }
 
 void editor_draw(Editor* editor) {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	render_frame_begin();
 
 	const float window_width = (float)os_window_width();
 	const float window_height = (float)os_window_height();
@@ -47,20 +49,31 @@ void editor_draw(Editor* editor) {
 		draw_rect(x0, y0, x1, y1, vec4_color(0x1a212d));
 	}
 
+
+
 	{
 		const float height = 20.f;
+		{
+			const float x0 = 0.f;
+			const float y0 = window_height - height * 2.f;
+			const float x1 = window_width;
+			const float y1 = window_height;
 
-		const float x0 = 0.f;
-		const float y0 = window_height - (height * 2.25f);
-		const float x1 = window_width;
-		const float y1 = y0 + height;
+			draw_rect(x0, y0, x1, y1, vec4_color(0x1a212d));
+		}
 
-		draw_rect(x0, y0, x1, y1, vec4_color(0x273244));
+		{
+			const float x0 = 0.f;
+			const float y0 = window_height - (height * 2.25f);
+			const float x1 = window_width;
+			const float y1 = y0 + height;
 
-		String str = make_string("Scratch Buffer");
-		draw_string(&str, x0, y0, height - 2.f, &editor->font);
+			draw_rect(x0, y0, x1, y1, vec4_color(0x273244));
+
+			String str = make_string("Scratch Buffer");
+			draw_string(&str, x0, y0, height - 2.f, &font);
+		}
 	}
 
-
-	gl_swap_buffers();
+	render_frame_end();
 }

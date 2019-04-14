@@ -33,17 +33,18 @@ extern Matrix4 world_to_view;
 extern Shader solid_shape_shader;
 extern Shader font_shader;
 
-void refresh_transformation();
-
 void init_renderer();
 
 void immediate_begin();
 void immediate_flush();
 
-void draw_rect(float x0, float y0, float x1, float y1, Vector4 color);
-// void draw_font_atlas(float x0, float y0, float x1, float y1, Font* font);
-void draw_string(String* str, float x, float y, float font_height, Font* font);
-// void draw_framebuffer(const Framebuffer& fb, float x0, float y0, float x1, float y1);
-// void draw_gap_buffer(Gap_Buffer* buffer, float x, float y, float width, float height, float font_height, Font* font);
+void render_frame_begin();
+void render_frame_end();
 
+void draw_rect(float x0, float y0, float x1, float y1, Vector4 color);
+void draw_string(String* str, float x, float y, float font_height, Font* font);
+
+Vector2 get_draw_string_size(String* str, float font_height, Font* font);
+
+void refresh_transformation();
 void render_right_handed();

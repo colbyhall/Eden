@@ -46,7 +46,6 @@ bool string_starts_with(String* str, const char* cstr, bool case_matters) {
 	return true;
 }
 
-
 void append_cstring(String* str, const char* app) {
 	size_t app_length = strlen(app);
 	

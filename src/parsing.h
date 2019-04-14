@@ -2,6 +2,7 @@
 
 #include "types.h"
 
+bool is_eof(u8 c);
 bool is_eol(u8 c);
 bool is_whitespace(u8 c);
 bool is_letter(u8 c);
