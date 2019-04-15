@@ -65,7 +65,7 @@ String string_eat_line(String* str) {
 
 	String result;
 	for (size_t i = 0; i < str->length; i++) {
-		if (is_eol(str->data[i])) {
+		if (is_eol(str->data[i]) || is_eof(str->data[i])) {
 			result.data = str->data;
 			result.length = i;
 			result.allocated = i;

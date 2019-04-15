@@ -62,6 +62,11 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 	case WM_SIZING: {
 		editor_draw();
 	} break;
+
+	case WM_MOUSEWHEEL: {
+		float delta = GET_WHEEL_DELTA_WPARAM(w_param);
+		editor_on_mousewheel_scrolled(delta);
+	} break;
 	}
 
 	return DefWindowProc(handle, message, w_param, l_param);

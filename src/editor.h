@@ -15,5 +15,6 @@ void editor_loop();
 void editor_shutdown();
 
 void editor_on_window_resized(u32 old_width, u32 old_height);
+void editor_on_mousewheel_scrolled(float delta);
 
 void editor_draw();

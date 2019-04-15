@@ -301,7 +301,7 @@ void draw_string(String* str, float x, float y, float font_height, Font* font) {
 			float x1 = x0 + glyph.width * ratio;
 			float y1 = y0 + glyph.height * ratio;
 
-			if (x0 > os_window_width() || x1 < 0.f || y0 > os_window_height() || y1 < 0.f) {
+			if (x0 > os_window_width() || x1 < 0.f || y > os_window_height() || y + font_height < 0.f) {
 				verts_culled += 6;
 				continue;
 			}
@@ -397,18 +397,18 @@ void render_frame_end() {
 	{
 
 		char buffer[256];
-		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %i", draw_calls, verts_drawn, verts_culled, fps);
+		sprintf_s((char* const)&buffer, 256, "  Draw Calls: %i\n Verts Drawn: %i\nVerts Culled: %i\n         FPS: %i", draw_calls, verts_drawn, verts_culled, fps);
 		String debug_string;
 		debug_string.data = (u8*)&buffer;
 		debug_string.allocated = 256;
 		debug_string.length = strlen(buffer);
 
-		float x = 0.f;
+		Vector2 string_size = get_draw_string_size(&debug_string, 20.f, &font);
+		Vector2 padding = vec2s(10.f);
+		float x = os_window_width() - (string_size.x + padding.x);
 		float y = 0.f;
 
-		Vector2 padding = vec2s(10.f);
 		{
-			Vector2 string_size = get_draw_string_size(&debug_string, 20.f, &font);
 
 			float x0 = x;
 			float y0 = y;
@@ -419,8 +419,8 @@ void render_frame_end() {
 		}
 
 		{
-			float x0 = 0.f + padding.x / 2.f;
-			float y0 = 0.f + padding.y / 2.f;
+			float x0 = x + padding.x / 2.f;
+			float y0 = y + padding.y / 2.f;
 			draw_string(&debug_string, x0, y0, 20.f, &font);
 		}
 	}

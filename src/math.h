@@ -39,3 +39,5 @@ Matrix4 m4_translate(Vector2 pos);
 
 Matrix4 m4_multiply(Matrix4* left, Matrix4* right);
 void m4_muleq(Matrix4* left, Matrix4* right);
+
+float finterpto(float current, float target, float delta_time, float speed);

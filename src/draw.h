@@ -29,7 +29,7 @@ void bind_shader(Shader* shader);
 
 extern Matrix4 view_to_projection;
 extern Matrix4 world_to_view;
-
+ 
 extern Shader solid_shape_shader;
 extern Shader font_shader;
 

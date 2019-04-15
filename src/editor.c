@@ -3,11 +3,15 @@
 #include "opengl.h"
 #include "draw.h"
 #include "string.h"
+#include "buffer.h"
 
 #include <assert.h>
 
 Font font;
-String test;
+
+Buffer test_buffer;
+
+Buffer* current_buffer;
 
 u32 fps;
 u32 fps_frame_count;
@@ -16,15 +20,34 @@ bool is_running;
 float delta_time;
 u64 last_frame_time;
 
+float scroll_speed;
+
+typedef struct Buffer_View {
+	Buffer* buffer;
+	float desired_scroll_y;
+	float current_scroll_y;
+} Buffer_View;
+
+Buffer_View test_buffer_view;
+
 void editor_init() {
 	assert(gl_init());
 	init_renderer();
 
 	font = load_font("data\\fonts\\Consolas.ttf");
-	test = os_load_file_into_memory("src\\draw.c");
+	test_buffer = make_buffer();
+	buffer_load_from_file(&test_buffer, "src\\draw.c");
+
+	current_buffer = &test_buffer;
+
+	test_buffer_view.buffer = current_buffer;
+	test_buffer_view.desired_scroll_y = 0.f;
+	test_buffer_view.current_scroll_y = 0.f;
 
 	fps = 0;
 	fps_frame_count = 0;
+	scroll_speed = 5.f;
+
 
 	is_running = true;
 }
@@ -42,8 +65,11 @@ void editor_loop() {
 			fps = fps_frame_count;
 			fps_frame_count = 0;
 		}
-
 		os_poll_window_events();
+
+
+
+		test_buffer_view.current_scroll_y = finterpto(test_buffer_view.current_scroll_y, test_buffer_view.desired_scroll_y, delta_time, scroll_speed);
 
 		editor_draw();
 	}
@@ -56,6 +82,13 @@ void editor_shutdown() {
 void editor_on_window_resized(u32 old_width, u32 old_height) {
 	glViewport(0, 0, os_window_width(), os_window_height());
 	render_right_handed();
+}
+
+void editor_on_mousewheel_scrolled(float delta) {
+	test_buffer_view.desired_scroll_y -= delta;
+
+	if (test_buffer_view.desired_scroll_y < 0.f) test_buffer_view.desired_scroll_y = 0.f;
+
 }
 
 void editor_draw() {
@@ -76,7 +109,10 @@ void editor_draw() {
 
 	// @NOTE(Colby): Buffer drawing goes here
 	{
-		draw_string(&test, 0.f, 0.f, 20.f, &font);
+		String out_string;
+		out_string.length = current_buffer->size;
+		out_string.data = current_buffer->data;
+		draw_string(&out_string, 0.f, 0.f - test_buffer_view.current_scroll_y, 20.f, &font);
 	}
 
 	{
@@ -102,7 +138,7 @@ void editor_draw() {
 
 			draw_rect(x0, y0, x1, y1, vec4_color(0x273244));
 
-			String str = make_string("  draw.c");
+			String str = make_string(current_buffer->path);
 			draw_string(&str, x0, y0 + padding.y / 2.f, height - 2.f, &font);
 		}
 	}

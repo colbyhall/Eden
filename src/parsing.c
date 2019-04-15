@@ -1,11 +1,13 @@
 #include "parsing.h"
 
+#define EOF 0
+
 bool is_eof(u8 c) {
-	return c == 0;
+	return c == EOF;
 }
 
 bool is_eol(u8 c) {
-	return is_eof(c) || c == '\n' || c == '\r';
+	return c == '\n' || c == '\r';
 }
 
 bool is_whitespace(u8 c) {

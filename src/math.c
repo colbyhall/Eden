@@ -130,3 +130,28 @@ void m4_muleq(Matrix4* left, Matrix4* right) {
 	Matrix4 result = m4_multiply(left, right);
 	*left = result;
 }
+
+#define SMALL_NUMBER		(1.e-8f)
+
+float fclamp(float value, float min, float max) {
+	if (value < min) return min;
+	if (value > max) return max;
+	return value;
+}
+
+float finterpto(float current, float target, float delta_time, float speed) {
+
+	if (speed <= 0.f) {
+		return target;
+	}
+
+	const float distance = target - current;
+
+	if (distance * distance < SMALL_NUMBER) {
+		return target;
+	}
+
+	const float delta_move = distance * fclamp(delta_time * speed, 0.f, 1.f);
+
+	return current + delta_move;
+}
