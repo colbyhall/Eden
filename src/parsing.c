@@ -11,7 +11,7 @@ bool is_eol(u8 c) {
 }
 
 bool is_whitespace(u8 c) {
-	return is_eol(c) || c == ' ';
+	return is_eol(c) || c == ' ' || c == '\t';
 }
 
 bool is_letter(u8 c) {

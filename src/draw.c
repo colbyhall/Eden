@@ -32,7 +32,7 @@ typedef enum Shader_Type {
 	ST_VERT,
 } Shader_Type;
 
-void bind_shader(Shader* shader) {
+void bind_shader(Shader* shader) {	
 	if (shader == NULL) {
 		glUseProgram(0);
 	} else {
@@ -262,20 +262,12 @@ void draw_rect(float x0, float y0, float x1, float y1, Vector4 color) {
     immediate_flush();
 }
 
-void draw_string(String* str, float x, float y, float font_height, Font* font) {
+void immediate_string(String* str, float x, float y, float font_height, int color) {
+
 	const float ratio = font_height / FONT_SIZE;
 
 	const float original_x = x;
-	y += font_height - font->line_gap * ratio;
-
-	bind_shader(&font_shader);
-	refresh_transformation();
-	glUniform1i(font_shader.texture_loc, 0);
-
-	glBindTexture(GL_TEXTURE_2D, font->texture_id);
-	glActiveTexture(GL_TEXTURE0);
-
-	immediate_begin();
+	y += font_height - font.line_gap * ratio;
 
 	for (size_t i = 0; i < str->length; i++) {
 
@@ -285,16 +277,16 @@ void draw_string(String* str, float x, float y, float font_height, Font* font) {
 			continue;
 		}
 
-		if (str->data[i] == 9) {
-			Font_Glyph space_glyph = font->characters[' ' - 32];
+		if (str->data[i] == '\t') {
+			Font_Glyph space_glyph = font.characters[' ' - 32];
 			x += space_glyph.advance * ratio * 4.f;
 			continue;
 		}
 
-		Font_Glyph glyph = font->characters[str->data[i] - 32];
+		Font_Glyph glyph = font.characters[str->data[i] - 32];
 
 		if (!is_whitespace(str->data[i])) {
-			Vector4 color = vec4_color(0xFFFFFF);
+			Vector4 v4_color = vec4_color(color);
 
 			float x0 = x + glyph.bearing_x * ratio;
 			float y0 = y + glyph.bearing_y * ratio;
@@ -311,18 +303,34 @@ void draw_string(String* str, float x, float y, float font_height, Font* font) {
 			Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
 			Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
 
-			immediate_vertex(x0, y0, color, top_left);
-			immediate_vertex(x0, y1, color, top_right);
-			immediate_vertex(x1, y0, color, bottom_left);
+			immediate_vertex(x0, y0, v4_color, top_left);
+			immediate_vertex(x0, y1, v4_color, top_right);
+			immediate_vertex(x1, y0, v4_color, bottom_left);
 
-			immediate_vertex(x0, y1, color, top_right);
-			immediate_vertex(x1, y1, color, bottom_right);
-			immediate_vertex(x1, y0, color, bottom_left);
+			immediate_vertex(x0, y1, v4_color, top_right);
+			immediate_vertex(x1, y1, v4_color, bottom_right);
+			immediate_vertex(x1, y0, v4_color, bottom_left);
 		}
 
 		x += glyph.advance * ratio;
 	}
+}
 
+void immediate_cstring(const char* str, float x, float y, float font_height, int color) {
+	String cstr_s = make_string(str);
+	immediate_string(&cstr_s, x, y, font_height, color);
+}
+
+void draw_string(String* str, float x, float y, float font_height, int color) {
+	bind_shader(&font_shader);
+	refresh_transformation();
+	glUniform1i(font_shader.texture_loc, 0);
+
+	glBindTexture(GL_TEXTURE_2D, font.texture_id);
+	glActiveTexture(GL_TEXTURE0);
+
+	immediate_begin();
+	immediate_string(str, x, y, font_height, color);
 	immediate_flush();
 }
 
@@ -343,18 +351,20 @@ Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
 		if (str->data[i] == '\n') {
 			y += font_height;
 			x = original_x;
+		} else if (str->data[i] == '\t') {
+			Font_Glyph space_glyph = font->characters[' ' - 32];
+			x += space_glyph.advance * ratio * 4.f;
+		} else {
+			float x0 = x + glyph.bearing_x * ratio;
+			float y0 = y + glyph.bearing_y * ratio;
+			float x1 = x0 + glyph.width * ratio;
+			float y1 = y0 + glyph.height * ratio;
+			x += glyph.advance * ratio;
+			if (y1 > largest_y) largest_y = y1;
 		}
 
-		float x0 = x + glyph.bearing_x * ratio;
-		float y0 = y + glyph.bearing_y * ratio;
-		float x1 = x0 + glyph.width * ratio;
-		float y1 = y0 + glyph.height * ratio;
 
-		if (y1 > largest_y) largest_y = y1;
-
-		x += glyph.advance * ratio;
-
-		if (x1 > largest_x) largest_x = x1;
+		if (x > largest_x) largest_x = x;
 	}
 
 	return vec2(largest_x, largest_y);
@@ -397,13 +407,13 @@ void render_frame_end() {
 	{
 
 		char buffer[256];
-		sprintf_s((char* const)&buffer, 256, "  Draw Calls: %i\n Verts Drawn: %i\nVerts Culled: %i\n         FPS: %i", draw_calls, verts_drawn, verts_culled, fps);
+		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %i", draw_calls, verts_drawn, verts_culled, fps);
 		String debug_string;
 		debug_string.data = (u8*)&buffer;
 		debug_string.allocated = 256;
 		debug_string.length = strlen(buffer);
 
-		Vector2 string_size = get_draw_string_size(&debug_string, 20.f, &font);
+		Vector2 string_size = get_draw_string_size(&debug_string, FONT_SIZE, &font);
 		Vector2 padding = vec2s(10.f);
 		float x = os_window_width() - (string_size.x + padding.x);
 		float y = 0.f;
@@ -421,7 +431,7 @@ void render_frame_end() {
 		{
 			float x0 = x + padding.x / 2.f;
 			float y0 = y + padding.y / 2.f;
-			draw_string(&debug_string, x0, y0, 20.f, &font);
+			draw_string(&debug_string, x0, y0, 20.f, 0xFFFFFF);
 		}
 	}
 

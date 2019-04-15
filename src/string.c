@@ -81,6 +81,60 @@ String string_eat_line(String* str) {
 	return result;
 }
 
+bool string_equals_cstr(String* str, const char* cstr) {
+	String cstr_s = make_string(cstr);
+	return string_equals(str, &cstr_s);
+}
+
+bool string_equals(String* left, String* right) {
+	if (left->length != right->length) return false;
+
+	for (size_t i = 0; i < left->length; i++) {
+		if (left->data[i] != right->data[i]) return false;
+	}
+
+	return true;
+}
+
+String string_eat_until_char(String* str, u8 c) {
+	// string_eat_whitespace(str);
+
+	String result;
+	for (size_t i = 0; i < str->length; i++) {
+		if (str->data[i] == c) {
+			result.data = str->data;
+			result.length = i;
+			result.allocated = i;
+			advance_string(str, i + 1);
+
+			return result;
+		}
+	}
+
+	String copy = *str;
+	advance_string(str, str->length);
+	return copy;
+}
+
+String string_eat_word(String* str) {
+	string_eat_whitespace(str);
+
+	for (size_t i = 0; i < str->length; i++) {
+		if (is_whitespace(str->data[i])) {
+			String result;
+			result.data = str->data;
+			result.length = i;
+			result.allocated = i;
+			advance_string(str, i);
+
+			return result;
+		}
+	}
+	String copy = *str;
+	advance_string(str, str->length);
+	return copy;
+}
+
 void string_eat_whitespace(String* str) {
 	while (str->length > 0 && is_whitespace(str->data[0])) {
 		advance_string(str, 1);

@@ -49,7 +49,7 @@ bool gl_init() {
 			if (wglMakeCurrent(window_context, glrc)) {
 				wglChoosePixelFormatARB = (WGL_Choose_Pixel_Format_ARB *)wglGetProcAddress("wglChoosePixelFormatARB");
 				wglCreateContextAttribsARB = (WGL_Create_Context_Attribs_ARB *)wglGetProcAddress("wglCreateContextAttribsARB");
-
+				wglSwapIntervalEXT = (WGL_Swap_Interval_Ext *)wglGetProcAddress("wglSwapIntervalEXT");
 				wglMakeCurrent(0, 0);
 			}
 

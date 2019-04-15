@@ -38,7 +38,7 @@
 typedef HGLRC WINAPI WGL_Create_Context_Attribs_ARB(HDC hdc, HGLRC share_context, const s32* attrib_list);
 typedef bool WINAPI WGL_Choose_Pixel_Format_ARB(HDC hdc, const s32 *int_attrib_list, const float *float_attrib_list, u32 max_formats, s32 *int_formats, u32 *num_formats);
 
-typedef bool(*WGL_Swap_Interval_Ext)(s32 interval);
+typedef bool WINAPI WGL_Swap_Interval_Ext(s32 interval);
 
 extern WGL_Create_Context_Attribs_ARB* wglCreateContextAttribsARB;
 extern WGL_Choose_Pixel_Format_ARB* wglChoosePixelFormatARB;

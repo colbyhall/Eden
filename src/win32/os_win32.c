@@ -121,6 +121,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	editor_init();
 	ShowWindow(window_handle, SW_SHOW);
+	wglSwapIntervalEXT(0);
 	editor_loop();
 	editor_shutdown();
 
