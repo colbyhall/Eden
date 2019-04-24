@@ -2,6 +2,7 @@
 #include "os.h"
 #include "parsing.h"
 #include "editor.h"
+#include "stretchy_buffer.h"
 
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
@@ -336,7 +337,14 @@ void draw_buffer(Buffer* buffer, float x, float y) {
 
 	immediate_begin();
 
-	for (size_t i = 0; i < buffer->allocated; i++) {
+	const size_t line_numbers_down = -y / FONT_SIZE;
+
+	u32 start_index = 0;
+	for (size_t i = 0; i < line_numbers_down; i++) {
+		start_index += buffer->line_table[i];
+	}
+
+	for (size_t i = start_index; i < buffer->allocated; i++) {
 
 		if (buffer->data[i] == '\n') {
 			y += font_height;
@@ -391,9 +399,14 @@ void draw_buffer(Buffer* buffer, float x, float y) {
 			float x1 = x0 + glyph.width;
 			float y1 = y0 + glyph.height;
 
-			if (x0 > os_window_width() || x1 < 0.f || y > os_window_height() || y + font_height < 0.f) {
+			if (x0 > os_window_width() || x1 < 0.f || y < 0.f) {
 				verts_culled += 6;
 				continue;
+			}
+
+			// @NOTE(Colby): If we're below the window just break so we dont waste time
+			if (y > os_window_height()) {
+				break;
 			}
 
 			Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);

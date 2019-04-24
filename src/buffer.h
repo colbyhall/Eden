@@ -27,6 +27,9 @@ typedef struct Buffer {
 	u8* gap;
 	size_t gap_size;
 
+	// @NOTE(Colby): Stretchy Buffer that keeps the delta between lines
+	u32* line_table;
+
 	u64 current_line_number;
 	u64 desired_column_number;
 	u64 current_column_number;
