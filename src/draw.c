@@ -321,6 +321,70 @@ void immediate_cstring(const char* str, float x, float y, float font_height, int
 	immediate_string(&cstr_s, x, y, font_height, color);
 }
 
+void draw_buffer(Buffer* buffer, float x, float y) {
+	const float font_height = FONT_SIZE;
+	const float original_x = x;
+	
+	y += font_height - font.line_gap;
+
+	bind_shader(&font_shader);
+	refresh_transformation();
+	glUniform1i(font_shader.texture_loc, 0);
+
+	glBindTexture(GL_TEXTURE_2D, font.texture_id);
+	glActiveTexture(GL_TEXTURE0);
+
+	for (size_t i = 0; i < buffer->allocated; i++) {
+
+		if (buffer->data[i] == '\n') {
+			y += font_height;
+			x = original_x;
+			continue;
+		}
+
+		if (buffer->data[i] == '\t') {
+			Font_Glyph space_glyph = font.characters[' ' - 32];
+			x += space_glyph.advance * 4.f;
+			continue;
+		}
+
+		Font_Glyph glyph = font.characters[buffer->data[i] - 32];
+
+		if (!is_whitespace(buffer->data[i])) {
+			Vector4 v4_color = vec4_color(0xFFFFFF);
+
+			float x0 = x + glyph.bearing_x;
+			float y0 = y + glyph.bearing_y;
+			float x1 = x0 + glyph.width;
+			float y1 = y0 + glyph.height;
+
+			if (x0 > os_window_width() || x1 < 0.f || y > os_window_height() || y + font_height < 0.f) {
+				verts_culled += 6;
+				continue;
+			}
+
+			if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->gap + buffer->gap_size) {
+				continue;
+			}
+
+			Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+
+			immediate_vertex(x0, y0, v4_color, top_left);
+			immediate_vertex(x0, y1, v4_color, top_right);
+			immediate_vertex(x1, y0, v4_color, bottom_left);
+
+			immediate_vertex(x0, y1, v4_color, top_right);
+			immediate_vertex(x1, y1, v4_color, bottom_right);
+			immediate_vertex(x1, y0, v4_color, bottom_left);
+		}
+
+		x += glyph.advance;
+	}
+}
+
 void draw_string(String* str, float x, float y, float font_height, int color) {
 	bind_shader(&font_shader);
 	refresh_transformation();

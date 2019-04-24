@@ -67,6 +67,12 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 		float delta = GET_WHEEL_DELTA_WPARAM(w_param);
 		editor_on_mousewheel_scrolled(delta);
 	} break;
+
+	case WM_CHAR: {
+		u8 key = w_param;
+		editor_on_key_pressed(key);
+	} break;
+
 	}
 
 	return DefWindowProc(handle, message, w_param, l_param);
@@ -160,4 +166,21 @@ String os_load_file_into_memory(const char* path) {
 
 u64 os_get_ms_time() {
 	return (u64)GetTickCount64();
+}
+
+void os_set_cursor_type(OS_Cursor_Type type) {
+	HCURSOR new_cursor = NULL;
+	switch (type) {
+	case CT_Arrow:
+		new_cursor = LoadCursor(NULL, IDC_ARROW);
+		break;
+	case CT_HResize:
+		new_cursor = LoadCursor(NULL, IDC_SIZENS);
+		break;
+	case CT_VResize:
+		new_cursor = LoadCursor(NULL, IDC_SIZEWE);
+		break;
+	}
+
+	SetCursor(new_cursor);
 }

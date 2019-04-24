@@ -36,7 +36,7 @@ void editor_init() {
 
 	font = load_font("data\\fonts\\Consolas.ttf");
 	test_buffer = make_buffer();
-	buffer_load_from_file(&test_buffer, "src\\draw.c");
+	buffer_init_from_size(&test_buffer, 0);
 
 	current_buffer = &test_buffer;
 
@@ -67,8 +67,6 @@ void editor_loop() {
 		}
 		os_poll_window_events();
 
-
-
 		test_buffer_view.current_scroll_y = finterpto(test_buffer_view.current_scroll_y, test_buffer_view.desired_scroll_y, delta_time, scroll_speed);
 
 		editor_draw();
@@ -91,6 +89,12 @@ void editor_on_mousewheel_scrolled(float delta) {
 
 }
 
+void editor_on_key_pressed(u8 key) {
+	if (current_buffer) {
+		buffer_add_char(current_buffer, key);
+	}
+}
+
 void editor_draw() {
 	render_frame_begin();
 
@@ -109,60 +113,7 @@ void editor_draw() {
 
 	// @NOTE(Colby): Buffer drawing goes here
 	{
-		String out_string;
-		out_string.data = current_buffer->data;
-		out_string.length = current_buffer->size;
-		out_string.allocated = current_buffer->size;
-
-#if 0
-		bind_shader(&font_shader);
-		refresh_transformation();
-		glUniform1i(font_shader.texture_loc, 0);
-
-		glBindTexture(GL_TEXTURE_2D, font.texture_id);
-		glActiveTexture(GL_TEXTURE0);
-
-		immediate_begin();
-
-		float space_width = 0.f;
-		{
-			String space_string = make_string(" ");
-			space_width = get_draw_string_size(&space_string, FONT_SIZE, &font).x;
-		}
-
-		float x = 0.f;
-		const float original_x = x;
-		float y = -test_buffer_view.current_scroll_y;
-
-		String line = string_eat_line(&out_string);
-		while (line.length > 0) {
-			String word = string_eat_until_char(&line, ' ');
-			while (word.length > 0) {
-				int color = 0xFFFFFF;
-
-				if (string_equals_cstr(&word, "u32")) {
-					color = 0x42f46e;
-				} else if (string_equals_cstr(&word, "void")) {
-					color = 0x42f46e;
-				} else if (string_equals_cstr(&word, "bool")) {
-					color = 0x42f46e;
-				}
-
-				Vector2 word_size = get_draw_string_size(&word, FONT_SIZE, &font);
-				immediate_string(&word, x, y, FONT_SIZE, color);
-				x += space_width;
-				x += word_size.x;
-				word = string_eat_until_char(&line, ' ');
-			}
-			x = original_x;
-			y += FONT_SIZE;
-			line = string_eat_line(&out_string);
-		}
-
-		immediate_flush();
-#else
-	draw_string(&out_string, 0.f, 0.f - test_buffer_view.current_scroll_y, FONT_SIZE, 0xFFFFFF);
-#endif
+		draw_buffer(current_buffer, 0.f, -test_buffer_view.current_scroll_y);
 	}
 
 	{
@@ -182,7 +133,7 @@ void editor_draw() {
 		// @NOTE(Colby): Info Bar
 		{
 			const float height = FONT_SIZE;
-			Vector2 padding = vec2s(10.f);
+			Vector2 padding = vec2s(15.f);
 
 			const float x0 = 0.f;
 			const float y0 = window_height - command_bar_height - height - padding.y / 2.f;
@@ -191,8 +142,8 @@ void editor_draw() {
 
 			draw_rect(x0, y0, x1, y1, vec4_color(0x273244));
 
-			String str = make_string(current_buffer->path);
-			draw_string(&str, x0, y0, FONT_SIZE, 0xFFFFFF);
+			// String str = make_string(current_buffer->path);
+			// draw_string(&str, x0, y0, FONT_SIZE, 0xFFFFFF);
 		}
 	}
 
