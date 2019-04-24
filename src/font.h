@@ -4,18 +4,15 @@
 #include "opengl.h"
 
 typedef struct Font_Glyph {
-
 	float width, height;
 	float bearing_x, bearing_y;
 	float advance;
 
 	u32 x0, y0, x1, y1;
-
 } Font_Glyph;
 
 
 typedef struct Bitmap {
-
 	s32 width, height;
 	u8* data;
 } Bitmap;

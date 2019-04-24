@@ -4,8 +4,10 @@
 #include "draw.h"
 #include "string.h"
 #include "buffer.h"
+#include "input.h"
 
 #include <assert.h>
+#include <stdio.h>
 
 Font font;
 
@@ -36,7 +38,7 @@ void editor_init() {
 
 	font = load_font("data\\fonts\\Consolas.ttf");
 	test_buffer = make_buffer();
-	buffer_init_from_size(&test_buffer, 0);
+	buffer_load_from_file(&test_buffer, "src\\draw.c");
 
 	current_buffer = &test_buffer;
 
@@ -90,7 +92,14 @@ void editor_on_mousewheel_scrolled(float delta) {
 }
 
 void editor_on_key_pressed(u8 key) {
-	if (current_buffer) {
+	if (!current_buffer) {
+		return;
+	}
+
+	switch (key) {
+	case KEY_ENTER:
+		buffer_add_char(current_buffer, '\n');
+	default:
 		buffer_add_char(current_buffer, key);
 	}
 }
@@ -127,7 +136,7 @@ void editor_draw() {
 
 			draw_rect(x0, y0, x1, y1, vec4_color(0x1a212d));
 			String str = make_string("ctrl-shift o");
-			draw_string(&str, x0, y0 + 2.f, FONT_SIZE, 0xFFFFFF);
+			draw_string(&str, x0, y0 + 3.f, FONT_SIZE, 0xFFFFFF);
 		}
 
 		// @NOTE(Colby): Info Bar
@@ -142,8 +151,13 @@ void editor_draw() {
 
 			draw_rect(x0, y0, x1, y1, vec4_color(0x273244));
 
-			// String str = make_string(current_buffer->path);
-			// draw_string(&str, x0, y0, FONT_SIZE, 0xFFFFFF);
+			char buffer[256];
+			sprintf_s(buffer, 256, "%s      LN: %llu      COL: %llu", current_buffer->path, current_buffer->current_line_number, current_buffer->current_column_number);
+			String str;
+			str.data = buffer;
+			str.allocated = 256;
+			str.length = strlen(buffer);
+			draw_string(&str, x0, y0 + 3.f, FONT_SIZE, 0xFFFFFF);
 		}
 	}
 

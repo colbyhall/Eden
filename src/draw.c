@@ -352,6 +352,37 @@ void draw_buffer(Buffer* buffer, float x, float y) {
 
 		Font_Glyph glyph = font.characters[buffer->data[i] - 32];
 
+		if (buffer->data + i == buffer->cursor) {
+			immediate_flush();
+
+			const float x0 = x;
+			const float y0 = y - font.ascent;
+			float x1 = x0 + glyph.advance;
+			if (buffer->cursor == buffer->gap) {
+
+				Font_Glyph space_glyph = font.characters[' ' - 32];
+
+				x1 = x0 + space_glyph.advance;
+
+			}
+			const float y1 = y - font.descent;
+
+			draw_rect(x0, y0, x1, y1, vec4_color(0xFFFFFF));
+
+			immediate_begin();
+
+			bind_shader(&font_shader);
+			refresh_transformation();
+			glUniform1i(font_shader.texture_loc, 0);
+
+			glBindTexture(GL_TEXTURE_2D, font.texture_id);
+			glActiveTexture(GL_TEXTURE0);
+		}
+
+		if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->gap + buffer->gap_size) {
+			continue;
+		}
+
 		if (!is_whitespace(buffer->data[i])) {
 			Vector4 v4_color = vec4_color(0xFFFFFF);
 
@@ -362,10 +393,6 @@ void draw_buffer(Buffer* buffer, float x, float y) {
 
 			if (x0 > os_window_width() || x1 < 0.f || y > os_window_height() || y + font_height < 0.f) {
 				verts_culled += 6;
-				continue;
-			}
-
-			if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->gap + buffer->gap_size) {
 				continue;
 			}
 
@@ -471,7 +498,7 @@ void render_frame_begin() {
 
 void render_frame_end() {
 
-	if (BUILD_DEBUG)
+	// if (BUILD_DEBUG)
 	{
 
 		char buffer[256];

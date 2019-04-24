@@ -41,6 +41,26 @@ static void buffer_move_gap_to_cursor(Buffer* buffer) {
 	}
 }
 
+static void buffer_update_cursor_info(Buffer* buffer) {
+	u32 line_count = 1;
+	u32 column_number = 0;
+	for (size_t i = 0; i < buffer->allocated; i++) {
+		if (buffer->data + i == buffer->cursor) {
+			buffer->current_line_number = line_count;
+			buffer->current_column_number = column_number;
+			buffer->desired_column_number = column_number;
+			return;
+		}
+
+		column_number += 1;
+
+		if (is_eol(buffer->data[i])) {
+			line_count += 1;
+			column_number = 0;
+		}
+	}
+}
+
 void buffer_load_from_file(Buffer* buffer, const char* path) {
 	buffer->path = (u8*)path;
 	FILE* fd = fopen(path, "rb");
@@ -73,6 +93,7 @@ void buffer_load_from_file(Buffer* buffer, const char* path) {
 		}
 	}
 	buffer->line_count = line_count;
+	buffer_update_cursor_info(buffer);
 }
 
 void buffer_init_from_size(Buffer* buffer, size_t size) {
@@ -84,6 +105,8 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	buffer->gap = buffer->data;
 	buffer->gap_size = size;
 	buffer->line_count = 1;
+
+	buffer_update_cursor_info(buffer);
 }
 
 void buffer_add_char(Buffer* buffer, u8 c) {
@@ -93,4 +116,13 @@ void buffer_add_char(Buffer* buffer, u8 c) {
 	buffer->cursor += 1;
 	buffer->gap += 1;
 	buffer->gap_size -= 1;
+
+	if (is_eol(c)) {
+		buffer->current_line_number += 1;
+		buffer->current_column_number = 0;
+		buffer->desired_column_number = 0;
+	} else {
+		buffer->current_column_number += 1;
+		buffer->desired_column_number += 1;
+	}
 }
