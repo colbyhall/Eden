@@ -127,7 +127,7 @@ void editor_draw() {
 
 			draw_rect(x0, y0, x1, y1, vec4_color(0x1a212d));
 			String str = make_string("ctrl-shift o");
-			draw_string(&str, x0, y0 + 2.5f, FONT_SIZE, 0xFFFFFF);
+			draw_string(&str, x0, y0 + 2.f, FONT_SIZE, 0xFFFFFF);
 		}
 
 		// @NOTE(Colby): Info Bar

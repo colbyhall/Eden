@@ -34,7 +34,10 @@ Font load_font(const char* path) {
 	pr.num_chars = NUM_CHARACTERS;
 	pr.font_size = FONT_SIZE;
 
-	// stbtt_PackSetOversampling(&pc, 2, 2);
+	const u32 h_oversample = 4;
+	const u32 v_oversample = 4;
+
+	stbtt_PackSetOversampling(&pc, h_oversample, v_oversample);
 	stbtt_PackFontRanges(&pc, font_data.data, 0, &pr, 1);
 	stbtt_PackEnd(&pc);
 
@@ -52,8 +55,8 @@ Font load_font(const char* path) {
 		glyph->y0 = pdata[i].y0;
 		glyph->y1 = pdata[i].y1;
 
-		glyph->width = (f32)pdata[i].x1 - pdata[i].x0;
-		glyph->height = (f32)pdata[i].y1 - pdata[i].y0;
+		glyph->width = ((f32)pdata[i].x1 - pdata[i].x0) / (float)h_oversample;
+		glyph->height = ((f32)pdata[i].y1 - pdata[i].y0) / (float)v_oversample;
 		glyph->bearing_x = pdata[i].xoff;
 		glyph->bearing_y = pdata[i].yoff;
 		glyph->advance = pdata[i].xadvance;

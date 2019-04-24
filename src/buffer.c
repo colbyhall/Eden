@@ -79,6 +79,7 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	if (size < DEFAULT_GAP_SIZE) size = DEFAULT_GAP_SIZE;
 
 	buffer->data = malloc(size);
+	buffer->allocated = size;
 	buffer->cursor = buffer->data;
 	buffer->gap = buffer->data;
 	buffer->gap_size = size;

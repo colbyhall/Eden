@@ -334,6 +334,8 @@ void draw_buffer(Buffer* buffer, float x, float y) {
 	glBindTexture(GL_TEXTURE_2D, font.texture_id);
 	glActiveTexture(GL_TEXTURE0);
 
+	immediate_begin();
+
 	for (size_t i = 0; i < buffer->allocated; i++) {
 
 		if (buffer->data[i] == '\n') {
@@ -383,6 +385,8 @@ void draw_buffer(Buffer* buffer, float x, float y) {
 
 		x += glyph.advance;
 	}
+
+	immediate_flush();
 }
 
 void draw_string(String* str, float x, float y, float font_height, int color) {
@@ -495,7 +499,7 @@ void render_frame_end() {
 		{
 			float x0 = x + padding.x / 2.f;
 			float y0 = y + padding.y / 2.f;
-			draw_string(&debug_string, x0, y0, 20.f, 0xFFFFFF);
+			draw_string(&debug_string, x0, y0, FONT_SIZE, 0xFFFFFF);
 		}
 	}
 
