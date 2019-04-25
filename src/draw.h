@@ -7,13 +7,13 @@
 #include "string.h"
 #include "buffer.h"
 
-typedef struct Vertex {
+struct Vertex {
 	Vector2 position;
 	Vector4 color;
 	Vector2 uv;
-} Vertex;
+};
 
-typedef struct Shader {
+struct Shader {
 	GLuint program_id;
 
 	GLint view_to_projection_loc;
@@ -24,9 +24,13 @@ typedef struct Shader {
 	GLint uv_loc;
 
 	GLuint texture_loc;
-} Shader;
 
-void bind_shader(Shader* shader);
+	void bind();
+
+	static Shader load_from_file(const char* path);
+
+	static Shader* current;
+};
 
 extern Matrix4 view_to_projection;
 extern Matrix4 world_to_view;
@@ -43,9 +47,9 @@ void render_frame_begin();
 void render_frame_end();
 
 void draw_rect(float x0, float y0, float x1, float y1, Vector4 color);
-void draw_string(String* str, float x, float y, float font_height, int color);
-Vector2 immediate_string(String* str, float x, float y, float font_height, int color);
-void immediate_cstring(const char* str, float x, float y, float font_height, int color);
+void draw_string(const String& str, float x, float y, float font_height, int color);
+
+Vector2 immediate_string(const String& str, float x, float y, float font_height, int color);
 
 Vector2 get_draw_string_size(String* str, float font_height, Font* font);
 

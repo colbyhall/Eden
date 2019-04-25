@@ -1,6 +1,7 @@
 #include "buffer.h"
 #include "parsing.h"
 #include "os.h"
+#include "memory.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -63,7 +64,7 @@ static void buffer_update_cursor_info(Buffer* buffer) {
 }
 
 void buffer_load_from_file(Buffer* buffer, const char* path) {
-	buffer->path = make_string(path);
+	buffer->path = path;
 	FILE* fd = fopen(path, "rb");
 	if (!fd) {
 		return;
@@ -72,7 +73,7 @@ void buffer_load_from_file(Buffer* buffer, const char* path) {
 	size_t size = ftell(fd);
 	fseek(fd, 0, SEEK_SET);
 
-	u8* buffer_data = (u8*)malloc(size + DEFAULT_GAP_SIZE);
+	u8* buffer_data = c_new u8[size + DEFAULT_GAP_SIZE];
 	fread(buffer_data, size, 1, fd);
 
 	fclose(fd);
@@ -108,7 +109,7 @@ void buffer_load_from_file(Buffer* buffer, const char* path) {
 void buffer_init_from_size(Buffer* buffer, size_t size) {
 	if (size < DEFAULT_GAP_SIZE) size = DEFAULT_GAP_SIZE;
 
-	buffer->data = malloc(size);
+	buffer->data = c_new u8[size];
 	buffer->allocated = size;
 	buffer->cursor = buffer->data;
 	buffer->gap = buffer->data;

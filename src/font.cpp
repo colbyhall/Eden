@@ -1,5 +1,6 @@
 #include "font.h"
 #include "os.h"
+#include "memory.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -9,7 +10,7 @@
 
 Font load_font(const char* path) {
 
-	String font_data = os_load_file_into_memory(path);
+	String font_data = OS::load_file_into_memory(path);
 
 	assert(font_data.data != NULL);
 
@@ -20,7 +21,7 @@ Font load_font(const char* path) {
 
 	Bitmap atlas;
 	atlas.width = atlas.height = FONT_ATLAS_DIMENSION;
-	atlas.data = (u8*)malloc(atlas.width * atlas.height);
+	atlas.data = c_new u8[atlas.width * atlas.height];
 
 	stbtt_pack_context pc;
 	stbtt_packedchar pdata[NUM_CHARACTERS];
@@ -73,7 +74,7 @@ Font load_font(const char* path) {
 	result.descent = (float)descent * font_scale;
 	result.line_gap = (float)line_gap * font_scale;
 
-	// free(font_data.data);
+	c_delete[] font_data.data;
 
 	return result;
 }

@@ -2,7 +2,8 @@
 #include "os.h"
 #include "parsing.h"
 #include "editor.h"
-#include "stretchy_buffer.h"
+
+#include "memory.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +18,6 @@ u32 imm_vertex_count;
 Matrix4 view_to_projection;
 Matrix4 world_to_view;
 
-Shader* current_shader;
-
 Shader solid_shape_shader;
 Shader font_shader;
 
@@ -26,78 +25,75 @@ u32 draw_calls;
 u32 verts_drawn;
 u32 verts_culled;
 
+Shader* Shader::current = nullptr;
+
 typedef enum Shader_Type {
 	ST_NONE,
 	ST_FRAG,
 	ST_VERT,
 } Shader_Type;
 
-void bind_shader(Shader* shader) {	
-	if (shader == NULL) {
-		glUseProgram(0);
-	} else {
-		glUseProgram(shader->program_id);
-	}
-	current_shader = shader;
+void Shader::bind() {	
+	glUseProgram(program_id);
+	Shader::current = this;
 }
 
-void parse_shader_source(String* fd, Shader_Type type, String* out_source) {
+static void parse_shader_source(String& fd, Shader_Type type, String& out_source) {
 	if (type == ST_NONE) return;
 
 	Shader_Type current_type = ST_NONE;
 	String line;
 	do {
-		line = string_eat_line(fd);
+		line = fd.eat_line();
 
 		// @NOTE(Colby): this is super basic but it works.
-		if (string_starts_with(&line, "#if VERT", false) || string_starts_with(&line, "#elif VERT", false)) {
+		if (line.starts_with("#if VERT", false) || line.starts_with("#elif VERT", false)) {
 			current_type = ST_VERT;
 		}
-		else if (string_starts_with(&line, "#if FRAG", false) || string_starts_with(&line, "#elif FRAG", false)) {
+		else if (line.starts_with("#if FRAG", false) || line.starts_with("#elif FRAG", false)) {
 			current_type = ST_FRAG;
 		}
 		// @BUG(Colby): This needs to be true for some reason
-		else if (string_starts_with(&line, "#endif", true)) {
+		else if (line.starts_with("#endif", true)) {
 			current_type = ST_NONE;
 		}
 		else {
 			if (current_type == type || current_type == ST_NONE) {
-				append_string(out_source, &line);
-				append_cstring(out_source, "\n");
+				out_source.append(line);
+				out_source.append("\n");
 			}
 		}
 
-	} while (line.length > 0);
+	} while (line.count > 0);
 
-	out_source->data[out_source->length] = 0;
+	out_source.data[out_source.count] = 0;
 }
 
-Shader shader_load_from_file(const char* path) {
+Shader Shader::load_from_file(const char* path) {
 	Shader result;
 	GLuint program_id = glCreateProgram();
 
 	GLuint vertex_id = glCreateShader(GL_VERTEX_SHADER);
 	GLuint frag_id = glCreateShader(GL_FRAGMENT_SHADER);
 
-	String shader_source = os_load_file_into_memory(path);
-	// @NOTE(Colby): copy so we can free
+	String shader_source = OS::load_file_into_memory(path);
 
-	u8* buffer = (u8*)malloc(shader_source.length * 2 + 2);
+	u8* buffer = (u8*)c_new u8[shader_source.count * 2 + 2];
 
 	String vert_source;
-	vert_source.length = 0;
-	vert_source.allocated = shader_source.length + 1;
+	vert_source.count = 0;
+	vert_source.allocated = shader_source.count + 1;
 	vert_source.data = buffer;
 
 	String frag_source;
-	frag_source.length = 0;
-	frag_source.allocated = shader_source.length + 1;
-	frag_source.data = buffer + shader_source.length + 1;
+	frag_source.count = 0;
+	frag_source.allocated = shader_source.count + 1;
+	frag_source.data = buffer + shader_source.count + 1;
 
 	String fd = shader_source;
-	parse_shader_source(&fd, ST_VERT, &vert_source);
+	parse_shader_source(fd, ST_VERT, vert_source);
 	fd = shader_source;
-	parse_shader_source(&fd, ST_FRAG, &frag_source);
+	parse_shader_source(fd, ST_FRAG, frag_source);
 
 	glShaderSource(vertex_id, 1, (const char**)&vert_source.data, 0);
 	glShaderSource(frag_id, 1, (const char**)&frag_source.data, 0);
@@ -141,7 +137,8 @@ Shader shader_load_from_file(const char* path) {
 	result.uv_loc = 2;
 
 	// @Cleanup: Why can't we free this
-	// p_delete[] buffer;
+	c_delete[] buffer;
+	c_delete[] shader_source.data;
 	// free_string(&shader_source);
 	// free(buffer);
 
@@ -167,8 +164,8 @@ void init_renderer() {
 	glEnable(GL_BLEND);
 	glEnable(GL_MULTISAMPLE);
 
-	solid_shape_shader = shader_load_from_file("data\\shaders\\solid_shape.glsl");
-	font_shader = shader_load_from_file("data\\shaders\\font.glsl");
+	solid_shape_shader = Shader::load_from_file("data\\shaders\\solid_shape.glsl");
+	font_shader = Shader::load_from_file("data\\shaders\\font.glsl");
 }
 
 void immediate_begin() {
@@ -180,7 +177,7 @@ bool is_valid(GLuint id) {
 }
 
 void immediate_flush() {
-    if (!current_shader)
+    if (!Shader::current)
     {
         assert(!"We should have a shader set");
         return;
@@ -190,9 +187,9 @@ void immediate_flush() {
     glBindBuffer(GL_ARRAY_BUFFER, imm_vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(imm_vertices[0]) * imm_vertex_count, imm_vertices, GL_STREAM_DRAW);
     
-    GLuint position_loc = current_shader->position_loc;
-    GLuint color_loc = current_shader->color_loc;
-    GLuint uv_loc = current_shader->uv_loc;
+    GLuint position_loc = Shader::current->position_loc;
+    GLuint color_loc = Shader::current->color_loc;
+    GLuint uv_loc = Shader::current->uv_loc;
     
     if (is_valid(position_loc)) {
         glVertexAttribPointer(position_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
@@ -253,7 +250,7 @@ void immediate_quad(float x0, float y0, float x1, float y1, Vector4 color) {
 
 
 void draw_rect(float x0, float y0, float x1, float y1, Vector4 color) {   
-	bind_shader(&solid_shape_shader);
+	solid_shape_shader.bind();
 
     refresh_transformation();
     
@@ -262,7 +259,7 @@ void draw_rect(float x0, float y0, float x1, float y1, Vector4 color) {
     immediate_flush();
 }
 
-Vector2 immediate_string(String* str, float x, float y, float font_height, int color) {
+Vector2 immediate_string(const String& str, float x, float y, float font_height, int color) {
 
 	const float ratio = font_height / FONT_SIZE;
 
@@ -273,22 +270,22 @@ Vector2 immediate_string(String* str, float x, float y, float font_height, int c
 	float largest_x = 0.f;
 	float largest_y = 0.f;
 
-	for (size_t i = 0; i < str->length; i++) {
-		if (str->data[i] == '\n') {
+	for (size_t i = 0; i < str.count; i++) {
+		if (str.data[i] == '\n') {
 			y += font_height;
 			x = original_x;
 			continue;
 		}
 
-		if (str->data[i] == '\t') {
+		if (str.data[i] == '\t') {
 			Font_Glyph space_glyph = font.characters[' ' - 32];
 			x += space_glyph.advance * ratio * 4.f;
 			continue;
 		}
 
-		Font_Glyph glyph = font.characters[str->data[i] - 32];
+		Font_Glyph glyph = font.characters[str.data[i] - 32];
 
-		if (!is_whitespace(str->data[i])) {
+		if (!is_whitespace(str.data[i])) {
 			Vector4 v4_color = vec4_color(color);
 
 			float x0 = x + glyph.bearing_x * ratio;
@@ -296,7 +293,7 @@ Vector2 immediate_string(String* str, float x, float y, float font_height, int c
 			float x1 = x0 + glyph.width * ratio;
 			float y1 = y0 + glyph.height * ratio;
 
-			if (x0 > os_window_width() || x1 < 0.f || y > os_window_height() || y + font_height < 0.f) {
+			if (x0 > OS::window_width() || x1 < 0.f || y > OS::window_height() || y + font_height < 0.f) {
 				verts_culled += 6;
 				continue;
 			}
@@ -324,13 +321,8 @@ Vector2 immediate_string(String* str, float x, float y, float font_height, int c
 	return vec2(largest_x, largest_y);
 }
 
-void immediate_cstring(const char* str, float x, float y, float font_height, int color) {
-	String cstr_s = make_string(str);
-	immediate_string(&cstr_s, x, y, font_height, color);
-}
-
-void draw_string(String* str, float x, float y, float font_height, int color) {
-	bind_shader(&font_shader);
+void draw_string(const String& str, float x, float y, float font_height, int color) {
+	font_shader.bind();
 	refresh_transformation();
 	glUniform1i(font_shader.texture_loc, 0);
 
@@ -353,7 +345,7 @@ Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
 	const float original_x = x;
 	y += font_height - font->line_gap * ratio;
 
-	for (size_t i = 0; i < str->length; i++) {
+	for (size_t i = 0; i < str->count; i++) {
 		Font_Glyph glyph = font->characters[str->data[i] - 32];
 
 		if (str->data[i] == '\n') {
@@ -379,15 +371,15 @@ Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
 }
 
 void refresh_transformation() {
-    if (!current_shader) return;
+    if (!Shader::current) return;
     
-    glUniformMatrix4fv(current_shader->world_to_view_loc, 1, GL_FALSE, world_to_view.elems);
-    glUniformMatrix4fv(current_shader->view_to_projection_loc, 1, GL_FALSE, view_to_projection.elems);
+    glUniformMatrix4fv(Shader::current->world_to_view_loc, 1, GL_FALSE, world_to_view.elems);
+    glUniformMatrix4fv(Shader::current->view_to_projection_loc, 1, GL_FALSE, view_to_projection.elems);
 }
 
 void render_right_handed() {
-    const float width = (f32)os_window_width();
-    const float height = (f32)os_window_height();
+    const float width = (f32)OS::window_width();
+    const float height = (f32)OS::window_height();
     
     const float aspect_ratio = width / height;
     
@@ -415,15 +407,15 @@ void render_frame_end() {
 	{
 
 		char buffer[256];
-		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %f", draw_calls, verts_drawn, verts_culled, 1.f / delta_time);
-		String debug_string;
-		debug_string.data = (u8*)&buffer;
-		debug_string.allocated = 256;
-		debug_string.length = strlen(buffer);
+		sprintf_s(
+			buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %i\nAllocations: %i\nAllocated: %i KB", 
+			draw_calls, verts_drawn, verts_culled, (int)(1.f / Editor::get().delta_time), Memory::get().num_allocations, Memory::get().amount_allocated / 1024
+		);
+		String debug_string = buffer;
 
 		Vector2 string_size = get_draw_string_size(&debug_string, FONT_SIZE, &font);
 		Vector2 padding = vec2s(10.f);
-		float x = os_window_width() - (string_size.x + padding.x);
+		float x = OS::window_width() - (string_size.x + padding.x);
 		float y = 0.f;
 
 		{
@@ -439,7 +431,7 @@ void render_frame_end() {
 		{
 			float x0 = x + padding.x / 2.f;
 			float y0 = y + padding.y / 2.f;
-			draw_string(&debug_string, x0, y0, FONT_SIZE, 0xFFFFFF);
+			draw_string(debug_string, x0, y0, FONT_SIZE, 0xFFFFFF);
 		}
 	}
 

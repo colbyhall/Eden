@@ -10,11 +10,11 @@
 HWND window_handle;
 u32 window_width, window_height;
 
-void* os_get_window_handle() {
+void* OS::get_window_handle() {
 	return window_handle;
 }
 
-void os_poll_window_events() {
+void OS::poll_window_events() {
 	MSG msg;
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
 		TranslateMessage(&msg);
@@ -22,12 +22,12 @@ void os_poll_window_events() {
 	}
 }
 
-u32 os_window_width() {
-	return window_width;
+u32 OS::window_width() {
+	return ::window_width;
 }
 
-u32 os_window_height() {
-	return window_height;
+u32 OS::window_height() {
+	return ::window_height;
 }
 
 typedef enum PROCESS_DPI_AWARENESS {
@@ -40,6 +40,8 @@ typedef HRESULT(*Set_Process_DPI_Awareness)(PROCESS_DPI_AWARENESS value);
 
 static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_param) {
 	
+	Editor& editor = Editor::get();
+
 	switch (message) {
 	case WM_SIZE: {
 		RECT rect;
@@ -51,26 +53,26 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 		window_width = rect.right - rect.left;
 		window_height = rect.bottom - rect.top;
 
-		editor_on_window_resized(old_width, old_height);
+		editor.on_window_resized(old_width, old_height);
 		// game_state->on_window_resized(old_width, old_height);
 	} break;
 
 	case WM_DESTROY: {
 		// game_state->on_exit_requested();
-		is_running = false;
+		editor.is_running = false;
 	} break;
 	case WM_SIZING: {
-		editor_draw();
+		editor.draw();
 	} break;
 
 	case WM_MOUSEWHEEL: {
 		float delta = GET_WHEEL_DELTA_WPARAM(w_param);
-		editor_on_mousewheel_scrolled(delta);
+		editor.on_mousewheel_scrolled(delta);
 	} break;
 
 	case WM_CHAR: {
 		u8 key = (u8)w_param;
-		editor_on_key_pressed(key);
+		editor.on_key_pressed(key);
 	} break;
 
 	}
@@ -125,50 +127,21 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	}
 #endif
 
-	editor_init();
+	Editor& editor = Editor::get();
+	editor.init();
 	ShowWindow(window_handle, SW_SHOW);
-	wglSwapIntervalEXT(0);
-	editor_loop();
-	editor_shutdown();
+	wglSwapIntervalEXT(BUILD_DEBUG);
+	editor.loop();
+	editor.shutdown();
 
 	return 0;
 }
 
-String os_load_file_into_memory(const char* path) {
-	HANDLE file_handle = CreateFile(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-	String result;
-
-	// NOTE(Colby): Should we throw an assert here?
-	if (file_handle == INVALID_HANDLE_VALUE) {
-		result.length = 0;
-		result.allocated = 0;
-		result.data = NULL;
-	}
-
-	SetFilePointer(file_handle, 0, NULL, FILE_BEGIN);
-
-	const DWORD file_size = GetFileSize(file_handle, NULL);
-
-	u8* buffer = (u8*)malloc(file_size + 1);
-
-	ReadFile(file_handle, buffer, file_size, 0, NULL);
-	buffer[file_size] = 0;
-
-	CloseHandle(file_handle);
-
-	result.data = buffer;
-	result.length = file_size;
-	result.allocated = file_size + 1;
-
-	return result;
-}
-
-u64 os_get_ms_time() {
+u64 OS::get_ms_time() {
 	return (u64)GetTickCount64();
 }
 
-void os_set_cursor_type(OS_Cursor_Type type) {
+void OS::set_cursor_type(OS_Cursor_Type type) {
 	HCURSOR new_cursor = NULL;
 	switch (type) {
 	case CT_Arrow:

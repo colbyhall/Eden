@@ -3,23 +3,23 @@
 #include "types.h"
 
 struct String {
-	u8* data;
-	size_t length;
-	size_t allocated;
+	u8* data = nullptr;
+	size_t count = 0;
+	size_t allocated = 0;
+
+	String() = default;
+	String(const char* cstr);
+
+	operator bool() const { return count > 0 && data != nullptr; }
+
+	u8 operator[](size_t index) const;
+
+	operator const char*() const { return (const char*)data; }
+
+	bool starts_with(const String& str, bool case_matters = true) const;
+	void append(const String& str);
+
+	void advance(size_t amount);
+	String eat_line();
+	void eat_whitespace();
 };
-
-String make_string(const char* str);
-void advance_string(String* str, size_t amount);
-bool string_starts_with(String* str, const char* cstr, bool case_matters);
-void append_cstring(String* str, const char* app);
-void append_string(String* str, String* app);
-String string_eat_line(String* str);
-void string_eat_whitespace(String* str);
-
-String string_eat_until_char(String* str, u8 c);
-String string_eat_word(String* str);
-
-bool string_equals_cstr(String* str, const char* cstr);
-bool string_equals(String* left, String* right);
-
-void free_string(String* str);

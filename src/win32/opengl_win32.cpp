@@ -59,7 +59,7 @@ bool gl_init() {
 		}
 	}
 
-	HDC window_context = GetDC((HWND)os_get_window_handle());
+	HDC window_context = GetDC((HWND)OS::get_window_handle());
 
 	if (wglChoosePixelFormatARB) {
 		s32 attrib_list[] =
@@ -106,7 +106,7 @@ bool gl_init() {
 }
 
 void gl_swap_buffers() {
-	HWND window_handle = (HWND)os_get_window_handle();
+	HWND window_handle = (HWND)OS::get_window_handle();
 	HDC window_context = GetDC(window_handle);
 	SwapBuffers(window_context);
 	ReleaseDC(window_handle, window_context);

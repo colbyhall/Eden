@@ -20,23 +20,26 @@ typedef struct Buffer_View {
 	float height;
 } Buffer_View;
 
-typedef enum View_Container_Type {
-	VCT_VERTICAL,
-	VCT_HORIZONTAL
-} View_Container_Type;
+struct Editor {
 
-typedef struct View_Container {
-	View_Container_Type type;
-} View_Container;
+	static Editor& get();
 
-void editor_init();
-void editor_loop();
-void editor_shutdown();
-Buffer* editor_make_buffer();
+	bool is_running = false;
+	float delta_time = 0.f;
+	u64 last_frame_time = 0;
 
-void editor_on_window_resized(u32 old_width, u32 old_height);
-void editor_on_mousewheel_scrolled(float delta);
-void editor_on_key_pressed(u8 key);
+	void init();
+	void loop();
+	void shutdown();
 
-void editor_draw();
+	void on_window_resized(u32 old_width, u32 old_height);
+	void on_mousewheel_scrolled(float delta);
+	void on_key_pressed(u8 key);
+	
+	void draw();
+private:
+	static Editor g_editor;
+};
+
+
 
