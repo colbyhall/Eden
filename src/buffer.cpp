@@ -2,17 +2,16 @@
 #include "parsing.h"
 #include "os.h"
 
-#include "stretchy_buffer.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #define DEFAULT_GAP_SIZE 1024
 
-Buffer make_buffer() {
+Buffer make_buffer(Buffer_ID id) {
 	Buffer result;
 	memset(&result, 0, sizeof(result));
+	result.id = id;
 	return result;
 }
 
@@ -64,7 +63,7 @@ static void buffer_update_cursor_info(Buffer* buffer) {
 }
 
 void buffer_load_from_file(Buffer* buffer, const char* path) {
-	buffer->path = (u8*)path;
+	buffer->path = make_string(path);
 	FILE* fd = fopen(path, "rb");
 	if (!fd) {
 		return;
@@ -90,14 +89,14 @@ void buffer_load_from_file(Buffer* buffer, const char* path) {
 	u64 line_count = 1;
 	u8* last_new_line = buffer->data;
 
-	buf_push(buffer->line_table, 0);
+	// buf_push(buffer->line_table, 0);
 
 	for (size_t i = 0; buffer->data[i] != 0; i++) {
 		if (is_eol(buffer->data[i])) {
 			line_count += 1;
 			
 			u8* current_new_line = buffer->data + i;
-			buf_push(buffer->line_table, current_new_line - last_new_line);
+			// buf_push(buffer->line_table, current_new_line - last_new_line);
 			last_new_line = current_new_line;
 		}
 	}
@@ -116,7 +115,7 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	buffer->gap_size = size;
 	buffer->line_count = 1;
 
-	buf_push(buffer->line_table, 0);
+	// buf_push(buffer->line_table, 0);
 
 	buffer_update_cursor_info(buffer);
 }

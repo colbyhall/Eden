@@ -44,10 +44,8 @@ void render_frame_end();
 
 void draw_rect(float x0, float y0, float x1, float y1, Vector4 color);
 void draw_string(String* str, float x, float y, float font_height, int color);
-void immediate_string(String* str, float x, float y, float font_height, int color);
+Vector2 immediate_string(String* str, float x, float y, float font_height, int color);
 void immediate_cstring(const char* str, float x, float y, float font_height, int color);
-
-void draw_buffer(Buffer* buffer, float x, float y);
 
 Vector2 get_draw_string_size(String* str, float font_height, Font* font);
 

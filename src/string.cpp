@@ -7,10 +7,14 @@
 
 String make_string(const char* str) {
 	String result;
-
-	result.data = (u8*)str;
-	result.length = strlen(str);
-	result.allocated = result.length + 1;
+	
+	if (!str) {
+		memset(&result, 0, sizeof(result));
+	} else {
+		result.data = (u8*)str;
+		result.length = strlen(str);
+		result.allocated = result.length + 1;
+	}
 	
 	return result;
 }

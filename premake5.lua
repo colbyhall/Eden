@@ -10,16 +10,21 @@ workspace "YEET"
 
 project "YEET"
     kind "WindowedApp"
-    language "C"
+    language "C++"
 
     targetdir ("bin")
     objdir ("bin")
 	characterset("ASCII")
 
+	defines
+	{
+		"_CRT_SECURE_NO_WARNINGS"
+	}
+
     files
     {
         "src/*.h",
-        "src/*.c",
+        "src/*.cpp",
 		"libs/**.h"
     }
 
@@ -56,7 +61,7 @@ project "YEET"
         optimize "On"
         
     filter "system:windows"
-        cdialect  "Default"
+        cppdialect "C++17"
 		systemversion "latest"
 		architecture "x64"
 
@@ -68,5 +73,5 @@ project "YEET"
 		files 
 		{
 			"src/win32/**.h",
-			"src/win32/**.c"
+			"src/win32/**.cpp"
 		}

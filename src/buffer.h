@@ -14,8 +14,12 @@
 	How many woodchucks*[             ] would
 */
 
-typedef struct Buffer {
-	u8* path;
+using Buffer_ID = size_t;
+
+struct Buffer {
+	Buffer_ID id;
+
+	String path;
 	String title;
 
 	u64 line_count;
@@ -28,16 +32,16 @@ typedef struct Buffer {
 	size_t gap_size;
 
 	// @NOTE(Colby): Stretchy Buffer that keeps the delta between lines
-	u32* line_table;
+	size_t* line_table;
 
 	u64 current_line_number;
 	u64 desired_column_number;
 	u64 current_column_number;
 
 	u8* cursor;
-} Buffer;
+};
 
-Buffer make_buffer();
+Buffer make_buffer(Buffer_ID id);
 void destroy_buffer(Buffer* buffer);
 void buffer_load_from_file(Buffer* buffer, const char* path);
 void buffer_init_from_size(Buffer* buffer, size_t size);

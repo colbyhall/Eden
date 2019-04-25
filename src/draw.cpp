@@ -4,7 +4,6 @@
 #include "editor.h"
 #include "stretchy_buffer.h"
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -263,15 +262,18 @@ void draw_rect(float x0, float y0, float x1, float y1, Vector4 color) {
     immediate_flush();
 }
 
-void immediate_string(String* str, float x, float y, float font_height, int color) {
+Vector2 immediate_string(String* str, float x, float y, float font_height, int color) {
 
 	const float ratio = font_height / FONT_SIZE;
 
 	const float original_x = x;
+	const float original_y = y;
 	y += font_height - font.line_gap * ratio;
 
-	for (size_t i = 0; i < str->length; i++) {
+	float largest_x = 0.f;
+	float largest_y = 0.f;
 
+	for (size_t i = 0; i < str->length; i++) {
 		if (str->data[i] == '\n') {
 			y += font_height;
 			x = original_x;
@@ -314,119 +316,17 @@ void immediate_string(String* str, float x, float y, float font_height, int colo
 		}
 
 		x += glyph.advance * ratio;
+
+		if (x - original_x > largest_x) largest_x = x - original_x;
+		if (y - original_y > largest_y) largest_y = x - original_y;
 	}
+
+	return vec2(largest_x, largest_y);
 }
 
 void immediate_cstring(const char* str, float x, float y, float font_height, int color) {
 	String cstr_s = make_string(str);
 	immediate_string(&cstr_s, x, y, font_height, color);
-}
-
-void draw_buffer(Buffer* buffer, float x, float y) {
-	const float font_height = FONT_SIZE;
-	const float original_x = x;
-	
-	y += font_height - font.line_gap;
-
-	bind_shader(&font_shader);
-	refresh_transformation();
-	glUniform1i(font_shader.texture_loc, 0);
-
-	glBindTexture(GL_TEXTURE_2D, font.texture_id);
-	glActiveTexture(GL_TEXTURE0);
-
-	immediate_begin();
-
-	const size_t line_numbers_down = -y / FONT_SIZE;
-
-	u32 start_index = 0;
-	for (size_t i = 0; i < line_numbers_down; i++) {
-		start_index += buffer->line_table[i];
-	}
-
-	for (size_t i = start_index; i < buffer->allocated; i++) {
-
-		if (buffer->data[i] == '\n') {
-			y += font_height;
-			x = original_x;
-			continue;
-		}
-
-		if (buffer->data[i] == '\t') {
-			Font_Glyph space_glyph = font.characters[' ' - 32];
-			x += space_glyph.advance * 4.f;
-			continue;
-		}
-
-		Font_Glyph glyph = font.characters[buffer->data[i] - 32];
-
-		if (buffer->data + i == buffer->cursor) {
-			immediate_flush();
-
-			const float x0 = x;
-			const float y0 = y - font.ascent;
-			float x1 = x0 + glyph.advance;
-			if (buffer->cursor == buffer->gap) {
-
-				Font_Glyph space_glyph = font.characters[' ' - 32];
-
-				x1 = x0 + space_glyph.advance;
-
-			}
-			const float y1 = y - font.descent;
-
-			draw_rect(x0, y0, x1, y1, vec4_color(0xFFFFFF));
-
-			immediate_begin();
-
-			bind_shader(&font_shader);
-			refresh_transformation();
-			glUniform1i(font_shader.texture_loc, 0);
-
-			glBindTexture(GL_TEXTURE_2D, font.texture_id);
-			glActiveTexture(GL_TEXTURE0);
-		}
-
-		if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->gap + buffer->gap_size) {
-			continue;
-		}
-
-		if (!is_whitespace(buffer->data[i])) {
-			Vector4 v4_color = vec4_color(0xFFFFFF);
-
-			float x0 = x + glyph.bearing_x;
-			float y0 = y + glyph.bearing_y;
-			float x1 = x0 + glyph.width;
-			float y1 = y0 + glyph.height;
-
-			if (x0 > os_window_width() || x1 < 0.f || y < 0.f) {
-				verts_culled += 6;
-				continue;
-			}
-
-			// @NOTE(Colby): If we're below the window just break so we dont waste time
-			if (y > os_window_height()) {
-				break;
-			}
-
-			Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-
-			immediate_vertex(x0, y0, v4_color, top_left);
-			immediate_vertex(x0, y1, v4_color, top_right);
-			immediate_vertex(x1, y0, v4_color, bottom_left);
-
-			immediate_vertex(x0, y1, v4_color, top_right);
-			immediate_vertex(x1, y1, v4_color, bottom_right);
-			immediate_vertex(x1, y0, v4_color, bottom_left);
-		}
-
-		x += glyph.advance;
-	}
-
-	immediate_flush();
 }
 
 void draw_string(String* str, float x, float y, float font_height, int color) {
@@ -515,7 +415,7 @@ void render_frame_end() {
 	{
 
 		char buffer[256];
-		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %i", draw_calls, verts_drawn, verts_culled, fps);
+		sprintf_s((char* const)&buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %f", draw_calls, verts_drawn, verts_culled, 1.f / delta_time);
 		String debug_string;
 		debug_string.data = (u8*)&buffer;
 		debug_string.allocated = 256;

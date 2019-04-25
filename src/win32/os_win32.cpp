@@ -69,7 +69,7 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 	} break;
 
 	case WM_CHAR: {
-		u8 key = w_param;
+		u8 key = (u8)w_param;
 		editor_on_key_pressed(key);
 	} break;
 
