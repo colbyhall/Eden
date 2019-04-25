@@ -16,6 +16,10 @@ Buffer* loaded_buffers = NULL;
 
 Editor Editor::g_editor;
 
+u32 frame_count = 0;
+
+Buffer buffer(0);
+
 
 Editor& Editor::get() {
 	return g_editor;
@@ -27,15 +31,25 @@ void Editor::init() {
 
 	font = load_font("data\\fonts\\Consolas.ttf");
 
+	buffer.load_from_file("src\\draw.cpp");
+
 	is_running = true;
 }
 
 void Editor::loop() {
 	last_frame_time = OS::get_ms_time();
+	static float counter = 0.f;
 	while (is_running) {
 		u64 current_time = OS::get_ms_time();
 		delta_time = (current_time - last_frame_time) / 1000.f;
 		last_frame_time = current_time;
+		
+		counter += delta_time;
+		if (counter >= 1.f) {
+			counter = 0.f;
+			fps = frame_count;
+			frame_count = 0;
+		}
 
 		OS::poll_window_events();
 
@@ -59,12 +73,12 @@ void Editor::on_mousewheel_scrolled(float delta) {
 }
 
 void Editor::on_key_pressed(u8 key) {
-	Buffer* current_buffer = NULL;
+	Buffer* current_buffer = &buffer;
 	switch (key) {
 	case KEY_ENTER:
-		buffer_add_char(current_buffer, '\n');
+		current_buffer->add_char('\n');
 	default:
-		buffer_add_char(current_buffer, key);
+		current_buffer->add_char(key);
 	}
 }
 
@@ -86,7 +100,7 @@ void Editor::draw() {
 
 	// @NOTE(Colby): Buffer drawing goes here
 	{
-
+		draw_string((const char*)buffer.data, 0.f, 0.f, FONT_SIZE, 0xFFFFFF);
 	}
 
 	{
@@ -103,5 +117,6 @@ void Editor::draw() {
 		}
 	}
 
+	frame_count += 1;
 	render_frame_end();
 }

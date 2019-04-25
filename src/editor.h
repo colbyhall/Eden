@@ -21,12 +21,12 @@ typedef struct Buffer_View {
 } Buffer_View;
 
 struct Editor {
-
 	static Editor& get();
 
 	bool is_running = false;
 	float delta_time = 0.f;
 	u64 last_frame_time = 0;
+	u32 fps;
 
 	void init();
 	void loop();

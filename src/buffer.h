@@ -36,10 +36,16 @@ struct Buffer {
 	u64 current_column_number;
 
 	u8* cursor;
+
+	Buffer(Buffer_ID id);
+
+	void load_from_file(const char* path);
+	void init_from_size(size_t size);
+
+	void add_char(u8 c);
+
+private:
+	void move_gap_to_cursor();
+	void refresh_cursor_info();
 };
 
-Buffer make_buffer(Buffer_ID id);
-void destroy_buffer(Buffer* buffer);
-void buffer_load_from_file(Buffer* buffer, const char* path);
-void buffer_init_from_size(Buffer* buffer, size_t size);
-void buffer_add_char(Buffer* buffer, u8 c);

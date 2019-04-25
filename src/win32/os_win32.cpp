@@ -10,6 +10,12 @@
 HWND window_handle;
 u32 window_width, window_height;
 
+extern "C"
+{
+	__declspec(dllexport) DWORD NvOptimusEnablement = 0x0;
+	__declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x0;
+}
+
 void* OS::get_window_handle() {
 	return window_handle;
 }
@@ -130,7 +136,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	Editor& editor = Editor::get();
 	editor.init();
 	ShowWindow(window_handle, SW_SHOW);
-	wglSwapIntervalEXT(BUILD_DEBUG);
+	wglSwapIntervalEXT(!BUILD_DEBUG);
 	editor.loop();
 	editor.shutdown();
 

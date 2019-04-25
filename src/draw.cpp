@@ -22,8 +22,8 @@ Shader solid_shape_shader;
 Shader font_shader;
 
 u32 draw_calls;
-u32 verts_drawn;
-u32 verts_culled;
+size_t verts_drawn;
+size_t verts_culled;
 
 Shader* Shader::current = nullptr;
 
@@ -278,12 +278,12 @@ Vector2 immediate_string(const String& str, float x, float y, float font_height,
 		}
 
 		if (str.data[i] == '\t') {
-			Font_Glyph space_glyph = font.characters[' ' - 32];
+			const Font_Glyph& space_glyph = font.characters[' ' - 32];
 			x += space_glyph.advance * ratio * 4.f;
 			continue;
 		}
 
-		Font_Glyph glyph = font.characters[str.data[i] - 32];
+		const Font_Glyph& glyph = font.characters[str.data[i] - 32];
 
 		if (!is_whitespace(str.data[i])) {
 			Vector4 v4_color = vec4_color(color);
@@ -293,9 +293,15 @@ Vector2 immediate_string(const String& str, float x, float y, float font_height,
 			float x1 = x0 + glyph.width * ratio;
 			float y1 = y0 + glyph.height * ratio;
 
-			if (x0 > OS::window_width() || x1 < 0.f || y > OS::window_height() || y + font_height < 0.f) {
+			if (x0 > OS::window_width() || x1 < 0.f || y + font_height < 0.f) {
 				verts_culled += 6;
 				continue;
+			}
+
+			// @NOTE(Colby): If we're below the window just break so we don't look through all this data
+			if (y > OS::window_height()) {
+				verts_culled += (str.count - i) * 6;
+				break;
 			}
 
 			Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
@@ -346,13 +352,13 @@ Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
 	y += font_height - font->line_gap * ratio;
 
 	for (size_t i = 0; i < str->count; i++) {
-		Font_Glyph glyph = font->characters[str->data[i] - 32];
+		const Font_Glyph& glyph = font->characters[str->data[i] - 32];
 
 		if (str->data[i] == '\n') {
 			y += font_height;
 			x = original_x;
 		} else if (str->data[i] == '\t') {
-			Font_Glyph space_glyph = font->characters[' ' - 32];
+			const Font_Glyph& space_glyph = font->characters[' ' - 32];
 			x += space_glyph.advance * ratio * 4.f;
 		} else {
 			float x0 = x + glyph.bearing_x * ratio;
@@ -408,8 +414,8 @@ void render_frame_end() {
 
 		char buffer[256];
 		sprintf_s(
-			buffer, 256, "Draw Calls: %i\nVerts Drawn: %i\nVerts Culled: %i\nFPS: %i\nAllocations: %i\nAllocated: %i KB", 
-			draw_calls, verts_drawn, verts_culled, (int)(1.f / Editor::get().delta_time), Memory::get().num_allocations, Memory::get().amount_allocated / 1024
+			buffer, 256, "Draw Calls: %i\nVerts Drawn: %llu\nVerts Culled: %llu\nFPS: %i\nAllocations: %llu\nAllocated: %f KB", 
+			draw_calls, verts_drawn, verts_culled, Editor::get().fps, Memory::get().num_allocations, Memory::get().amount_allocated / 1024.f
 		);
 		String debug_string = buffer;
 

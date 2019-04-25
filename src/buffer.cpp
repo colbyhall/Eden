@@ -9,62 +9,51 @@
 
 #define DEFAULT_GAP_SIZE 1024
 
-Buffer make_buffer(Buffer_ID id) {
-	Buffer result;
-	memset(&result, 0, sizeof(result));
-	result.id = id;
-	return result;
-}
+Buffer::Buffer(Buffer_ID id) 
+	: id(id), line_count(0), modified(false), allocated(0), gap(nullptr), gap_size(0), current_line_number(0), desired_column_number(0), current_column_number(0), cursor(nullptr) {}
 
-void destroy_buffer(Buffer* buffer) {
-	if (buffer->data) {
-		free(buffer->data);
-		buffer->data = NULL;
-	}
-}
+void Buffer::move_gap_to_cursor() {
+	if (cursor == gap) return;
 
-static void buffer_move_gap_to_cursor(Buffer* buffer) {
-	if (buffer->cursor == buffer->gap) return;
+	if (cursor < gap) {
+		const size_t amount_to_move = gap - cursor;
 
-	if (buffer->cursor < buffer->gap) {
-		const size_t amount_to_move = buffer->gap - buffer->cursor;
+		memcpy(cursor, gap + gap_size - amount_to_move, amount_to_move);
 
-		memcpy(buffer->cursor, buffer->gap + buffer->gap_size - amount_to_move, amount_to_move);
-
-		buffer->gap = buffer->cursor;
+		gap = cursor;
 	}
 	else {
-		const size_t amount_to_move = buffer->cursor - buffer->gap + buffer->gap_size;
+		const size_t amount_to_move = cursor - gap + gap_size;
 
-		memcpy(buffer->cursor - amount_to_move, buffer->gap, amount_to_move);
+		memcpy(cursor - amount_to_move, gap, amount_to_move);
 
-		buffer->gap += amount_to_move;
-		buffer->cursor = buffer->gap;
+		gap += amount_to_move;
+		cursor = gap;
 	}
 }
 
-static void buffer_update_cursor_info(Buffer* buffer) {
+void Buffer::refresh_cursor_info() {
 	u32 line_count = 1;
 	u32 column_number = 0;
-	for (size_t i = 0; i < buffer->allocated; i++) {
-		if (buffer->data + i == buffer->cursor) {
-			buffer->current_line_number = line_count;
-			buffer->current_column_number = column_number;
-			buffer->desired_column_number = column_number;
+	for (size_t i = 0; i < allocated; i++) {
+		if (data + i == cursor) {
+			current_line_number = line_count;
+			current_column_number = column_number;
+			desired_column_number = column_number;
 			return;
 		}
 
 		column_number += 1;
 
-		if (is_eol(buffer->data[i])) {
+		if (is_eol(data[i])) {
 			line_count += 1;
 			column_number = 0;
 		}
 	}
 }
 
-void buffer_load_from_file(Buffer* buffer, const char* path) {
-	buffer->path = path;
+void Buffer::load_from_file(const char* path) {
+	path = path;
 	FILE* fd = fopen(path, "rb");
 	if (!fd) {
 		return;
@@ -77,64 +66,64 @@ void buffer_load_from_file(Buffer* buffer, const char* path) {
 	fread(buffer_data, size, 1, fd);
 
 	fclose(fd);
-	buffer->data = buffer_data;
-	buffer->allocated = size + DEFAULT_GAP_SIZE;
+	data = buffer_data;
+	allocated = size + DEFAULT_GAP_SIZE;
 
-	buffer->gap = buffer->data + size;
-	buffer->gap_size = DEFAULT_GAP_SIZE;
+	gap = data + size;
+	gap_size = DEFAULT_GAP_SIZE;
 
-	buffer->cursor = buffer->gap;
+	cursor = gap;
 
-	*buffer->gap = 0;
+	*gap = 0;
 
 	u64 line_count = 1;
-	u8* last_new_line = buffer->data;
+	u8* last_new_line = data;
 
-	// buf_push(buffer->line_table, 0);
+	// buf_push(line_table, 0);
 
-	for (size_t i = 0; buffer->data[i] != 0; i++) {
-		if (is_eol(buffer->data[i])) {
+	for (size_t i = 0; data[i] != 0; i++) {
+		if (is_eol(data[i])) {
 			line_count += 1;
 			
-			u8* current_new_line = buffer->data + i;
-			// buf_push(buffer->line_table, current_new_line - last_new_line);
+			u8* current_new_line = data + i;
+			// buf_push(line_table, current_new_line - last_new_line);
 			last_new_line = current_new_line;
 		}
 	}
-	buffer->line_count = line_count;
+	line_count = line_count;
 
-	buffer_update_cursor_info(buffer);
+	refresh_cursor_info();
 }
 
-void buffer_init_from_size(Buffer* buffer, size_t size) {
+void Buffer::init_from_size(size_t size) {
 	if (size < DEFAULT_GAP_SIZE) size = DEFAULT_GAP_SIZE;
 
-	buffer->data = c_new u8[size];
-	buffer->allocated = size;
-	buffer->cursor = buffer->data;
-	buffer->gap = buffer->data;
-	buffer->gap_size = size;
-	buffer->line_count = 1;
+	data = c_new u8[size];
+	allocated = size;
+	cursor = data;
+	gap = data;
+	gap_size = size;
+	line_count = 1;
 
-	// buf_push(buffer->line_table, 0);
+	// buf_push(line_table, 0);
 
-	buffer_update_cursor_info(buffer);
+	refresh_cursor_info();
 }
 
-void buffer_add_char(Buffer* buffer, u8 c) {
-	buffer_move_gap_to_cursor(buffer);
+void Buffer::add_char(u8 c) {
+	move_gap_to_cursor();
 
-	*buffer->cursor = c;
-	buffer->cursor += 1;
-	buffer->gap += 1;
-	buffer->gap_size -= 1;
+	*cursor = c;
+	cursor += 1;
+	gap += 1;
+	gap_size -= 1;
 
 	if (is_eol(c)) {
-		buffer->current_line_number += 1;
-		buffer->current_column_number = 0;
-		buffer->desired_column_number = 0;
+		current_line_number += 1;
+		current_column_number = 0;
+		desired_column_number = 0;
 	} else {
-		buffer->current_column_number += 1;
-		buffer->desired_column_number += 1;
+		current_column_number += 1;
+		desired_column_number += 1;
 	}
 }
