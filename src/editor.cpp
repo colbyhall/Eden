@@ -112,6 +112,10 @@ void Editor::on_key_pressed(u8 key) {
 	switch (key) {
 	case KEY_ENTER:
 		current_buffer->add_char('\n');
+	case KEY_LEFT:
+		current_buffer->move_cursor(-1);
+	case KEY_RIGHT:
+		current_buffer->move_cursor(1);
 	default:
 		current_buffer->add_char(key);
 	}
@@ -183,11 +187,32 @@ void Buffer_View::draw() {
 			continue;
 		}
 
+		const Font_Glyph& glyph = font[buffer->data[i]];
+
+		if (buffer->data + i == buffer->cursor) {
+			immediate_flush();
+
+			float x0 = x;
+			float y0 = y - font.ascent;
+			float x1 = x0 + glyph.advance;
+			if (buffer->cursor == buffer->gap) {
+
+				const Font_Glyph& space_glyph = font.get_space_glyph();
+
+				x1 = x0 + space_glyph.advance;
+
+			}
+			float y1 = y - font.descent;
+
+			draw_rect(x0, y0, x1, y1, 0xFF00FF);
+
+			immediate_begin();
+			font.bind();
+		}
+
 		if (buffer->data + i == buffer->gap) {
 			i += buffer->gap_size;
 		}
-
-		const Font_Glyph& glyph = font[buffer->data[i]];
 
 		if (!is_whitespace(buffer->data[i])) {
 			Vector4 v4_color = 0xFFFFFF;

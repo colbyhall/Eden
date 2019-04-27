@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #define DEFAULT_GAP_SIZE 1024
 
@@ -127,4 +128,37 @@ void Buffer::add_char(u8 c) {
 		current_column_number += 1;
 		desired_column_number += 1;
 	}
+}
+
+void Buffer::move_cursor(s32 delta) {
+	assert(delta != 0);
+	// @NOTE(Colby): SUPER WIP
+#if 0
+	u8* new_cursor = cursor;
+	const s32 abs_delta = abs(delta);
+	const bool add = delta > 0;
+	for (s32 i = 0; i < abs_delta; i++) {
+		if (add) {
+			if (new_cursor + 1 > gap) {
+				new_cursor += gap_size + 1;
+			} else {
+				new_cursor += 1;
+			}
+		} else {
+			if (new_cursor - 1 < gap + gap_size) {
+				new_cursor -= gap_size;
+			} else {
+				new_cursor -= 1;
+			}
+		}
+	}
+	
+	cursor = new_cursor;
+#endif
+}
+
+void Buffer::move_cursor_to(size_t pos) {
+	assert(pos < allocated);
+	// @NOTE(Colby): Not implemented
+	assert(false);
 }

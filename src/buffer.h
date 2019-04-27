@@ -46,6 +46,9 @@ struct Buffer {
 
 	void add_char(u8 c);
 
+	void move_cursor(s32 delta);
+	void move_cursor_to(size_t pos);
+
 private:
 	void move_gap_to_cursor();
 	void refresh_cursor_info();

@@ -1,5 +1,7 @@
 #include "../os.h"
 #include "../editor.h"
+#include "../parsing.h"
+#include "../input.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -80,6 +82,13 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 		u8 key = (u8)w_param;
 		editor.on_key_pressed(key);
 	} break;
+
+	case WM_KEYDOWN: {
+		u8 key = (u8)w_param;
+		if (key >= KEY_LEFT && key <= KEY_DOWN) {
+			editor.on_key_pressed(key);
+		}
+	};
 
 	}
 
