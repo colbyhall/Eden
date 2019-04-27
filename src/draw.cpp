@@ -1,8 +1,11 @@
 #include "draw.h"
+
 #include "os.h"
 #include "parsing.h"
 #include "editor.h"
-
+#include "font.h"
+#include "string.h"
+#include "buffer.h"
 #include "memory.h"
 
 #include <stdio.h>

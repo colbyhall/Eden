@@ -136,7 +136,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	Editor& editor = Editor::get();
 	editor.init();
 	ShowWindow(window_handle, SW_SHOW);
-	wglSwapIntervalEXT(!BUILD_DEBUG);
+	// wglSwapIntervalEXT(!BUILD_DEBUG);
 	editor.loop();
 	editor.shutdown();
 

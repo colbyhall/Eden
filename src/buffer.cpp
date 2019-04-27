@@ -1,5 +1,6 @@
 #include "buffer.h"
 #include "parsing.h"
+#include "string.h"
 #include "os.h"
 #include "memory.h"
 

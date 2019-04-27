@@ -1,11 +1,13 @@
 #pragma once
 #include "types.h"
-#include "font.h"
 #include "buffer.h"
 #include "array.h"
-#include "math.h"
 
 #define WINDOW_TITLE "YEET"
+
+struct Font;
+struct Buffer;
+struct Vector2;
 
 extern Font font;
 extern u32 fps;

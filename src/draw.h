@@ -1,11 +1,12 @@
 #pragma once
 
 #include "types.h"
-#include "math.h"
 #include "opengl.h"
-#include "font.h"
-#include "string.h"
-#include "buffer.h"
+#include "math.h"
+
+struct Buffer;
+struct Font;
+struct String;
 
 struct Vertex {
 	Vector2 position;

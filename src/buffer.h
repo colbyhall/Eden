@@ -3,6 +3,7 @@
 #include "types.h"
 #include "string.h"
 
+
 /* ---- GAP BUFFER ----
 	* = Cursor
 	[ = Start of Gap

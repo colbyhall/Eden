@@ -1,15 +1,18 @@
 #include "editor.h"
+
 #include "os.h"
+#include "buffer.h"
+#include "math.h"
 #include "opengl.h"
 #include "draw.h"
 #include "string.h"
 #include "input.h"
 #include "parsing.h"
+#include "font.h"
+#include "lua.h"
 
 #include <assert.h>
 #include <stdio.h>
-
-#include <lua/lua.hpp>
 
 Font font;
 
@@ -56,9 +59,7 @@ void Editor::init() {
 	assert(GL::init());
 	init_renderer();
 
-	lua_state = luaL_newstate();
-	luaopen_base(lua_state);
-	luaopen_math(lua_state);
+	Lua::get().init();
 
 	font = Font::load_font("data\\fonts\\Consolas.ttf");
 	
@@ -92,7 +93,7 @@ void Editor::loop() {
 }
 
 void Editor::shutdown() {
-	lua_close(lua_state);
+	Lua::get().shutdown();
 }
 
 void Editor::on_window_resized(u32 old_width, u32 old_height) {

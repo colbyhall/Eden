@@ -42,8 +42,12 @@ private:
 
 #if BUILD_DEBUG
 #define c_realloc(ptr, new_size) Memory::realloc_debug(ptr, new_size)
+#define c_alloc(size) Memory::alloc_debug(size, __FILE__, __LINE__);
+#define c_free(block) Memory::free_debug(block)
 #else
 #define c_realloc(ptr, new_size) Memory::realloc(ptr, new_size)
+#define c_alloc(size) Memory::alloc(size);
+#define c_free(block) Memory::free(block)
 #endif
 
 inline void* operator new(size_t size, const char* file, u32 line) {
