@@ -2,23 +2,26 @@
 #include "types.h"
 #include "font.h"
 #include "buffer.h"
+#include "array.h"
+#include "math.h"
 
 #define WINDOW_TITLE "YEET"
 
 extern Font font;
 extern u32 fps;
 extern float delta_time;
-extern bool is_running;
 
-typedef struct Buffer_View {
-	Buffer* buffer;
+struct Buffer_View {
+	Buffer* buffer = nullptr;
 
-	float current_scroll_y;
-	float target_scroll_y;
+	float current_scroll_y = 0.f;
+	float target_scroll_y = 0.f;
 
-	float width;
-	float height;
-} Buffer_View;
+	void draw();
+
+	Vector2 get_size() const;
+	Vector2 get_position() const;
+};
 
 struct Editor {
 	static Editor& get();
@@ -27,6 +30,12 @@ struct Editor {
 	float delta_time = 0.f;
 	u64 last_frame_time = 0;
 	u32 fps;
+
+	Buffer* create_buffer();
+	Buffer* find_buffer(Buffer_ID id);
+	bool destroy_buffer(Buffer_ID id);
+
+	inline Buffer_View* get_current_view() { return &main_view; }
 
 	void init();
 	void loop();
@@ -39,6 +48,13 @@ struct Editor {
 	void draw();
 private:
 	static Editor g_editor;
+
+	Array<Buffer> loaded_buffers;
+	size_t last_id = 0;
+
+
+	// @NOTE(Colby): this is super temporary as we don't support multiple views
+	Buffer_View main_view;
 };
 
 

@@ -1,6 +1,7 @@
 #include "font.h"
 #include "os.h"
 #include "memory.h"
+#include "draw.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -8,7 +9,7 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb/stb_truetype.h>
 
-Font load_font(const char* path) {
+Font Font::load_font(const char* path) {
 
 	String font_data = OS::load_file_into_memory(path);
 
@@ -77,4 +78,17 @@ Font load_font(const char* path) {
 	c_delete[] font_data.data;
 
 	return result;
+}
+
+const Font_Glyph& Font::operator[](u8 c) const {
+	return characters[c - 32];
+}
+
+void Font::bind() {
+	font_shader.bind();
+	refresh_transformation();
+	glUniform1i(font_shader.texture_loc, 0);
+
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glActiveTexture(GL_TEXTURE0);
 }

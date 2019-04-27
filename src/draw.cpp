@@ -154,10 +154,6 @@ void init_renderer() {
     
     glBindVertexArray(0);
 
-	imm_vertex_count = 0;
-	view_to_projection = m4_identity();
-	world_to_view = m4_identity();
-
 	render_right_handed();
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -239,13 +235,13 @@ void immediate_vertex(float x, float y, Vector4 color, Vector2 uv) {
 }
 
 void immediate_quad(float x0, float y0, float x1, float y1, Vector4 color) {
-    immediate_vertex(x0, y0, color, vec2(0.f, 0.f));
-    immediate_vertex(x0, y1, color, vec2(0.f, 1.f));
-    immediate_vertex(x1, y0, color, vec2(1.f, 0.f));
+    immediate_vertex(x0, y0, color, Vector2(0.f, 0.f));
+    immediate_vertex(x0, y1, color, Vector2(0.f, 1.f));
+    immediate_vertex(x1, y0, color, Vector2(1.f, 0.f));
     
-    immediate_vertex(x0, y1, color, vec2(0.f, 1.f));
-    immediate_vertex(x1, y1, color, vec2(1.f, 1.f));
-    immediate_vertex(x1, y0, color, vec2(1.f, 0.f));
+    immediate_vertex(x0, y1, color, Vector2(0.f, 1.f));
+    immediate_vertex(x1, y1, color, Vector2(1.f, 1.f));
+    immediate_vertex(x1, y0, color, Vector2(1.f, 0.f));
 }
 
 
@@ -278,15 +274,15 @@ Vector2 immediate_string(const String& str, float x, float y, float font_height,
 		}
 
 		if (str.data[i] == '\t') {
-			const Font_Glyph& space_glyph = font.characters[' ' - 32];
+			const Font_Glyph& space_glyph = font.get_space_glyph();
 			x += space_glyph.advance * ratio * 4.f;
 			continue;
 		}
 
-		const Font_Glyph& glyph = font.characters[str.data[i] - 32];
+		const Font_Glyph& glyph = font[str.data[i]];
 
 		if (!is_whitespace(str.data[i])) {
-			Vector4 v4_color = vec4_color(color);
+			Vector4 v4_color = color;
 
 			float x0 = x + glyph.bearing_x * ratio;
 			float y0 = y + glyph.bearing_y * ratio;
@@ -304,10 +300,10 @@ Vector2 immediate_string(const String& str, float x, float y, float font_height,
 				break;
 			}
 
-			Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 bottom_right = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 bottom_left = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 top_right = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+			Vector2 top_left = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
 
 			immediate_vertex(x0, y0, v4_color, top_left);
 			immediate_vertex(x0, y1, v4_color, top_right);
@@ -324,23 +320,18 @@ Vector2 immediate_string(const String& str, float x, float y, float font_height,
 		if (y - original_y > largest_y) largest_y = x - original_y;
 	}
 
-	return vec2(largest_x, largest_y);
+	return Vector2(largest_x, largest_y);
 }
 
 void draw_string(const String& str, float x, float y, float font_height, int color) {
-	font_shader.bind();
-	refresh_transformation();
-	glUniform1i(font_shader.texture_loc, 0);
-
-	glBindTexture(GL_TEXTURE_2D, font.texture_id);
-	glActiveTexture(GL_TEXTURE0);
+	font.bind();
 
 	immediate_begin();
 	immediate_string(str, x, y, font_height, color);
 	immediate_flush();
 }
 
-Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
+Vector2 get_draw_string_size(String* str, float font_height, const Font& font) {
 	const float ratio = font_height / FONT_SIZE;
 
 	float y = 0.f;
@@ -349,16 +340,16 @@ Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
 	float largest_x = x;
 	float largest_y = y;
 	const float original_x = x;
-	y += font_height - font->line_gap * ratio;
+	y += font_height - font.line_gap * ratio;
 
 	for (size_t i = 0; i < str->count; i++) {
-		const Font_Glyph& glyph = font->characters[str->data[i] - 32];
+		const Font_Glyph& glyph = font[str->data[i]];
 
 		if (str->data[i] == '\n') {
 			y += font_height;
 			x = original_x;
 		} else if (str->data[i] == '\t') {
-			const Font_Glyph& space_glyph = font->characters[' ' - 32];
+			const Font_Glyph& space_glyph = font[' '];
 			x += space_glyph.advance * ratio * 4.f;
 		} else {
 			float x0 = x + glyph.bearing_x * ratio;
@@ -373,7 +364,7 @@ Vector2 get_draw_string_size(String* str, float font_height, Font* font) {
 		if (x > largest_x) largest_x = x;
 	}
 
-	return vec2(largest_x, largest_y);
+	return Vector2(largest_x, largest_y);
 }
 
 void refresh_transformation() {
@@ -394,8 +385,8 @@ void render_right_handed() {
     
     const float ortho_size = height / 2.f;
     
-    view_to_projection = m4_ortho(ortho_size, aspect_ratio, f, n);
-    world_to_view      = m4_translate(vec2(-width / 2.f, ortho_size));
+    view_to_projection = Matrix4::ortho(ortho_size, aspect_ratio, f, n);
+    world_to_view      = Matrix4::translate(Vector2(-width / 2.f, ortho_size));
     
     refresh_transformation();
 }
@@ -409,37 +400,35 @@ void render_frame_begin() {
 
 void render_frame_end() {
 
-	// if (BUILD_DEBUG)
+#if BUILD_DEBUG
+	char buffer[256];
+	sprintf_s(
+		buffer, 256, "Draw Calls: %i\nVerts Drawn: %llu\nVerts Culled: %llu\nFPS: %i\nAllocations: %llu\nAllocated: %f KB",
+		draw_calls, verts_drawn, verts_culled, Editor::get().fps, Memory::get().num_allocations, Memory::get().amount_allocated / 1024.f
+	);
+	String debug_string = buffer;
+
+	Vector2 string_size = get_draw_string_size(&debug_string, FONT_SIZE, font);
+	Vector2 padding = 10.f;
+	float x = OS::window_width() - (string_size.x + padding.x);
+	float y = 0.f;
+
 	{
 
-		char buffer[256];
-		sprintf_s(
-			buffer, 256, "Draw Calls: %i\nVerts Drawn: %llu\nVerts Culled: %llu\nFPS: %i\nAllocations: %llu\nAllocated: %f KB", 
-			draw_calls, verts_drawn, verts_culled, Editor::get().fps, Memory::get().num_allocations, Memory::get().amount_allocated / 1024.f
-		);
-		String debug_string = buffer;
+		float x0 = x;
+		float y0 = y;
+		float x1 = x0 + string_size.x + padding.x;
+		float y1 = y0 + string_size.y + padding.y;
 
-		Vector2 string_size = get_draw_string_size(&debug_string, FONT_SIZE, &font);
-		Vector2 padding = vec2s(10.f);
-		float x = OS::window_width() - (string_size.x + padding.x);
-		float y = 0.f;
-
-		{
-
-			float x0 = x;
-			float y0 = y;
-			float x1 = x0 + string_size.x + padding.x;
-			float y1 = y0 + string_size.y + padding.y;
-
-			draw_rect(x0, y0, x1, y1, vec4_color(0xAAAAAA));
-		}
-
-		{
-			float x0 = x + padding.x / 2.f;
-			float y0 = y + padding.y / 2.f;
-			draw_string(debug_string, x0, y0, FONT_SIZE, 0xFFFFFF);
-		}
+		draw_rect(x0, y0, x1, y1, 0xAAAAAA);
 	}
 
-	gl_swap_buffers();
+	{
+		float x0 = x + padding.x / 2.f;
+		float y0 = y + padding.y / 2.f;
+		draw_string(debug_string, x0, y0, FONT_SIZE, 0xFFFFFF);
+	}
+#endif
+
+	GL::swap_buffers();
 }

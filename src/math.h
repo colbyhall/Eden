@@ -14,39 +14,35 @@ struct Vector2 {
 	Vector2() : x(0.f), y(0.f) {}
 	Vector2(float xy) : x(xy), y(xy) {}
 	Vector2(float x, float y) : x(x), y(y) {}
+
+	Vector2 operator+(const Vector2& right) const;
+	void operator+=(const Vector2& right);
 };
-
-Vector2 vec2(f32 x, f32 y);
-Vector2 vec2s(f32 xy);
-f32 vec2_length_sq(Vector2* vec);
-f32 vec2_length(Vector2* vec);
-
-struct Vector3 {
-	f32 x, y, z;
-};
-
-Vector3 vec3(f32 x, f32 y, f32 z);
-Vector3 vec3s(f32 xyz);
-f32 vec3_length_sq(Vector3* vec);
-f32 vec3_length(Vector3* vec);
 
 struct Vector4 {
-	f32 x, y, z, w;
-};
+	union {
+		struct { f32 x, y, z, w; };
+		struct { f32 r, g, b, a; };
+	};
 
-Vector4 vec4_color(int color);
+	Vector4() : x(0.f), y(0.f), z(0.f), w(0.f) {}
+	Vector4(float scalar) : x(scalar), y(scalar), z(scalar), w(scalar) {}
+	Vector4(int color);
+};
 
 struct Matrix4 {
-	f32 elems[4 * 4];
+	union {
+		f32 row_col[4][4];
+		f32 elems[4 * 4];
+	};
+
+	Matrix4();
+	static Matrix4 identity();
+	static Matrix4 ortho(float size, float aspect_ratio, float far, float near);
+	static Matrix4 translate(Vector2 pos);
+
 };
 
-Matrix4 m4();
-Matrix4 m4_identity();
-
-Matrix4 m4_ortho(float size, float aspect_ratio, float far, float near);
-Matrix4 m4_translate(Vector2 pos);
-
-Matrix4 m4_multiply(Matrix4* left, Matrix4* right);
-void m4_muleq(Matrix4* left, Matrix4* right);
-
-float finterpto(float current, float target, float delta_time, float speed);
+namespace Math {
+	float finterpto(float current, float target, float delta_time, float speed);
+}

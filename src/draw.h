@@ -43,6 +43,8 @@ void init_renderer();
 void immediate_begin();
 void immediate_flush();
 
+void immediate_vertex(float x, float y, Vector4 color, Vector2 uv);
+
 void render_frame_begin();
 void render_frame_end();
 

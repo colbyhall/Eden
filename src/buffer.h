@@ -38,6 +38,7 @@ struct Buffer {
 	u8* cursor;
 
 	Buffer(Buffer_ID id);
+	Buffer() : id(0) {}
 
 	void load_from_file(const char* path);
 	void init_from_size(size_t size);

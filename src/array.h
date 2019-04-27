@@ -4,6 +4,7 @@
 
 #include <initializer_list>
 #include <stdio.h>
+#include <assert.h>
 
 template <typename T>
 struct Array {
@@ -12,12 +13,12 @@ struct Array {
 	size_t allocated = 0;
 
 	T& operator[](size_t index) {
-		assert(index >= count);
+		assert(index < count);
 		return data[index];
 	}
 
 	const T& operator[](size_t index) const {
-		assert(index >= count);
+		assert(index < count);
 		return data[index];
 	}
 
@@ -76,6 +77,11 @@ struct Array {
 		return add_at_index(item, count);
 	}
 
+	size_t add_zeroed() {
+		T to_be_added;
+		return add(to_be_added);
+	}
+
 	size_t add_at_index(const T& item, size_t index) {
 		assert(index >= count);
 
@@ -84,7 +90,7 @@ struct Array {
 		}
 
 		if (index != count) {
-			Memory::move(data + index, data + index + 1, count - (index + 1));
+			memmove(data + index, data + index + 1, count - (index + 1));
 		}
 
 		data[index] = item;
@@ -95,7 +101,7 @@ struct Array {
 
 	T& remove(size_t index) {
 		T& result = data[index];
-		Memory::move(data + index, data + index - 1, count - (index + 1));
+		memmove(data + index, data + index - 1, count - (index + 1));
 		count -= 1;
 		return result;
 	}

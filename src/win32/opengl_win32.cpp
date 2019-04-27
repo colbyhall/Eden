@@ -15,7 +15,7 @@ WGL_Create_Context_Attribs_ARB* wglCreateContextAttribsARB = NULL;
 WGL_Choose_Pixel_Format_ARB* wglChoosePixelFormatARB = NULL;
 WGL_Swap_Interval_Ext* wglSwapIntervalEXT = NULL;
 
-bool gl_init() {
+bool GL::init() {
 
 	{
 		WNDCLASSEX window_class;
@@ -105,7 +105,7 @@ bool gl_init() {
 	return false;
 }
 
-void gl_swap_buffers() {
+void GL::swap_buffers() {
 	HWND window_handle = (HWND)OS::get_window_handle();
 	HDC window_context = GetDC(window_handle);
 	SwapBuffers(window_context);
