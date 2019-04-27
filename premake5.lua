@@ -8,12 +8,15 @@ workspace "YEET"
         "Release"
     }
 
+	targetdir ("bin")
+    objdir ("bin")
+
+	include "libs/lua"
+
 project "YEET"
     kind "WindowedApp"
     language "C++"
 
-    targetdir ("bin")
-    objdir ("bin")
 	characterset("ASCII")
 
 	defines
@@ -25,7 +28,6 @@ project "YEET"
     {
         "src/*.h",
         "src/*.cpp",
-		"libs/**.h"
     }
 
     includedirs
@@ -39,8 +41,14 @@ project "YEET"
         "opengl32",
         "user32",
         "kernel32",
-		"shlwapi"
+		"shlwapi",
+		"bin/lua-lib.lib"
     }
+
+	dependson
+	{
+		"lua-lib"
+	}
 
     filter "configurations:Debug"
 		defines 

@@ -31,6 +31,8 @@ struct Editor {
 	u64 last_frame_time = 0;
 	u32 fps;
 
+	struct lua_State* lua_state;
+
 	Buffer* create_buffer();
 	Buffer* find_buffer(Buffer_ID id);
 	bool destroy_buffer(Buffer_ID id);
@@ -51,7 +53,6 @@ private:
 
 	Array<Buffer> loaded_buffers;
 	size_t last_id = 0;
-
 
 	// @NOTE(Colby): this is super temporary as we don't support multiple views
 	Buffer_View main_view;

@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include <lua/lua.hpp>
+
 Font font;
 
 const float scroll_speed = 5.f;
@@ -54,8 +56,11 @@ void Editor::init() {
 	assert(GL::init());
 	init_renderer();
 
-	font = Font::load_font("data\\fonts\\Consolas.ttf");
+	lua_state = luaL_newstate();
+	luaopen_base(lua_state);
+	luaopen_math(lua_state);
 
+	font = Font::load_font("data\\fonts\\Consolas.ttf");
 	
 	Buffer* buffer = create_buffer();
 	main_view.buffer = buffer;
@@ -87,7 +92,7 @@ void Editor::loop() {
 }
 
 void Editor::shutdown() {
-
+	lua_close(lua_state);
 }
 
 void Editor::on_window_resized(u32 old_width, u32 old_height) {
