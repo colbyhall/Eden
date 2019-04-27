@@ -4,6 +4,7 @@
 #include "array.h"
 
 #define WINDOW_TITLE "YEET"
+#define GAP_BUFFER_DEBUG 1
 
 struct Font;
 struct Buffer;

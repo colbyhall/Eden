@@ -3,9 +3,9 @@
 #include "types.h"
 #include "opengl.h"
 #include "math.h"
+#include "font.h"
 
 struct Buffer;
-struct Font;
 struct String;
 
 struct Vertex {
@@ -44,17 +44,20 @@ void init_renderer();
 void immediate_begin();
 void immediate_flush();
 
-void immediate_vertex(float x, float y, Vector4 color, Vector2 uv);
+void immediate_vertex(float x, float y, const Vector4& color, Vector2 uv);
 
 void render_frame_begin();
 void render_frame_end();
 
-void draw_rect(float x0, float y0, float x1, float y1, Vector4 color);
-void draw_string(const String& str, float x, float y, float font_height, int color);
+void draw_rect(float x0, float y0, float x1, float y1, const Vector4& color);
+void draw_string(const String& str, float x, float y, const Vector4& color);
 
-Vector2 immediate_string(const String& str, float x, float y, float font_height, int color);
+Vector2 immediate_string(const String& str, float x, float y, const Vector4& color);
 
-Vector2 get_draw_string_size(String* str, float font_height, Font* font);
+void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Vector4& color);
+const Font_Glyph& immediate_char(u8 c, float x, float y, const Vector4& color);
+
+Vector2 get_draw_string_size(String* str);
 
 void refresh_transformation();
 void render_right_handed();

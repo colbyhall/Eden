@@ -51,45 +51,44 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 	Editor& editor = Editor::get();
 
 	switch (message) {
-	case WM_SIZE: {
-		RECT rect;
-		GetClientRect(handle, &rect);
+		case WM_SIZE: {
+			RECT rect;
+			GetClientRect(handle, &rect);
 
-		const u32 old_width = window_width;
-		const u32 old_height = window_height;
+			const u32 old_width = window_width;
+			const u32 old_height = window_height;
 
-		window_width = rect.right - rect.left;
-		window_height = rect.bottom - rect.top;
+			window_width = rect.right - rect.left;
+			window_height = rect.bottom - rect.top;
 
-		editor.on_window_resized(old_width, old_height);
-		// game_state->on_window_resized(old_width, old_height);
-	} break;
+			editor.on_window_resized(old_width, old_height);
+			// game_state->on_window_resized(old_width, old_height);
+		} break;
 
-	case WM_DESTROY: {
-		// game_state->on_exit_requested();
-		editor.is_running = false;
-	} break;
-	case WM_SIZING: {
-		editor.draw();
-	} break;
+		case WM_DESTROY: {
+			// game_state->on_exit_requested();
+			editor.is_running = false;
+		} break;
+		case WM_SIZING: {
+			editor.draw();
+		} break;
 
-	case WM_MOUSEWHEEL: {
-		float delta = GET_WHEEL_DELTA_WPARAM(w_param);
-		editor.on_mousewheel_scrolled(delta);
-	} break;
+		case WM_MOUSEWHEEL: {
+			float delta = GET_WHEEL_DELTA_WPARAM(w_param);
+			editor.on_mousewheel_scrolled(delta);
+		} break;
 
-	case WM_CHAR: {
-		u8 key = (u8)w_param;
-		editor.on_key_pressed(key);
-	} break;
-
-	case WM_KEYDOWN: {
-		u8 key = (u8)w_param;
-		if (key >= KEY_LEFT && key <= KEY_DOWN) {
+		case WM_CHAR: {
+			u8 key = (u8)w_param;
 			editor.on_key_pressed(key);
-		}
-	};
+		} break;
 
+		case WM_KEYDOWN: {
+			u8 key = (u8)w_param;
+			if (key >= KEY_LEFT && key <= KEY_DOWN) {
+				editor.on_key_pressed(key);
+			}
+		} break;
 	}
 
 	return DefWindowProc(handle, message, w_param, l_param);

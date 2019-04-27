@@ -65,7 +65,8 @@ void Editor::init() {
 	
 	Buffer* buffer = create_buffer();
 	main_view.buffer = buffer;
-	buffer->init_from_size(2048);
+	buffer->init_from_size(10);
+	buffer->title = "Scratch Buffer";
 
 
 	is_running = true;
@@ -112,10 +113,22 @@ void Editor::on_key_pressed(u8 key) {
 	switch (key) {
 	case KEY_ENTER:
 		current_buffer->add_char('\n');
+		break;
 	case KEY_LEFT:
 		current_buffer->move_cursor(-1);
+		break;
 	case KEY_RIGHT:
 		current_buffer->move_cursor(1);
+		break;
+	case KEY_UP:
+		current_buffer->move_cursor_line(-1);
+		break;
+	case KEY_DOWN:
+		current_buffer->move_cursor_line(1);
+		break;
+	case KEY_BACKSPACE:
+		current_buffer->remove_before_cursor();
+		break;
 	default:
 		current_buffer->add_char(key);
 	}
@@ -152,7 +165,7 @@ void Editor::draw() {
 			const float y1 = window_height;
 
 			draw_rect(x0, y0, x1, y1, 0x1a212d);
-			draw_string("edit mode", x0 + 5.f, y0 + 3.f, FONT_SIZE, 0xFFFFFF);
+			// draw_string("edit mode", x0 + 5.f, y0 + 3.f, FONT_SIZE, 0xFFFFFF);
 		}
 	}
 
@@ -161,85 +174,137 @@ void Editor::draw() {
 }
 
 void Buffer_View::draw() {
-
 	if (!buffer) return;
 
 	const Vector2 position = get_position();
 	const Vector2 size = get_size();
 
-	font.bind();
+	// @NOTE(Colby): This is where we draw the text data
+	{
+		font.bind();
 
-	const float font_height = FONT_SIZE;
-	float x = 0.f;
-	float y = font_height - font.line_gap;
+		const float font_height = FONT_SIZE;
+		float x = 0.f;
+		float y = font_height - font.line_gap;
 
-	immediate_begin();
-	for (size_t i = 0; i < buffer->allocated; i++) {
-		if (buffer->data[i] == '\n') {
-			y += font_height;
-			x = 0.f;
-			continue;
-		}
+		immediate_begin();
 
-		if (buffer->data[i] == '\t') {
-			const Font_Glyph& space_glyph = font.get_space_glyph();
-			x += space_glyph.advance  * 4.f;
-			continue;
-		}
+#if GAP_BUFFER_DEBUG
+		size_t line_index = 0;
 
-		const Font_Glyph& glyph = font[buffer->data[i]];
+		const char* format = "%llu: LS: %llu |";
 
-		if (buffer->data + i == buffer->cursor) {
-			immediate_flush();
+		char out_line_size[20];
+		sprintf_s(out_line_size, 20, format, line_index + 1, buffer->eol_table[line_index]);
 
-			float x0 = x;
-			float y0 = y - font.ascent;
-			float x1 = x0 + glyph.advance;
-			if (buffer->cursor == buffer->gap) {
+		x += immediate_string(out_line_size, position.x + x, position.y + y, 0xFFFF00).x;
+#endif
 
-				const Font_Glyph& space_glyph = font.get_space_glyph();
+		for (size_t i = 0; i < buffer->allocated; i++) {
+			if (buffer->data + i == buffer->cursor) {
+				immediate_flush();
 
-				x1 = x0 + space_glyph.advance;
+				const Font_Glyph& glyph = font[buffer->data[i]];
 
+				const float x0 = x;
+				const float y0 = y - font.ascent;
+				float x1 = x0 + glyph.advance;
+				if (buffer->cursor == buffer->gap || is_eol(buffer->data[i])) {
+					const Font_Glyph& space_glyph = font.get_space_glyph();
+
+					x1 = x0 + space_glyph.advance;
+				}
+				const float y1 = y - font.descent;
+
+				draw_rect(x0, y0, x1, y1, 0xFF00FF);
+
+				immediate_begin();
+				font.bind();
 			}
-			float y1 = y - font.descent;
 
-			draw_rect(x0, y0, x1, y1, 0xFF00FF);
+			u8 c_to_draw = buffer->data[i];
+			Vector4 color = 0xFFFFFF;
+#if GAP_BUFFER_DEBUG
+			const u8* current_position = buffer->data + i;
 
-			immediate_begin();
-			font.bind();
+			if (current_position == buffer->gap) {
+				c_to_draw = '[';
+				color = 0x00FFFF;
+			} else if (current_position == buffer->get_gap_end() - 1) {
+				c_to_draw = ']';
+				color = 0x00FFFF;
+			} else if (current_position > buffer->gap && current_position < buffer->get_gap_end()) {
+				c_to_draw = '*';
+				color = 0xFFFF00;
+			} else {
+				if (is_eol(buffer->data[i])) {
+					line_index += 1;
+					x = 0.f;
+					y += font_height;
+
+					char out_line_size[20];
+					sprintf_s(out_line_size, 20, format, line_index + 1, buffer->eol_table[line_index]);
+					x += immediate_string(out_line_size, position.x + x, position.y + y, 0xFFFF00).x;
+					continue;
+				} else if (buffer->data[i] == '\t') {
+					const Font_Glyph& space_glyph = font.get_space_glyph();
+					x += space_glyph.advance  * 4.f;
+					continue;
+				} else if (buffer->data[i] == ' ') {
+					x += font.get_space_glyph().advance;
+					continue;
+				}
+			}
+#else
+			if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->get_gap_end()) {
+				continue;
+			}
+
+			if (is_eol(buffer->data[i])) {
+				y += font_height;
+				x = 0.f;
+				continue;
+			} else if (buffer->data[i] == '\t') {
+				const Font_Glyph& space_glyph = font.get_space_glyph();
+				x += space_glyph.advance  * 4.f;
+				continue;
+			} else if (buffer->data[i] == ' ') {
+				x += font.get_space_glyph().advance;
+				continue;
+			}
+#endif
+
+			assert(!is_whitespace(c_to_draw));
+
+			const Font_Glyph& glyph = font[c_to_draw];
+
+			if (x + glyph.advance > size.x) {
+				x = 0.f;
+				y += font_height;
+			}
+
+			immediate_glyph(glyph, position.x + x, position.y + y, color);
+			x += glyph.advance;
 		}
 
-		if (buffer->data + i == buffer->gap) {
-			i += buffer->gap_size;
-		}
-
-		if (!is_whitespace(buffer->data[i])) {
-			Vector4 v4_color = 0xFFFFFF;
-
-			float x0 = position.x + x + glyph.bearing_x;
-			float y0 = position.y + y + glyph.bearing_y;
-			float x1 = x0 + glyph.width;
-			float y1 = y0 + glyph.height;
-
-			Vector2 bottom_right = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 bottom_left = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 top_right = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-			Vector2 top_left = Vector2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-
-			immediate_vertex(x0, y0, v4_color, top_left);
-			immediate_vertex(x0, y1, v4_color, top_right);
-			immediate_vertex(x1, y0, v4_color, bottom_left);
-
-			immediate_vertex(x0, y1, v4_color, top_right);
-			immediate_vertex(x1, y1, v4_color, bottom_right);
-			immediate_vertex(x1, y0, v4_color, bottom_left);
-		}
-
-		x += glyph.advance;
+		immediate_flush();
 	}
 
-	immediate_flush();
+	// @NOTE(Colby): We're drawing info bar here
+	{
+		const float bar_height = FONT_SIZE + 10.f;
+
+		const float x0 = position.x;
+		const float y0 = position.y + size.y - bar_height;
+		const float x1 = x0 + size.x;
+		const float y1 = y0 + bar_height;
+		draw_rect(x0, y0, x1, y1, 0x273244);
+
+		char output_string[1024];
+		sprintf_s(output_string, 1024, " %s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
+		String out_str = output_string;
+		draw_string(out_str, x0, y0 + 5.f, 0xFFFFFF);
+	}
 }
 
 Vector2 Buffer_View::get_size() const {

@@ -64,7 +64,7 @@ struct Array {
 		allocated += amount;
 
 		if (data) {
-			data = (T*)c_realloc(data, allocated);
+			data = (T*)c_realloc(data, allocated * sizeof(T));
 		}
 		else {
 			data = c_new T[allocated];

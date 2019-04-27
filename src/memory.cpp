@@ -5,8 +5,9 @@
 
 Memory Memory::g_memory;
 
+
 void* Memory::alloc(size_t size) {
-	return malloc(size);
+	return ::malloc(size);
 }
 
 void* Memory::realloc(void* ptr, size_t new_size) {
@@ -62,7 +63,7 @@ void* Memory::realloc_debug(void* ptr, size_t new_size) {
 
 	g_memory.amount_allocated += new_size - original_size;
 
-	return Memory::realloc(original_block, new_size);
+	return (u8*)Memory::realloc(original_block, new_size) + sizeof(Memory_Header);
 }
 
 void Memory::free_debug(void* block) {

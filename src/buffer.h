@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "string.h"
+#include "array.h"
 
 
 /* ---- GAP BUFFER ----
@@ -23,7 +24,6 @@ struct Buffer {
 	String path;
 	String title;
 
-	u64 line_count;
 	bool modified;
 
 	u8* data;
@@ -38,6 +38,8 @@ struct Buffer {
 
 	u8* cursor;
 
+	Array<size_t> eol_table;
+
 	Buffer(Buffer_ID id);
 	Buffer() : id(0) {}
 
@@ -48,9 +50,22 @@ struct Buffer {
 
 	void move_cursor(s32 delta);
 	void move_cursor_to(size_t pos);
+	void move_cursor_line(s32 delta);
+
+	void remove_before_cursor();
+
+	inline u8* get_data_end() { return data + allocated; }
+	inline u8* get_gap_end() { return gap + gap_size; }
+	inline size_t get_line_count() const { return eol_table.count; }
+
+	u8* get_line(size_t line);
 
 private:
+
 	void move_gap_to_cursor();
 	void refresh_cursor_info();
+	void resize_gap(size_t new_size);
+
+	u8* get_position(size_t index);
 };
 
