@@ -268,7 +268,7 @@ void Buffer_View::input_pressed() {
 	const float cursor_y_in_buffer = (buffer->current_line_number) * font_height;
 	const float cursor_y_in_view = cursor_y_in_buffer - current_scroll_y;
 
-	const int lines_in_size = size.y / font_height;
+	const int lines_in_size = (int)(size.y / font_height);
 
 	if (cursor_y_in_view - font_height < 0.f) {
 		target_scroll_y = cursor_y_in_buffer;
@@ -306,8 +306,15 @@ void Buffer_View::draw() {
 
 		x += immediate_string(out_line_size, position.x + x, position.y + y, 0xFFFF00).x;
 #endif
+		const size_t lines_scrolled = (size_t)(current_scroll_y / font_height);
+		size_t start_index = 0;
+		for (size_t i = 0; i < lines_scrolled; i++) {
+			start_index += buffer->eol_table[i];
+		}
 
-		for (size_t i = 0; i < buffer->allocated; i++) {
+		y += lines_scrolled * font_height;
+
+		for (size_t i = start_index; i < buffer->allocated; i++) {
 			Vector4 color = 0xd6b58d;
 			u8 c_to_draw = buffer->data[i];
 
@@ -395,6 +402,10 @@ void Buffer_View::draw() {
 			if (x + glyph.advance > size.x) {
 				x = 0.f;
 				y += font_height;
+			}
+
+			if (get_buffer_position().y + y > size.y) {
+				break;
 			}
 
 			immediate_glyph(glyph, position.x + x, position.y + y, color);
