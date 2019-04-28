@@ -486,7 +486,7 @@ void Buffer_View::try_cursor_pick() {
 
 	const float font_height = FONT_SIZE;
 
-	const Vector2 position = get_position();
+	const Vector2 position = get_buffer_position();
 
 	float x = 0.f;
 	float y = 0.f;
