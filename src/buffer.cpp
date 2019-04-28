@@ -14,7 +14,7 @@
 #define DEFAULT_GAP_SIZE 1024
 
 Buffer::Buffer(Buffer_ID id) 
-	: id(id), modified(false), allocated(0), gap(nullptr), gap_size(0), current_line_number(0), desired_column_number(0), current_column_number(0), cursor(nullptr) {}
+	: id(id), modified(false), allocated(0), gap(nullptr), gap_size(0), current_line_number(0), desired_column_number(0), current_column_number(0), cursor(0) {}
 
 void Buffer::move_gap_to_cursor() {
 	if (cursor == gap) return;
@@ -37,25 +37,25 @@ void Buffer::move_gap_to_cursor() {
 	}
 }
 
-void Buffer::refresh_cursor_info() {
-	u32 line_count = 0;
-	u32 column_number = 0;
+void Buffer::refresh_cursor_info(bool update_desired) {
+	current_line_number = 0;
+	current_column_number = 0;
 	for (size_t i = 0; i < get_size(); i++) {
 		const u8* pos = get_position(i);
-
-		if (pos == cursor) {
-			current_line_number = line_count;
-			current_column_number = column_number;
-			desired_column_number = column_number;
-			return;
+		if (pos == cursor || (cursor == gap && get_gap_end() == pos)) {
+			break;
 		}
 
-		column_number += 1;
+		current_column_number += 1;
 
 		if (is_eol(*pos)) {
-			line_count += 1;
-			column_number = 0;
+			current_line_number += 1;
+			current_column_number = 0;
 		}
+	}
+
+	if (update_desired) {
+		desired_column_number = current_column_number;
 	}
 }
 
@@ -71,11 +71,12 @@ void Buffer::resize_gap(size_t new_size) {
 u8* Buffer::get_position(size_t index) {
 	assert(index < get_size());
 
-	if (index < (size_t)(gap - data)) {
+	const size_t first_data_size = (size_t)(gap - data);
+	if (index < first_data_size) {
 		return data + index;
 	} else {
-		index -= gap - data;
-		return gap + gap_size + index;
+		index -= first_data_size;
+		return get_gap_end() + index;
 	}
 }
 
@@ -191,8 +192,23 @@ void Buffer::move_cursor_to(size_t pos) {
 
 void Buffer::move_cursor_line(s32 delta) {
 	size_t new_line = current_line_number + delta;
-	cursor = get_line(new_line);
-	refresh_cursor_info();
+	if (delta < 0 && current_line_number == 0) {
+		new_line = 0;
+	} else if (new_line >= eol_table.count) {
+		new_line = eol_table.count - 1;
+	}
+
+	size_t line_position = 0;
+	for (size_t i = 0; i < new_line; i++) {
+		line_position += eol_table[i] + 1;
+	}
+
+	if (current_column_number > eol_table[new_line]) {
+		current_column_number = eol_table[new_line] - 1;
+	}
+
+	cursor = get_position(line_position + current_column_number);
+	refresh_cursor_info(false);
 }
 
 void Buffer::remove_before_cursor() {
@@ -223,10 +239,10 @@ u8* Buffer::get_line(size_t line) {
 
 	size_t line_position = 0;
 	for (size_t i = 0; i < line; i++) {
-		line_position += eol_table[i];
+		line_position += eol_table[i] + 1;
 	}
 
-	return get_position(line_position) + 1;
+	return get_position(line_position);
 }
 
 void Buffer_View::draw() {

@@ -5,8 +5,8 @@
 #include "array.h"
 #include "math.h"
 
-#define GAP_BUFFER_DEBUG 1
-#define LINE_COUNT_DEBUG 1
+#define GAP_BUFFER_DEBUG 0
+#define LINE_COUNT_DEBUG 0
 #define EOF_DEBUG 1
 
 /* ---- GAP BUFFER ----
@@ -42,7 +42,7 @@ struct Buffer {
 	u64 current_line_number;
 	u64 desired_column_number;
 	u64 current_column_number;
-
+	
 	u8* cursor;
 
 	Array<size_t> eol_table;
@@ -71,7 +71,7 @@ struct Buffer {
 private:
 
 	void move_gap_to_cursor();
-	void refresh_cursor_info();
+	void refresh_cursor_info(bool update_desired = true);
 	void resize_gap(size_t new_size);
 
 	u8* get_position(size_t index);
