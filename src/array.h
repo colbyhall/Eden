@@ -83,14 +83,14 @@ struct Array {
 	}
 
 	size_t add_at_index(const T& item, size_t index) {
-		assert(index >= count);
+		assert(index <= count);
 
 		if (count == allocated) {
 			reserve(1);
 		}
 
 		if (index != count) {
-			memmove(data + index, data + index + 1, count - (index + 1));
+			memmove(data + index + 1, data + index, (count - index) * sizeof(T));
 		}
 
 		data[index] = item;
@@ -99,9 +99,9 @@ struct Array {
 		return index;
 	}
 
-	T& remove(size_t index) {
-		T& result = data[index];
-		memmove(data + index, data + index - 1, count - (index + 1));
+	T remove(size_t index) {
+		T result = data[index];
+		memmove(data + index, data + index + 1, (count - index) * sizeof(T));
 		count -= 1;
 		return result;
 	}

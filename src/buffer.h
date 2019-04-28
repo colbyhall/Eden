@@ -3,7 +3,11 @@
 #include "types.h"
 #include "string.h"
 #include "array.h"
+#include "math.h"
 
+#define GAP_BUFFER_DEBUG 1
+#define LINE_COUNT_DEBUG 1
+#define EOF_DEBUG 1
 
 /* ---- GAP BUFFER ----
 	* = Cursor
@@ -17,6 +21,9 @@
 */
 
 using Buffer_ID = size_t;
+
+extern struct Font font;
+struct Font_Glyph;
 
 struct Buffer {
 	Buffer_ID id;
@@ -56,6 +63,7 @@ struct Buffer {
 
 	inline u8* get_data_end() { return data + allocated; }
 	inline u8* get_gap_end() { return gap + gap_size; }
+	inline size_t get_size() { return allocated - gap_size; }
 	inline size_t get_line_count() const { return eol_table.count; }
 
 	u8* get_line(size_t line);
@@ -67,5 +75,20 @@ private:
 	void resize_gap(size_t new_size);
 
 	u8* get_position(size_t index);
+};
+
+struct Buffer_View {
+	Buffer* buffer = nullptr;
+
+	float current_scroll_y = 0.f;
+	float target_scroll_y = 0.f;
+
+	void draw();
+
+	Vector2 get_size() const;
+	Vector2 get_position() const;
+
+private:
+	void draw_cursor(const Font_Glyph& glyph, float x, float y);
 };
 

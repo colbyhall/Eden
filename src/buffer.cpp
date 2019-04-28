@@ -3,6 +3,8 @@
 #include "string.h"
 #include "os.h"
 #include "memory.h"
+#include "draw.h"
+#include "font.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,10 +38,12 @@ void Buffer::move_gap_to_cursor() {
 }
 
 void Buffer::refresh_cursor_info() {
-	u32 line_count = 1;
+	u32 line_count = 0;
 	u32 column_number = 0;
-	for (size_t i = 0; i < allocated; i++) {
-		if (data + i == cursor) {
+	for (size_t i = 0; i < get_size(); i++) {
+		const u8* pos = get_position(i);
+
+		if (pos == cursor) {
 			current_line_number = line_count;
 			current_column_number = column_number;
 			desired_column_number = column_number;
@@ -48,7 +52,7 @@ void Buffer::refresh_cursor_info() {
 
 		column_number += 1;
 
-		if (is_eol(data[i])) {
+		if (is_eol(*pos)) {
 			line_count += 1;
 			column_number = 0;
 		}
@@ -65,17 +69,14 @@ void Buffer::resize_gap(size_t new_size) {
 }
 
 u8* Buffer::get_position(size_t index) {
-	size_t i = 0;
-	while (i < allocated && index != 0) {
-		if (data + i == gap) {
-			i += gap_size;
-		} else {
-			i += 1;
-		}
-		index -= 1;
-	}
+	assert(index < get_size());
 
-	return data + i;
+	if (index < (size_t)(gap - data)) {
+		return data + index;
+	} else {
+		index -= gap - data;
+		return gap + gap_size + index;
+	}
 }
 
 void Buffer::load_from_file(const char* path) {
@@ -139,16 +140,17 @@ void Buffer::add_char(u8 c) {
 	gap_size -= 1;
 
 	if (is_eol(c)) {
-		const size_t line_size = eol_table[current_line_number - 1];
-		eol_table[current_line_number - 1] = current_column_number;
-		eol_table.add(line_size - current_column_number);
+		const size_t line_size = eol_table[current_line_number];
+		eol_table[current_line_number] = current_column_number;
+		eol_table.add_at_index(line_size - current_column_number, current_line_number + 1);
+
 		current_line_number += 1;
 		current_column_number = 0;
 		desired_column_number = 0;
 	} else {
 		current_column_number += 1;
 		desired_column_number += 1;
-		eol_table[current_line_number - 1] += 1;
+		eol_table[current_line_number] += 1;
 	}
 
 	if (gap_size == 0) {
@@ -162,16 +164,17 @@ void Buffer::move_cursor(s32 delta) {
 	u8* new_cursor = cursor + delta;
 
 	if (new_cursor < data) new_cursor = data;
+	if (new_cursor > data + allocated) new_cursor = data + allocated;
 
-	if (new_cursor > gap && new_cursor < gap + gap_size) {
+	if (new_cursor > gap && new_cursor <= gap + gap_size) {
 		if (delta > 0) {
 			if (get_gap_end() == get_data_end() && new_cursor + gap_size >= get_data_end()) {
 				new_cursor = gap;
 			} else {
-				new_cursor += gap_size - 1;
+				new_cursor += gap_size;
 			}
 		} else {
-			new_cursor -= gap_size - 1;
+			new_cursor -= gap_size;
 		}
 	}
 	
@@ -182,21 +185,14 @@ void Buffer::move_cursor(s32 delta) {
 }
 
 void Buffer::move_cursor_to(size_t pos) {
-	assert(pos < allocated);
+	assert(pos < get_size());
 	cursor = get_position(pos);
 }
 
 void Buffer::move_cursor_line(s32 delta) {
-	size_t desired_line = current_line_number + delta;
-
-	if (desired_line > get_line_count()) desired_line = get_line_count() - 1;
-
-
-	cursor = get_line(desired_line);
-	const size_t line_length = eol_table[desired_line];
-	current_line_number = desired_line + 1;
-	if (line_length < current_column_number) current_column_number = line_length;
-	cursor += current_column_number;
+	size_t new_line = current_line_number + delta;
+	cursor = get_line(new_line);
+	refresh_cursor_info();
 }
 
 void Buffer::remove_before_cursor() {
@@ -205,9 +201,21 @@ void Buffer::remove_before_cursor() {
 	if (cursor == data) {
 		return;
 	}
+
+	eol_table[current_line_number] -= 1;
+
+	if (is_eol(*(cursor - 1))) {
+		const size_t amount_on_line = eol_table[current_line_number] + 1;
+		eol_table.remove(current_line_number);
+		eol_table[current_line_number - 1] += amount_on_line;
+	}
+
 	cursor -= 1;
 	gap -= 1;
 	gap_size += 1;
+
+	// @Hack(Colby): Slow but doing it out of laziness
+	refresh_cursor_info();
 }
 
 u8* Buffer::get_line(size_t line) {
@@ -218,5 +226,171 @@ u8* Buffer::get_line(size_t line) {
 		line_position += eol_table[i];
 	}
 
-	return get_position(line_position);
+	return get_position(line_position) + 1;
+}
+
+void Buffer_View::draw() {
+	if (!buffer) return;
+
+	const Vector2 position = get_position();
+	const Vector2 size = get_size();
+
+	// @NOTE(Colby): This is where we draw the text data
+	{
+
+		const float font_height = FONT_SIZE;
+		float x = 0.f;
+		float y = font_height - font.line_gap;
+
+		font.bind();
+		immediate_begin();
+
+#if LINE_COUNT_DEBUG
+		size_t line_index = 0;
+
+		const char* format = "%llu: LS: %llu |";
+
+		char out_line_size[20];
+		sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+
+		x += immediate_string(out_line_size, position.x + x, position.y + y, 0xFFFF00).x;
+#endif
+
+		for (size_t i = 0; i < buffer->allocated; i++) {
+			Vector4 color = 0xd6b58d;
+			u8 c_to_draw = buffer->data[i];
+
+			const u8* current_position = buffer->data + i;
+
+			if (buffer->data + i == buffer->cursor) {
+				immediate_flush();
+
+				const Font_Glyph& glyph = font[buffer->data[i]];
+
+				if (buffer->cursor == buffer->gap || is_eol(buffer->data[i])) {
+					draw_cursor(font.get_space_glyph(), position.x + x, position.y + y);
+				}
+				else {
+					draw_cursor(glyph, position.x + x, position.y + y);
+				}
+				color = 0x052329;
+
+				immediate_begin();
+				font.bind();
+			}
+
+#if GAP_BUFFER_DEBUG
+			if (current_position == buffer->gap) {
+				c_to_draw = '[';
+				color = 0x00FFFF;
+			} else if (current_position == buffer->get_gap_end() - 1) {
+				c_to_draw = ']';
+				color = 0x00FFFF;
+			} else if (current_position > buffer->gap && current_position < buffer->get_gap_end()) {
+				c_to_draw = '*';
+				color = 0xFFFF00;
+			} else {
+				if (c_to_draw == '\t') {
+					const Font_Glyph& space_glyph = font.get_space_glyph();
+					x += space_glyph.advance  * 4.f;
+					continue;
+				} else if (c_to_draw == ' ') {
+					x += font.get_space_glyph().advance;
+					continue;
+				}
+			}
+#else
+			if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->get_gap_end()) {
+				continue;
+			}
+
+			if (is_eol(c_to_draw) && !LINE_COUNT_DEBUG) {
+				y += font_height;
+				x = 0.f;
+				continue;
+			}
+			else if (c_to_draw == '\t') {
+				const Font_Glyph& space_glyph = font.get_space_glyph();
+				x += space_glyph.advance  * 4.f;
+				continue;
+			}
+			else if (c_to_draw == ' ') {
+				x += font.get_space_glyph().advance;
+				continue;
+			}
+#endif
+
+#if LINE_COUNT_DEBUG
+			if (is_eol(c_to_draw)) {
+				line_index += 1;
+				x = 0.f;
+				y += font_height;
+
+				char out_line_size[20];
+				sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+				x += immediate_string(out_line_size, position.x + x, position.y + y, 0xFFFF00).x;
+				continue;
+			}
+#endif
+
+			assert(!is_whitespace(c_to_draw));
+
+			const Font_Glyph& glyph = font[c_to_draw];
+
+			if (x + glyph.advance > size.x) {
+				x = 0.f;
+				y += font_height;
+			}
+
+			immediate_glyph(glyph, position.x + x, position.y + y, color);
+			x += glyph.advance;
+		}
+
+		if (buffer->cursor == buffer->get_data_end()) {
+			immediate_flush();
+			draw_cursor(font.get_space_glyph(), position.x + x, position.y + y);
+			immediate_begin();
+			font.bind();
+		}
+
+#if EOF_DEBUG
+		immediate_string("EOF", x, y, 0xAA00FF);
+#endif
+
+		immediate_flush();
+	}
+
+	// @NOTE(Colby): We're drawing info bar here
+	{
+		const float bar_height = FONT_SIZE + 10.f;
+
+		const float x0 = position.x;
+		const float y0 = position.y + size.y - bar_height;
+		const float x1 = x0 + size.x;
+		const float y1 = y0 + bar_height;
+		draw_rect(x0, y0, x1, y1, 0xd6b58d);
+
+		char output_string[1024];
+		sprintf_s(output_string, 1024, " %s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
+		String out_str = output_string;
+		draw_string(out_str, x0, y0 + 5.f, 0x052329);
+	}
+}
+
+Vector2 Buffer_View::get_size() const {
+	// @HACK: until we have a better system
+	return Vector2((float)OS::window_width(), (float)OS::window_height() - (FONT_SIZE + 10.f));
+}
+
+Vector2 Buffer_View::get_position() const {
+	return Vector2(0.f, 0.f);
+}
+
+void Buffer_View::draw_cursor(const Font_Glyph& glyph, float x, float y) {
+	const float x0 = x;
+	const float y0 = y - font.ascent;
+	float x1 = x0 + glyph.advance;
+	const float y1 = y - font.descent;
+
+	draw_rect(x0, y0, x1, y1, 0x81E38E);
 }

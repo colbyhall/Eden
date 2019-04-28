@@ -1,30 +1,18 @@
 #pragma once
 #include "types.h"
-#include "buffer.h"
 #include "array.h"
+#include "buffer.h"
 
 #define WINDOW_TITLE "YEET"
-#define GAP_BUFFER_DEBUG 1
 
 struct Font;
 struct Buffer;
+struct Buffer_View;
 struct Vector2;
 
 extern Font font;
 extern u32 fps;
 extern float delta_time;
-
-struct Buffer_View {
-	Buffer* buffer = nullptr;
-
-	float current_scroll_y = 0.f;
-	float target_scroll_y = 0.f;
-
-	void draw();
-
-	Vector2 get_size() const;
-	Vector2 get_position() const;
-};
 
 struct Editor {
 	static Editor& get();
@@ -54,7 +42,7 @@ struct Editor {
 private:
 	static Editor g_editor;
 
-	Array<Buffer> loaded_buffers;
+	Array<struct Buffer> loaded_buffers;
 	size_t last_id = 0;
 
 	// @NOTE(Colby): this is super temporary as we don't support multiple views
