@@ -82,6 +82,10 @@ struct Array {
 		return add(to_be_added);
 	}
 
+	void empty() {
+		count = 0;
+	}
+
 	size_t add_at_index(const T& item, size_t index) {
 		assert(index <= count);
 

@@ -59,6 +59,24 @@ void Buffer::refresh_cursor_info(bool update_desired) {
 	}
 }
 
+void Buffer::refresh_eol_table(size_t reserve_size) {
+	eol_table.empty();
+	if (eol_table.allocated <= reserve_size) {
+		eol_table.reserve(reserve_size - eol_table.allocated);
+	}
+
+	size_t current_line_size = 1;
+	for (size_t i = 0; i < get_size(); i++) {
+		if (is_eol(data[i])) {
+			eol_table.add(current_line_size);
+			current_line_size = 1;
+		} else {
+			current_line_size += 1;
+		}
+	}
+	eol_table.add(current_line_size);
+}
+
 void Buffer::resize_gap(size_t new_size) {
 	const size_t cursor_pos = cursor - data;
 	allocated += new_size;
@@ -82,7 +100,7 @@ u8* Buffer::get_position(size_t index) {
 
 void Buffer::load_from_file(const char* path) {
 	path = path;
-	FILE* fd = fopen(path, "rb");
+	FILE* fd = fopen(path, "r");
 	if (!fd) {
 		return;
 	}
@@ -91,31 +109,26 @@ void Buffer::load_from_file(const char* path) {
 	fseek(fd, 0, SEEK_SET);
 
 	u8* buffer_data = c_new u8[size + DEFAULT_GAP_SIZE];
-	fread(buffer_data, size, 1, fd);
-
+	fread(buffer_data, 1, size, fd);
 	fclose(fd);
+
 	data = buffer_data;
 	allocated = size + DEFAULT_GAP_SIZE;
 
 	gap = data + size;
 	gap_size = DEFAULT_GAP_SIZE;
 
-	cursor = gap;
+	cursor = data;
 
-	*gap = 0;
+	size_t line_count = 1;
 
-	u8* last_new_line = data;
-
-	eol_table.add(0);
-
-	for (size_t i = 0; data[i] != 0; i++) {
+	for (size_t i = 0; i < get_size(); i++) {
 		if (is_eol(data[i])) {
-			u8* current_new_line = data + i;
-			eol_table.add(current_new_line - last_new_line);
-			last_new_line = current_new_line;
+			line_count += 1;
 		}
 	}
 
+	refresh_eol_table(line_count);
 	refresh_cursor_info();
 }
 
@@ -142,7 +155,7 @@ void Buffer::add_char(u8 c) {
 
 	if (is_eol(c)) {
 		const size_t line_size = eol_table[current_line_number];
-		eol_table[current_line_number] = current_column_number;
+		eol_table[current_line_number] = current_column_number + 1;
 		eol_table.add_at_index(line_size - current_column_number, current_line_number + 1);
 
 		current_line_number += 1;
@@ -200,11 +213,13 @@ void Buffer::move_cursor_line(s32 delta) {
 
 	size_t line_position = 0;
 	for (size_t i = 0; i < new_line; i++) {
-		line_position += eol_table[i] + 1;
+		line_position += eol_table[i];
 	}
 
-	if (current_column_number > eol_table[new_line]) {
+	if (desired_column_number > eol_table[new_line]) {
 		current_column_number = eol_table[new_line] - 1;
+	} else {
+		current_column_number = desired_column_number;
 	}
 
 	cursor = get_position(line_position + current_column_number);
@@ -239,20 +254,40 @@ u8* Buffer::get_line(size_t line) {
 
 	size_t line_position = 0;
 	for (size_t i = 0; i < line; i++) {
-		line_position += eol_table[i] + 1;
+		line_position += eol_table[i];
 	}
 
 	return get_position(line_position);
 }
 
+void Buffer_View::input_pressed() {
+	const float font_height = FONT_SIZE;
+	const Vector2 size = get_size();
+	const Vector2 position = get_position();
+
+	const float cursor_y_in_buffer = (buffer->current_line_number) * font_height;
+	const float cursor_y_in_view = cursor_y_in_buffer - current_scroll_y;
+
+	const int lines_in_size = size.y / font_height;
+
+	if (cursor_y_in_view - font_height < 0.f) {
+		target_scroll_y = cursor_y_in_buffer;
+		current_scroll_y = target_scroll_y;
+	}
+	else if (cursor_y_in_view + font_height * 2.f > size.y) {
+		target_scroll_y = cursor_y_in_buffer - lines_in_size * font_height + font_height * 2.f;
+		current_scroll_y = target_scroll_y;
+	}
+}
+
 void Buffer_View::draw() {
 	if (!buffer) return;
 
-	const Vector2 position = get_position();
 	const Vector2 size = get_size();
 
 	// @NOTE(Colby): This is where we draw the text data
 	{
+		const Vector2 position = get_buffer_position();
 
 		const float font_height = FONT_SIZE;
 		float x = 0.f;
@@ -283,7 +318,7 @@ void Buffer_View::draw() {
 
 				const Font_Glyph& glyph = font[buffer->data[i]];
 
-				if (buffer->cursor == buffer->gap || is_eol(buffer->data[i])) {
+				if (buffer->cursor == buffer->gap || is_eol(c_to_draw) || is_whitespace(c_to_draw)) {
 					draw_cursor(font.get_space_glyph(), position.x + x, position.y + y);
 				}
 				else {
@@ -349,6 +384,10 @@ void Buffer_View::draw() {
 			}
 #endif
 
+			if (buffer->cursor == buffer->gap && buffer->data + i == buffer->get_gap_end()) {
+				color = 0x0f2329;
+			}
+
 			assert(!is_whitespace(c_to_draw));
 
 			const Font_Glyph& glyph = font[c_to_draw];
@@ -378,6 +417,7 @@ void Buffer_View::draw() {
 
 	// @NOTE(Colby): We're drawing info bar here
 	{
+		const Vector2 position = get_position();
 		const float bar_height = FONT_SIZE + 10.f;
 
 		const float x0 = position.x;
@@ -393,6 +433,10 @@ void Buffer_View::draw() {
 	}
 }
 
+void Buffer_View::tick(float delta_time) {
+	current_scroll_y = Math::finterpto(current_scroll_y, target_scroll_y, delta_time, 10.f);
+}
+
 Vector2 Buffer_View::get_size() const {
 	// @HACK: until we have a better system
 	return Vector2((float)OS::window_width(), (float)OS::window_height() - (FONT_SIZE + 10.f));
@@ -400,6 +444,20 @@ Vector2 Buffer_View::get_size() const {
 
 Vector2 Buffer_View::get_position() const {
 	return Vector2(0.f, 0.f);
+}
+
+Vector2 Buffer_View::get_buffer_position() const {
+	Vector2 result = get_position();
+	result.y -= current_scroll_y;
+	return result;
+}
+
+float Buffer_View::get_buffer_height() const {
+	if (!buffer) {
+		return 0.f;
+	}
+	const float font_height = FONT_SIZE;
+	return buffer->eol_table.count * font_height;
 }
 
 void Buffer_View::draw_cursor(const Font_Glyph& glyph, float x, float y) {

@@ -72,6 +72,7 @@ private:
 
 	void move_gap_to_cursor();
 	void refresh_cursor_info(bool update_desired = true);
+	void refresh_eol_table(size_t reserve_size = 0);
 	void resize_gap(size_t new_size);
 
 	u8* get_position(size_t index);
@@ -83,10 +84,15 @@ struct Buffer_View {
 	float current_scroll_y = 0.f;
 	float target_scroll_y = 0.f;
 
+	void input_pressed();
+
 	void draw();
+	void tick(float delta_time);
 
 	Vector2 get_size() const;
 	Vector2 get_position() const;
+	Vector2 get_buffer_position() const;
+	float get_buffer_height() const;
 
 private:
 	void draw_cursor(const Font_Glyph& glyph, float x, float y);

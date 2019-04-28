@@ -65,8 +65,9 @@ void Editor::init() {
 	
 	Buffer* buffer = create_buffer();
 	main_view.buffer = buffer;
-	buffer->init_from_size(10);
-	buffer->title = "Scratch Buffer";
+	// buffer->init_from_size(0);
+	buffer->load_from_file("src\\draw.cpp");
+	buffer->title = "(YEET project) src/draw.cpp";
 
 
 	is_running = true;
@@ -89,6 +90,8 @@ void Editor::loop() {
 
 		OS::poll_window_events();
 
+		main_view.tick(delta_time);
+
 		draw();
 	}
 }
@@ -103,9 +106,13 @@ void Editor::on_window_resized(u32 old_width, u32 old_height) {
 }
 
 void Editor::on_mousewheel_scrolled(float delta) {
-	// buffer_view.target_scroll_y -= delta;
+	main_view.target_scroll_y -= delta;
 
-	// if (buffer_view.target_scroll_y < 0.f) buffer_view.target_scroll_y = 0.f;
+	if (main_view.target_scroll_y < 0.f) main_view.target_scroll_y = 0.f;
+
+	const float font_height = FONT_SIZE;
+	const float max_scroll = main_view.get_buffer_height() - font_height;
+	if (main_view.target_scroll_y > max_scroll) main_view.target_scroll_y = max_scroll;
 }
 
 void Editor::on_key_pressed(u8 key) {
@@ -132,6 +139,7 @@ void Editor::on_key_pressed(u8 key) {
 	default:
 		current_buffer->add_char(key);
 	}
+	main_view.input_pressed();
 }
 
 void Editor::draw() {
