@@ -142,6 +142,14 @@ void Editor::on_key_pressed(u8 key) {
 	main_view.input_pressed();
 }
 
+void Editor::on_mouse_down(Vector2 position) {
+	main_view.on_mouse_down(position);
+}
+
+void Editor::on_mouse_up(Vector2 position) {
+	main_view.on_mouse_up(position);
+}
+
 void Editor::draw() {
 	render_frame_begin();
 

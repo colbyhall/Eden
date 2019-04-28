@@ -25,9 +25,9 @@ struct Font {
 
 	float ascent, descent, line_gap;
 
-	inline const Font_Glyph& get_space_glyph() const { return characters[' ' - 32]; }
+	inline Font_Glyph& get_space_glyph() { return characters[' ' - 32]; }
 
-	const Font_Glyph& operator[](u8 c) const;
+	Font_Glyph& operator[](u8 c);
 
 	void bind();
 

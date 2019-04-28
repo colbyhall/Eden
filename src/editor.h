@@ -37,6 +37,8 @@ struct Editor {
 	void on_window_resized(u32 old_width, u32 old_height);
 	void on_mousewheel_scrolled(float delta);
 	void on_key_pressed(u8 key);
+	void on_mouse_down(Vector2 position);
+	void on_mouse_up(Vector2 position);
 	
 	void draw();
 private:

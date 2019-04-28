@@ -314,11 +314,17 @@ void Buffer_View::draw() {
 
 		y += lines_scrolled * font_height;
 
+#if !GAP_BUFFER_DEBUG
+		for (size_t i = start_index; i < buffer->get_size(); i++) {
+			const u8* current_position = buffer->get_position(i);
+			u8 c_to_draw = *current_position;
+#else 
 		for (size_t i = start_index; i < buffer->allocated; i++) {
-			Vector4 color = 0xd6b58d;
 			u8 c_to_draw = buffer->data[i];
-
 			const u8* current_position = buffer->data + i;
+#endif
+			Vector4 color = 0xd6b58d;
+
 
 			if (buffer->data + i == buffer->cursor) {
 				immediate_flush();
@@ -355,13 +361,13 @@ void Buffer_View::draw() {
 				} else if (c_to_draw == ' ') {
 					x += font.get_space_glyph().advance;
 					continue;
+				} else if (is_eol(c_to_draw) && !LINE_COUNT_DEBUG) {
+					y += font_height;
+					x = 0.f;
+					continue;
 				}
 			}
 #else
-			if (buffer->data + i >= buffer->gap && buffer->data + i < buffer->get_gap_end()) {
-				continue;
-			}
-
 			if (is_eol(c_to_draw) && !LINE_COUNT_DEBUG) {
 				y += font_height;
 				x = 0.f;
@@ -391,7 +397,7 @@ void Buffer_View::draw() {
 			}
 #endif
 
-			if (buffer->cursor == buffer->gap && buffer->data + i == buffer->get_gap_end()) {
+			if (buffer->cursor == buffer->gap && current_position == buffer->get_gap_end()) {
 				color = 0x0f2329;
 			}
 
@@ -420,7 +426,7 @@ void Buffer_View::draw() {
 		}
 
 #if EOF_DEBUG
-		immediate_string("EOF", x, y, 0xAA00FF);
+		immediate_string("EOF", position.x + x, position.y + y, 0xAA00FF);
 #endif
 
 		immediate_flush();
@@ -446,6 +452,10 @@ void Buffer_View::draw() {
 
 void Buffer_View::tick(float delta_time) {
 	current_scroll_y = Math::finterpto(current_scroll_y, target_scroll_y, delta_time, 10.f);
+
+	if (mouse_pressed_on) {
+		try_cursor_pick();
+	}
 }
 
 Vector2 Buffer_View::get_size() const {
@@ -469,6 +479,69 @@ float Buffer_View::get_buffer_height() const {
 	}
 	const float font_height = FONT_SIZE;
 	return buffer->eol_table.count * font_height;
+}
+
+void Buffer_View::try_cursor_pick() {
+	const Vector2 mouse_pos = OS::get_mouse_position();
+
+	const float font_height = FONT_SIZE;
+
+	const Vector2 position = get_position();
+
+	float x = 0.f;
+	float y = 0.f;
+
+	const size_t lines_scrolled = (size_t)((current_scroll_y + mouse_pos.y) / font_height);
+	size_t start_index = 0;
+	for (size_t i = 0; i < lines_scrolled; i++) {
+		start_index += buffer->eol_table[i];
+	}
+
+	y += lines_scrolled * font_height;
+
+	for (size_t i = start_index; i < buffer->get_size(); i++) {
+		u8* current_position = buffer->get_position(i);
+		u8 c = *current_position;
+
+		Font_Glyph& glyph = font[c];
+		const Font_Glyph& space_glyph = font.get_space_glyph();
+		if (is_whitespace(c)) {
+			glyph = font.get_space_glyph();
+		}
+
+		float width = glyph.advance;
+		if (c == '\t') {
+			width += glyph.advance * 3;
+		}
+
+
+		const float x0 = position.x + x;
+		const float y0 = position.y + y;
+
+		const float x1 = x0 + width;
+		const float y1 = y0 + font_height;
+
+		if (mouse_pos.x >= x0 && mouse_pos.x <= x1 && mouse_pos.y >= y0 && mouse_pos.y <= y1) {
+			buffer->cursor = current_position;
+			buffer->refresh_cursor_info();
+			break;
+		}
+		x += width;
+
+		if (is_eol(c)) {
+			buffer->cursor = current_position;
+			buffer->refresh_cursor_info();
+			break;
+		}
+	}
+}
+
+void Buffer_View::on_mouse_down(Vector2 position) {
+	mouse_pressed_on = true;
+}
+
+void Buffer_View::on_mouse_up(Vector2 position) {
+	mouse_pressed_on = false;
 }
 
 void Buffer_View::draw_cursor(const Font_Glyph& glyph, float x, float y) {

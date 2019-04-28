@@ -90,6 +90,19 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 				editor.on_key_pressed(key);
 			}
 		} break;
+
+		case WM_LBUTTONDOWN: {
+			editor.on_mouse_down(OS::get_mouse_position());
+		} break;
+
+		case WM_LBUTTONUP: {
+			editor.on_mouse_up(OS::get_mouse_position());
+		} break;
+
+		case WM_NCLBUTTONUP: 
+		case WM_KILLFOCUS: {
+			editor.on_mouse_up(0.f);
+		} break;
 	}
 
 	return DefWindowProc(handle, message, w_param, l_param);
@@ -171,4 +184,15 @@ void OS::set_cursor_type(OS_Cursor_Type type) {
 	}
 
 	SetCursor(new_cursor);
+}
+
+Vector2 OS::get_mouse_position() {
+	POINT p;
+	if (GetCursorPos(&p)) {
+		if (ScreenToClient((HWND)OS::get_window_handle(), &p)) {
+			return {(float) p.x, (float)p.y };
+		}
+	}
+
+	return { 0.f, 0.f };
 }

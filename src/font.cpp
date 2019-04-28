@@ -80,7 +80,7 @@ Font Font::load_font(const char* path) {
 	return result;
 }
 
-const Font_Glyph& Font::operator[](u8 c) const {
+Font_Glyph& Font::operator[](u8 c) {
 	return characters[c - 32];
 }
 

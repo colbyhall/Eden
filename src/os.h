@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "string.h"
+#include "math.h"
 
 enum OS_Cursor_Type {
 	CT_Arrow,
@@ -21,4 +22,6 @@ namespace OS {
 	String load_file_into_memory(const char* path);
 
 	void set_cursor_type(OS_Cursor_Type type);
+
+	Vector2 get_mouse_position();
 }
