@@ -270,12 +270,14 @@ Vector2 immediate_string(const String& str, float x, float y, const Vector4& col
 		if (is_eol(str.data[i])) {
 			y += font_height;
 			x = original_x;
+			verts_culled += 6;
 			continue;
 		}
 
 		if (str.data[i] == '\t') {
 			const Font_Glyph& space_glyph = font.get_space_glyph();
 			x += space_glyph.advance  * 4.f;
+			verts_culled += 6 * 4;
 			continue;
 		}
 
@@ -299,6 +301,11 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Vector4& c
 	const float y0 = y + glyph.bearing_y;
 	const float x1 = x0 + glyph.width;
 	const float y1 = y0 + glyph.height;
+
+	if (x1 < 0.f || x0 > OS::window_width() || y1 < 0.f || y0 > OS::window_height()) {
+		verts_culled += 6;
+		return;
+	}
 
 	Vector2 bottom_right = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
 	Vector2 bottom_left = Vector2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
