@@ -95,7 +95,11 @@ u8* Buffer::get_position(size_t index) {
 		return data + index;
 	} else {
 		index -= first_data_size;
-		return get_gap_end() + index;
+		u8* result = get_gap_end() + index;
+		if (result == get_data_end() && get_data_end() == get_gap_end()) {
+			result = gap;
+		}
+		return result;
 	}
 }
 

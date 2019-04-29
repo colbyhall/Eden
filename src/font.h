@@ -18,7 +18,7 @@ struct Bitmap {
 };
 
 #define NUM_CHARACTERS 95
-#define FONT_SIZE      20.f
+#define FONT_SIZE      14.f
 #define FONT_ATLAS_DIMENSION 2048
 
 struct Font {
