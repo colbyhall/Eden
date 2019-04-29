@@ -5,6 +5,7 @@
 #include "memory.h"
 #include "draw.h"
 #include "font.h"
+#include "input.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -90,7 +91,7 @@ u8* Buffer::get_position(size_t index) {
 	assert(index < get_size() + 1);
 
 	const size_t first_data_size = (size_t)(gap - data);
-	if (index <= first_data_size) {
+	if (index < first_data_size) {
 		return data + index;
 	} else {
 		index -= first_data_size;
@@ -598,6 +599,35 @@ void Buffer_View::on_mouse_down(Vector2 position) {
 
 void Buffer_View::on_mouse_up(Vector2 position) {
 	mouse_pressed_on = false;
+}
+
+void Buffer_View::on_key_pressed(u8 key) {
+	assert(buffer);
+
+	switch (key) {
+	case KEY_ENTER:
+		buffer->add_char('\n');
+		break;
+	case KEY_LEFT:
+		buffer->move_cursor(-1);
+		break;
+	case KEY_RIGHT:
+		buffer->move_cursor(1);
+		break;
+	case KEY_UP:
+		buffer->move_cursor_line(-1);
+		break;
+	case KEY_DOWN:
+		buffer->move_cursor_line(1);
+		break;
+	case KEY_BACKSPACE:
+		buffer->remove_before_cursor();
+		break;
+	default:
+		buffer->add_char(key);
+	}
+	input_pressed();
+
 }
 
 void Buffer_View::draw_cursor(const Font_Glyph& glyph, float x, float y) {

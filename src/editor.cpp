@@ -6,7 +6,6 @@
 #include "opengl.h"
 #include "draw.h"
 #include "string.h"
-#include "input.h"
 #include "parsing.h"
 #include "font.h"
 #include "lua.h"
@@ -116,38 +115,27 @@ void Editor::on_mousewheel_scrolled(float delta) {
 }
 
 void Editor::on_key_pressed(u8 key) {
-	Buffer* current_buffer = main_view.buffer;
-	switch (key) {
-	case KEY_ENTER:
-		current_buffer->add_char('\n');
-		break;
-	case KEY_LEFT:
-		current_buffer->move_cursor(-1);
-		break;
-	case KEY_RIGHT:
-		current_buffer->move_cursor(1);
-		break;
-	case KEY_UP:
-		current_buffer->move_cursor_line(-1);
-		break;
-	case KEY_DOWN:
-		current_buffer->move_cursor_line(1);
-		break;
-	case KEY_BACKSPACE:
-		current_buffer->remove_before_cursor();
-		break;
-	default:
-		current_buffer->add_char(key);
+	Buffer_View* current_view = get_current_view();
+	if (!current_view) {
+		return;
 	}
-	main_view.input_pressed();
+	current_view->on_key_pressed(key);
 }
 
 void Editor::on_mouse_down(Vector2 position) {
-	main_view.on_mouse_down(position);
+	Buffer_View* current_view = get_current_view();
+	if (!current_view) {
+		return;
+	}
+	current_view->on_mouse_down(position);
 }
 
 void Editor::on_mouse_up(Vector2 position) {
-	main_view.on_mouse_up(position);
+	Buffer_View* current_view = get_current_view();
+	if (!current_view) {
+		return;
+	}
+	current_view->on_mouse_up(position);
 }
 
 void Editor::draw() {

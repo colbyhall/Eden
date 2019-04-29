@@ -7,7 +7,7 @@
 
 #define GAP_BUFFER_DEBUG 0
 #define LINE_COUNT_DEBUG 0
-#define EOF_DEBUG 1
+#define EOF_DEBUG 0
 
 /* ---- GAP BUFFER ----
 	* = Cursor
@@ -101,6 +101,7 @@ struct Buffer_View {
 
 	void on_mouse_down(Vector2 position);
 	void on_mouse_up(Vector2 position);
+	void on_key_pressed(u8 key);
 
 private:
 	void draw_cursor(const Font_Glyph& glyph, float x, float y);
