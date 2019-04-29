@@ -143,7 +143,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	window_handle = CreateWindow(window_class.lpszClassName, TEXT(WINDOW_TITLE), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
 
-#if 0
+	char path_at_start[MAX_PATH];
+	GetCurrentDirectory(MAX_PATH, path_at_start);
+
+
 	{
 		// @NOTE(Colby): This sucks really bad. I just wanted to set my working direction to parent directory of the exe's directory
 		char exe_path[MAX_PATH];
@@ -153,12 +156,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 		SetCurrentDirectory(exe_path);
 		SetCurrentDirectory(TEXT(".."));
 	}
-#endif
 
 	Editor& editor = Editor::get();
 	editor.init();
+	SetCurrentDirectory(path_at_start);
 	ShowWindow(window_handle, SW_SHOW);
-	wglSwapIntervalEXT(!BUILD_DEBUG);
+	wglSwapIntervalEXT(false);
 	editor.loop();
 	editor.shutdown();
 

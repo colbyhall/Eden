@@ -95,6 +95,8 @@ struct Buffer_View {
 	Vector2 get_buffer_position() const;
 	float get_buffer_height() const;
 
+	static Vector2 get_max_size();
+
 	bool mouse_pressed_on = false;
 
 	u8* get_char_at(Vector2 find_pos);

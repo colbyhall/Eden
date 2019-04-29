@@ -18,11 +18,10 @@ struct Bitmap {
 };
 
 #define NUM_CHARACTERS 95
-#define FONT_SIZE      14.f
+#define FONT_SIZE      15.f
 #define FONT_ATLAS_DIMENSION 2048
 
 struct Font {
-
 	float ascent, descent, line_gap;
 
 	inline Font_Glyph& get_space_glyph() { return characters[' ' - 32]; }

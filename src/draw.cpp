@@ -331,8 +331,7 @@ const Font_Glyph& immediate_char(u8 c, float x, float y, const Vector4& color) {
 
 void draw_string(const String& str, float x, float y, const Vector4& color) {
 	font.bind();
-
-	y += FONT_SIZE - font.line_gap;
+	y += font.ascent;
 
 	immediate_begin();
 	immediate_string(str, x, y, color);
@@ -348,7 +347,7 @@ Vector2 get_draw_string_size(const String& str) {
 	float largest_x = x;
 	float largest_y = y;
 	const float original_x = x;
-	y += font_height - font.line_gap ;
+	y += font.ascent;
 
 	for (size_t i = 0; i < str.count; i++) {
 		const Font_Glyph& glyph = font[str.data[i]];
@@ -408,7 +407,7 @@ void render_frame_begin() {
 
 void render_frame_end() {
 
-#if BUILD_DEBUG
+#if 1
 	char buffer[256];
 	sprintf_s(
 		buffer, 256, "Draw Calls: %i\nVerts Drawn: %llu\nVerts Culled: %llu\nFPS: %i\nAllocations: %llu\nAllocated: %f KB",
@@ -417,7 +416,7 @@ void render_frame_end() {
 	Vector2 string_size = get_draw_string_size(buffer);
 	Vector2 padding = 10.f;
 	float x = OS::window_width() - (string_size.x + padding.x);
-	float y = OS::window_height() - (string_size.y + padding.y);
+	float y = 0.f;
 
 	{
 

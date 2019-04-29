@@ -29,7 +29,6 @@ struct Shader {
 	void bind();
 
 	static Shader load_from_file(const char* path);
-
 	static Shader* current;
 };
 
@@ -45,8 +44,6 @@ void init_renderer();
 
 void immediate_begin();
 void immediate_flush();
-
-void immediate_vertex(float x, float y, const Vector4& color, Vector2 uv);
 
 void render_frame_begin();
 void render_frame_end();

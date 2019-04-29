@@ -36,8 +36,8 @@ Font Font::load_font(const char* path) {
 	pr.num_chars = NUM_CHARACTERS;
 	pr.font_size = FONT_SIZE;
 
-	const u32 h_oversample = 4;
-	const u32 v_oversample = 4;
+	const u32 h_oversample = 8;
+	const u32 v_oversample = 8;
 
 	stbtt_PackSetOversampling(&pc, h_oversample, v_oversample);
 	stbtt_PackFontRanges(&pc, font_data.data, 0, &pr, 1);

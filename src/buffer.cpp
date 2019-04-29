@@ -298,8 +298,8 @@ void Buffer_View::input_pressed() {
 		target_scroll_y = cursor_y_in_buffer;
 		current_scroll_y = target_scroll_y;
 	}
-	else if (cursor_y_in_view + font_height * 2.f > size.y) {
-		target_scroll_y = cursor_y_in_buffer - lines_in_size * font_height + font_height * 2.f;
+	else if (cursor_y_in_view + font_height > size.y) {
+		target_scroll_y = cursor_y_in_buffer - lines_in_size * font_height + font_height;
 		current_scroll_y = target_scroll_y;
 	}
 }
@@ -315,7 +315,7 @@ void Buffer_View::draw() {
 
 		const float font_height = FONT_SIZE;
 		float x = 0.f;
-		float y = font_height - font.line_gap;
+		float y = font.ascent;
 
 		font.bind();
 		immediate_begin();
@@ -468,18 +468,24 @@ void Buffer_View::draw() {
 	// @NOTE(Colby): We're drawing info bar here
 	{
 		const Vector2 position = get_position();
-		const float bar_height = FONT_SIZE + 10.f;
+		const float bar_height = font.ascent - font.descent;
+		
+		{
+			const float x0 = position.x;
+			const float y0 = position.y + size.y - bar_height;
+			const float x1 = x0 + size.x;
+			const float y1 = y0 + bar_height;
+			draw_rect(x0, y0, x1, y1, 0xd6b58d);
+		}
 
-		const float x0 = position.x;
-		const float y0 = position.y + size.y - bar_height;
-		const float x1 = x0 + size.x;
-		const float y1 = y0 + bar_height;
-		draw_rect(x0, y0, x1, y1, 0xd6b58d);
-
-		char output_string[1024];
-		sprintf_s(output_string, 1024, " %s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
-		String out_str = output_string;
-		draw_string(out_str, x0, y0 + 5.f, 0x052329);
+		{
+			const float x = position.x + 10.f;
+			const float y = position.y + size.y - bar_height;
+			char output_string[1024];
+			sprintf_s(output_string, 1024, "%s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
+			String out_str = output_string;
+			draw_string(out_str, x, y, 0x052329);
+		}
 	}
 }
 
@@ -498,7 +504,7 @@ void Buffer_View::tick(float delta_time) {
 
 Vector2 Buffer_View::get_size() const {
 	// @HACK: until we have a better system
-	return Vector2((float)OS::window_width(), (float)OS::window_height() - (FONT_SIZE + 10.f));
+	return get_max_size();
 }
 
 Vector2 Buffer_View::get_position() const {
@@ -519,11 +525,14 @@ float Buffer_View::get_buffer_height() const {
 	return buffer->eol_table.count * font_height;
 }
 
+Vector2 Buffer_View::get_max_size() {
+	return Vector2(OS::window_width(), OS::window_height() - FONT_SIZE);
+}
+
 u8* Buffer_View::get_char_at(Vector2 find_pos) {
 	assert(buffer);
 
 	const float font_height = FONT_SIZE;
-
 	const Vector2 position = get_buffer_position();
 
 	float x = 0.f;
@@ -583,8 +592,7 @@ u8* Buffer_View::get_char_at(Vector2 find_pos) {
 		}
 	}
 
-	if (lines_scrolled == buffer->eol_table.count - 1)
-	{
+	if (lines_scrolled == buffer->eol_table.count - 1) {
 		u8* char_pos = buffer->get_position(buffer->get_size() - 1) + 1;
 		return char_pos;
 	}

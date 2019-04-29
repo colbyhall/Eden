@@ -21,7 +21,6 @@ Editor Editor::g_editor;
 
 u32 frame_count = 0;
 
-
 Editor& Editor::get() {
 	return g_editor;
 }
@@ -60,7 +59,7 @@ void Editor::init() {
 
 	Lua::get().init();
 
-	font = Font::load_font("data\\fonts\\Consolas.ttf");
+	font = Font::load_font("data\\fonts\\FiraCode-Regular.ttf");
 	
 	Buffer* buffer = create_buffer();
 	main_view.buffer = buffer;
@@ -161,7 +160,7 @@ void Editor::draw() {
 
 	{
 		// @NOTE(Colby): Command bar filling
-		float command_bar_height = FONT_SIZE + 10.f;
+		const float command_bar_height = window_height - Buffer_View::get_max_size().y;
 		{
 			const float x0 = 0.f;
 			const float y0 = window_height - command_bar_height;
@@ -169,7 +168,7 @@ void Editor::draw() {
 			const float y1 = window_height;
 
 			draw_rect(x0, y0, x1, y1, 0x052329);
-			draw_string("ctrl + alt + o", x0 + 5.f, y0 + 3.f, 0xFFFFFF);
+			draw_string("ctrl + alt + o", x0 + 10.f, y0, 0xFFFFFF);
 		}
 	}
 
