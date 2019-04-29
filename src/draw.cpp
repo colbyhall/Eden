@@ -339,7 +339,7 @@ void draw_string(const String& str, float x, float y, const Vector4& color) {
 	immediate_flush();
 }
 
-Vector2 get_draw_string_size(String* str) {
+Vector2 get_draw_string_size(const String& str) {
 	const float font_height = FONT_SIZE;
 
 	float y = 0.f;
@@ -350,13 +350,13 @@ Vector2 get_draw_string_size(String* str) {
 	const float original_x = x;
 	y += font_height - font.line_gap ;
 
-	for (size_t i = 0; i < str->count; i++) {
-		const Font_Glyph& glyph = font[str->data[i]];
+	for (size_t i = 0; i < str.count; i++) {
+		const Font_Glyph& glyph = font[str.data[i]];
 
-		if (str->data[i] == '\n') {
+		if (str.data[i] == '\n') {
 			y += font_height;
 			x = original_x;
-		} else if (str->data[i] == '\t') {
+		} else if (str.data[i] == '\t') {
 			const Font_Glyph& space_glyph = font[' '];
 			x += space_glyph.advance  * 4.f;
 		} else {
@@ -414,9 +414,7 @@ void render_frame_end() {
 		buffer, 256, "Draw Calls: %i\nVerts Drawn: %llu\nVerts Culled: %llu\nFPS: %i\nAllocations: %llu\nAllocated: %f KB",
 		draw_calls, verts_drawn, verts_culled, Editor::get().fps, Memory::get().num_allocations, Memory::get().amount_allocated / 1024.f
 	);
-	String debug_string = buffer;
-
-	Vector2 string_size = get_draw_string_size(&debug_string);
+	Vector2 string_size = get_draw_string_size(buffer);
 	Vector2 padding = 10.f;
 	float x = OS::window_width() - (string_size.x + padding.x);
 	float y = OS::window_height() - (string_size.y + padding.y);
@@ -434,7 +432,7 @@ void render_frame_end() {
 	{
 		float x0 = x + padding.x / 2.f;
 		float y0 = y + padding.y / 2.f;
-		draw_string(debug_string, x0, y0, 0xFFFFFF);
+		draw_string(buffer, x0, y0, 0xFFFFFF);
 	}
 #endif
 

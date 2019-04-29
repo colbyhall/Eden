@@ -87,10 +87,10 @@ void Buffer::resize_gap(size_t new_size) {
 }
 
 u8* Buffer::get_position(size_t index) {
-	assert(index < get_size());
+	assert(index < get_size() + 1);
 
 	const size_t first_data_size = (size_t)(gap - data);
-	if (index < first_data_size) {
+	if (index <= first_data_size) {
 		return data + index;
 	} else {
 		index -= first_data_size;
@@ -228,10 +228,17 @@ void Buffer::move_cursor_line(s32 delta) {
 		line_position += eol_table[i];
 	}
 
-	if (desired_column_number > eol_table[new_line]) {
+	if (desired_column_number >= eol_table[new_line]) {
 		current_column_number = eol_table[new_line] - 1;
+		if (new_line == eol_table.count - 1) {
+			current_column_number += 1;
+		}
 	} else {
 		current_column_number = desired_column_number;
+	}
+
+	if (cursor == gap && get_gap_end() == get_data_end() && delta > 0) {
+		return;
 	}
 
 	cursor = get_position(line_position + current_column_number);
@@ -308,17 +315,6 @@ void Buffer_View::draw() {
 		font.bind();
 		immediate_begin();
 
-#if LINE_COUNT_DEBUG
-		size_t line_index = 0;
-
-		const char* format = "%llu: LS: %llu |";
-
-		char out_line_size[20];
-		sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
-
-		x += immediate_string(out_line_size, position.x + x, position.y + y, 0xFFFF00).x;
-#endif
-
 		const size_t lines_scrolled = (size_t)(current_scroll_y / font_height);
 		size_t start_index = 0;
 		for (size_t i = 0; i < lines_scrolled; i++) {
@@ -328,6 +324,17 @@ void Buffer_View::draw() {
 		verts_culled += start_index * 6;
 
 		y += lines_scrolled * font_height;
+
+#if LINE_COUNT_DEBUG
+		size_t line_index = lines_scrolled;
+
+		const char* format = "%llu: LS: %llu |";
+
+		char out_line_size[20];
+		sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+
+		x += immediate_string(out_line_size, position.x + x, position.y + y, 0xFFFF00).x;
+#endif
 
 #if !GAP_BUFFER_DEBUG
 		for (size_t i = start_index; i < buffer->get_size(); i++) {
@@ -528,6 +535,17 @@ void Buffer_View::try_cursor_pick() {
 
 	y += lines_scrolled * font_height;
 
+#if LINE_COUNT_DEBUG
+	size_t line_index = lines_scrolled;
+
+	const char* format = "%llu: LS: %llu |";
+
+	char out_line_size[20];
+	sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+
+	x += get_draw_string_size(out_line_size).x;
+#endif
+
 	for (size_t i = start_index; i < buffer->get_size(); i++) {
 		u8* current_position = buffer->get_position(i);
 		u8 c = *current_position;
@@ -565,7 +583,7 @@ void Buffer_View::try_cursor_pick() {
 
 	if (lines_scrolled == buffer->eol_table.count - 1)
 	{
-		u8* char_pos = buffer->get_position(buffer->get_size()- 1) + 1;
+		u8* char_pos = buffer->get_position(buffer->get_size() - 1) + 1;
 
 		buffer->cursor = char_pos;
 		buffer->refresh_cursor_info();

@@ -181,7 +181,7 @@ void Editor::draw() {
 			const float y1 = window_height;
 
 			draw_rect(x0, y0, x1, y1, 0x052329);
-			// draw_string("edit mode", x0 + 5.f, y0 + 3.f, FONT_SIZE, 0xFFFFFF);
+			draw_string("ctrl + alt + o", x0 + 5.f, y0 + 3.f, 0xFFFFFF);
 		}
 	}
 

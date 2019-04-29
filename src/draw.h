@@ -59,7 +59,7 @@ Vector2 immediate_string(const String& str, float x, float y, const Vector4& col
 void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Vector4& color);
 const Font_Glyph& immediate_char(u8 c, float x, float y, const Vector4& color);
 
-Vector2 get_draw_string_size(String* str);
+Vector2 get_draw_string_size(const String& str);
 
 void refresh_transformation();
 void render_right_handed();
