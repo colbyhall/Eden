@@ -480,10 +480,15 @@ void Buffer_View::draw() {
 }
 
 void Buffer_View::tick(float delta_time) {
+	if (!buffer) {
+		return;
+	}
+	
 	current_scroll_y = Math::finterpto(current_scroll_y, target_scroll_y, delta_time, 10.f);
 
 	if (mouse_pressed_on) {
-		try_cursor_pick();
+		buffer->cursor = get_char_at(OS::get_mouse_position());
+		buffer->refresh_cursor_info();
 	}
 }
 
@@ -510,12 +515,8 @@ float Buffer_View::get_buffer_height() const {
 	return buffer->eol_table.count * font_height;
 }
 
-void Buffer_View::try_cursor_pick() {
-	if (!buffer) {
-		return;
-	}
-
-	const Vector2 mouse_pos = OS::get_mouse_position();
+u8* Buffer_View::get_char_at(Vector2 find_pos) {
+	assert(buffer);
 
 	const float font_height = FONT_SIZE;
 
@@ -524,7 +525,7 @@ void Buffer_View::try_cursor_pick() {
 	float x = 0.f;
 	float y = 0.f;
 
-	size_t lines_scrolled = (size_t)((current_scroll_y + mouse_pos.y) / font_height);
+	size_t lines_scrolled = (size_t)((current_scroll_y + find_pos.y) / font_height);
 	if (lines_scrolled >= buffer->eol_table.count) {
 		lines_scrolled = buffer->eol_table.count - 1;
 	}
@@ -568,29 +569,25 @@ void Buffer_View::try_cursor_pick() {
 		const float x1 = x0 + width;
 		const float y1 = y0 + font_height;
 
-		if (mouse_pos.x >= x0 && mouse_pos.x <= x1 && mouse_pos.y >= y0 && mouse_pos.y <= y1) {
-			buffer->cursor = current_position;
-			buffer->refresh_cursor_info();
-			return;
+		if (find_pos.x >= x0 && find_pos.x <= x1 && find_pos.y >= y0 && find_pos.y <= y1) {
+			return current_position;
 		}
 		x += width;
 
 		if (is_eol(c)) {
-			buffer->cursor = current_position;
-			buffer->refresh_cursor_info();
-			return;
+			return current_position;
 		}
 	}
 
 	if (lines_scrolled == buffer->eol_table.count - 1)
 	{
 		u8* char_pos = buffer->get_position(buffer->get_size() - 1) + 1;
-
-		buffer->cursor = char_pos;
-		buffer->refresh_cursor_info();
-		return;
+		return char_pos;
 	}
 
+	assert(false);
+
+	return nullptr;
 }
 
 void Buffer_View::on_mouse_down(Vector2 position) {

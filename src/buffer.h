@@ -97,7 +97,7 @@ struct Buffer_View {
 
 	bool mouse_pressed_on = false;
 
-	void try_cursor_pick();
+	u8* get_char_at(Vector2 find_pos);
 
 	void on_mouse_down(Vector2 position);
 	void on_mouse_up(Vector2 position);
