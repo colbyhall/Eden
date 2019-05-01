@@ -73,57 +73,57 @@ struct Array {
 };
 
 template <typename T>
-size_t array_reserve(Array<T>* arr, size_t amount) {
-	arr->allocated += amount;
+size_t array_reserve(Array<T>* a, size_t amount) {
+	a->allocated += amount;
 
-	if (arr->data) {
-		arr->data = (T*)c_realloc(arr->data, arr->allocated * sizeof(T));
+	if (a->data) {
+		a->data = (T*)c_realloc(a->data, a->allocated * sizeof(T));
 	}
 	else {
-		arr->data = (T*)c_alloc(sizeof(T) * arr->allocated);
+		a->data = (T*)c_alloc(sizeof(T) * a->allocated);
 	}
 
-	return arr->allocated;
+	return a->allocated;
 }
 
 template <typename T>
-size_t array_add(Array<T>* arr, const T& item) {
-	return array_add_at_index(arr, item, arr->count);
+size_t array_add(Array<T>* a, const T& item) {
+	return array_add_at_index(a, item, a->count);
 }
 
 template <typename T>
-size_t array_add_zeroed(Array<T>* arr) {
+size_t array_add_zeroed(Array<T>* a) {
 	T to_be_added;
-	return array_add(arr, to_be_added);
+	return array_add(a, to_be_added);
 }
 
 template <typename T>
-void array_empty(Array<T>* arr) {
-	arr->count = 0;
+void array_empty(Array<T>* a) {
+	a->count = 0;
 }
 
 template <typename T>
-size_t array_add_at_index(Array<T>* arr, const T& item, size_t index) {
-	assert(index <= arr->count);
+size_t array_add_at_index(Array<T>* a, const T& item, size_t index) {
+	assert(index <= a->count);
 
-	if (arr->count == arr->allocated) {
-		array_reserve(arr, 1);
+	if (a->count == a->allocated) {
+		array_reserve(a, 1);
 	}
 
-	if (index != arr->count) {
-		memmove(arr->data + index + 1, arr->data + index, (arr->count - index) * sizeof(T));
+	if (index != a->count) {
+		memmove(a->data + index + 1, a->data + index, (a->count - index) * sizeof(T));
 	}
 
-	arr->data[index] = item;
-	arr->count += 1;
+	a->data[index] = item;
+	a->count += 1;
 
 	return index;
 }
 
 template <typename T>
-T array_remove(Array<T>* arr, size_t index) {
-	T result = arr->data[index];
-	memmove(arr->data + index, arr->data + index + 1, (arr->count - index) * sizeof(T));
-	arr->count -= 1;
+T array_remove(Array<T>* a, size_t index) {
+	T result = a->data[index];
+	memmove(a->data + index, a->data + index + 1, (a->count - index) * sizeof(T));
+	a->count -= 1;
 	return result;
 }

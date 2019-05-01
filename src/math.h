@@ -15,9 +15,9 @@ struct Vector2 {
 	void operator+=(const Vector2& right);
 };
 
-Vector2 vec2();
-Vector2 vec2(float scalar);
-Vector2 vec2(float x, float y);
+Vector2 v2();
+Vector2 v2(float scalar);
+Vector2 v2(float x, float y);
 
 struct Color {
 	f32 r, g, b, a;

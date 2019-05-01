@@ -98,7 +98,7 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 
 		case WM_NCLBUTTONUP: 
 		case WM_KILLFOCUS: {
-			editor_on_mouse_up(vec2(0.f));
+			editor_on_mouse_up(v2(0.f));
 		} break;
 	}
 

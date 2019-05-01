@@ -508,7 +508,7 @@ Vector2 Buffer_View::get_size() const {
 }
 
 Vector2 Buffer_View::get_position() const {
-	return vec2(0.f, 0.f);
+	return v2(0.f, 0.f);
 }
 
 Vector2 Buffer_View::get_buffer_position() const {
@@ -526,7 +526,7 @@ float Buffer_View::get_buffer_height() const {
 }
 
 Vector2 Buffer_View::get_max_size() {
-	return vec2((float)os_window_width(), (float)(os_window_height() - FONT_SIZE));
+	return v2((float)os_window_width(), (float)(os_window_height() - FONT_SIZE));
 }
 
 u8* Buffer_View::get_char_at(Vector2 find_pos) {

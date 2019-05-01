@@ -232,13 +232,13 @@ void immediate_vertex(float x, float y, const Color& color, Vector2 uv) {
 }
 
 void immediate_quad(float x0, float y0, float x1, float y1, const Color& color) {
-    immediate_vertex(x0, y0, color, vec2(0.f, 0.f));
-    immediate_vertex(x0, y1, color, vec2(0.f, 1.f));
-    immediate_vertex(x1, y0, color, vec2(1.f, 0.f));
+    immediate_vertex(x0, y0, color, v2(0.f, 0.f));
+    immediate_vertex(x0, y1, color, v2(0.f, 1.f));
+    immediate_vertex(x1, y0, color, v2(1.f, 0.f));
     
-    immediate_vertex(x0, y1, color, vec2(0.f, 1.f));
-    immediate_vertex(x1, y1, color, vec2(1.f, 1.f));
-    immediate_vertex(x1, y0, color, vec2(1.f, 0.f));
+    immediate_vertex(x0, y1, color, v2(0.f, 1.f));
+    immediate_vertex(x1, y1, color, v2(1.f, 1.f));
+    immediate_vertex(x1, y0, color, v2(1.f, 0.f));
 }
 
 
@@ -286,7 +286,7 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 		if (y - original_y > largest_y) largest_y = x - original_y;
 	}
 
-	return vec2(largest_x, largest_y);
+	return v2(largest_x, largest_y);
 }
 
 void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color) {
@@ -302,10 +302,10 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& col
 		return;
 	}
 
-	Vector2 bottom_right = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-	Vector2 bottom_left = vec2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-	Vector2 top_right = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-	Vector2 top_left = vec2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+	Vector2 bottom_right = v2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+	Vector2 bottom_left = v2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+	Vector2 top_right = v2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
+	Vector2 top_left = v2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
 
 	immediate_vertex(x0, y0, v4_color, top_left);
 	immediate_vertex(x0, y1, v4_color, top_right);
@@ -366,7 +366,7 @@ Vector2 get_draw_string_size(const String& str) {
 		if (x > largest_x) largest_x = x;
 	}
 
-	return vec2(largest_x, largest_y);
+	return v2(largest_x, largest_y);
 }
 
 void refresh_transformation() {
@@ -388,7 +388,7 @@ void render_right_handed() {
     const float ortho_size = height / 2.f;
     
     view_to_projection = m4_ortho(ortho_size, aspect_ratio, f, n);
-    world_to_view      = m4_translate(vec2(-width / 2.f, ortho_size));
+    world_to_view      = m4_translate(v2(-width / 2.f, ortho_size));
     
     refresh_transformation();
 }
@@ -409,7 +409,7 @@ void render_frame_end() {
 		draw_calls, verts_drawn, verts_culled, fps, memory_num_allocations(), memory_amount_allocated() / 1024.f
 	);
 	Vector2 string_size = get_draw_string_size(buffer);
-	Vector2 padding = vec2(10.f);
+	Vector2 padding = v2(10.f);
 	float x = os_window_width() - (string_size.x + padding.x);
 	float y = 0.f;
 

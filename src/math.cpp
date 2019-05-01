@@ -83,20 +83,20 @@ Matrix4 m4_translate(Vector2 position) {
 	return result;
 }
 
-Vector2 vec2() {
+Vector2 v2() {
 	return { 0.f, 0.f };
 }
 
-Vector2 vec2(float scalar) {
+Vector2 v2(float scalar) {
 	return { scalar, scalar };
 }
 
-Vector2 vec2(float x, float y) {
+Vector2 v2(float x, float y) {
 	return { x, y };
 }
 
 Vector2 Vector2::operator+(const Vector2& right) const {
-	return vec2(x + right.x, y + right.y);
+	return v2(x + right.x, y + right.y);
 }
 
 void Vector2::operator+=(const Vector2& right) {
