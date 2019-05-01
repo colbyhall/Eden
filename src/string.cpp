@@ -17,16 +17,16 @@ u8 String::operator[](size_t index) const {
 	return data[index];
 }
 
-bool String::starts_with(const String& str, bool case_matters) const {
-	if (str.count > count) return false;
+bool string_starts_with(const String& string, const String& compare, bool case_matters) {
+	if (string.count < compare.count) return false;
 
-	for (int i = 0; i < str.count; i++) {
-		const u8 a = str[i];
-		const u8 b = data[i];
+	for (int i = 0; i < compare.count; i++) {
+		const u8 a = compare[i];
+		const u8 b = string[i];
+
 		if (case_matters) {
 			if (a != b) return false;
-		}
-		else {
+		} else {
 			if (is_letter(a) && is_letter(b)) {
 				if (to_lowercase(a) != to_lowercase(b)) return false;
 			}
@@ -39,30 +39,29 @@ bool String::starts_with(const String& str, bool case_matters) const {
 	return true;
 }
 
-void String::append(const String& str) {
-	assert(count + str.count <= allocated);
+void string_append(String* string, const String& addition) {
+	assert(string->count + addition.count <= string->allocated);
 
-	memcpy(data + count, str.data, str.count);
-
-	count += str.count;
+	memcpy(string->data + string->count, addition.data, addition.count);
+	string->count += addition.count;
 }
 
-void String::advance(size_t amount) {
-	data += amount;
-	count -= amount;
-	allocated -= amount;
+void string_advance(String* string, size_t amount) {
+	string->data += amount;
+	string->count -= amount;
+	string->allocated -= amount;
 }
 
-String String::eat_line() {
-	eat_whitespace();
+String string_eat_line(String* string) {
+	string_eat_whitespace(string);
 
 	String result;
-	for (int i = 0; i < count; i++) {
-		if (is_eol(data[i])) {
-			result.data = data;
+	for (int i = 0; i < string->count; i++) {
+		if (is_eol(string->data[i])) {
+			result.data = string->data;
 			result.count = i;
 			result.allocated = i;
-			advance(i + 1);
+			string_advance(string, i + 1);
 
 			return result;
 		}
@@ -71,8 +70,8 @@ String String::eat_line() {
 	return result;
 }
 
-void String::eat_whitespace() {
-	while (count > 0 && is_whitespace(data[0])) {
-		advance(1);
+void string_eat_whitespace(String* string) {
+	while (string->count > 0 && is_whitespace(string->data[0])) {
+		string_advance(string, 1);
 	}
 }

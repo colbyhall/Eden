@@ -76,8 +76,9 @@ private:
 
 	void move_gap_to_cursor();
 	void resize_gap(size_t new_size);
-
 };
+
+Buffer* buffer_alloc();
 
 struct Buffer_View {
 	Buffer* buffer = nullptr;

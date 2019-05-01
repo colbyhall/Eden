@@ -10,18 +10,17 @@ enum OS_Cursor_Type {
 	CT_HResize,
 };
 
-namespace OS {
-	void* get_window_handle();
-	void poll_window_events();
+void* os_get_window_handle();
+void os_poll_window_events();
 
-	u32 window_width();
-	u32 window_height();
+u32 os_window_width();
+u32 os_window_height();
 
-	u64 get_ms_time();
+u64 os_get_ms_time();
 
-	String load_file_into_memory(const char* path);
+String os_load_file_into_memory(const char* path);
 
-	void set_cursor_type(OS_Cursor_Type type);
+void os_set_cursor_type(OS_Cursor_Type type);
 
-	Vector2 get_mouse_position();
-}
+Vector2 os_get_mouse_position();
+

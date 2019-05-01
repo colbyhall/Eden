@@ -10,7 +10,7 @@ float fclamp(float value, float min, float max) {
 	return value;
 }
 
-float Math::finterpto(float current, float target, float delta_time, float speed) {
+float math_finterpto(float current, float target, float delta_time, float speed) {
 
 	if (speed <= 0.f) {
 		return target;
@@ -27,20 +27,22 @@ float Math::finterpto(float current, float target, float delta_time, float speed
 	return current + delta_move;
 }
 
-Vector4::Vector4(int color) {
+Color::Color(int color) {
 	r = ((color >> 16) & 0xFF) / 255.f;
 	g = ((color >> 8) & 0xFF) / 255.f;
 	b = (color & 0xFF) / 255.f;
 	a = 1.f;
 }
 
-Matrix4::Matrix4() {
-	for (int i = 0; i < 4 * 4; i++) {
-		elems[i] = 0.f;
-	}
-}
-Matrix4 Matrix4::identity() {
+Matrix4 m4() {
 	Matrix4 result;
+	for (int i = 0; i < 4 * 4; i++) {
+		result.elems[i] = 0.f;
+	}
+	return result;
+}
+Matrix4 m4_identity() {
+	Matrix4 result= m4();
 	for (s32 i = 0; i < 4; i++) {
 		result.elems[i + i * 4] = 1.f;
 	}
@@ -48,7 +50,7 @@ Matrix4 Matrix4::identity() {
 }
 
 static Matrix4 m4__ortho(float left, float right, float top, float bottom, float far, float near) {
-	Matrix4 result = Matrix4::identity();
+	Matrix4 result = m4_identity();
 
 	result.elems[0 + 0 * 4] = 2.f / (right - left);
 	result.elems[1 + 1 * 4] = 2.f / (top - bottom);
@@ -61,7 +63,7 @@ static Matrix4 m4__ortho(float left, float right, float top, float bottom, float
 	return result;
 }
 
-Matrix4 Matrix4::ortho(float size, float aspect_ratio, float far, float near) {
+Matrix4 m4_ortho(float size, float aspect_ratio, float far, float near) {
 	const float right = size * aspect_ratio;
 	const float left = -right;
 
@@ -71,18 +73,30 @@ Matrix4 Matrix4::ortho(float size, float aspect_ratio, float far, float near) {
 	return m4__ortho(left, right, top, bottom, far, near);
 }
 
-Matrix4 Matrix4::translate(Vector2 pos) {
-	Matrix4 result = Matrix4::identity();
+Matrix4 m4_translate(Vector2 position) {
+	Matrix4 result = m4_identity();
 
-	result.elems[0 + 3 * 4] = pos.x;
-	result.elems[1 + 3 * 4] = pos.y;
+	result.elems[0 + 3 * 4] = position.x;
+	result.elems[1 + 3 * 4] = position.y;
 	result.elems[2 + 3 * 4] = 0.f;
 
 	return result;
 }
 
+Vector2 vec2() {
+	return { 0.f, 0.f };
+}
+
+Vector2 vec2(float scalar) {
+	return { scalar, scalar };
+}
+
+Vector2 vec2(float x, float y) {
+	return { x, y };
+}
+
 Vector2 Vector2::operator+(const Vector2& right) const {
-	return Vector2(x + right.x, y + right.y);
+	return vec2(x + right.x, y + right.y);
 }
 
 void Vector2::operator+=(const Vector2& right) {

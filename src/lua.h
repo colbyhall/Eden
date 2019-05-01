@@ -4,16 +4,5 @@
 
 struct lua_State;
 
-struct Lua {
-
-	static Lua& get();
-
-	void init();
-	void shutdown();
-
-private:
-
-	lua_State* lua_state;
-
-	static Lua g_lua;
-};
+void lua_init();
+void lua_shutdown();

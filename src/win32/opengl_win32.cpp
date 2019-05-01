@@ -15,7 +15,7 @@ WGL_Create_Context_Attribs_ARB* wglCreateContextAttribsARB = NULL;
 WGL_Choose_Pixel_Format_ARB* wglChoosePixelFormatARB = NULL;
 WGL_Swap_Interval_Ext* wglSwapIntervalEXT = NULL;
 
-bool GL::init() {
+bool gl_init() {
 
 	{
 		WNDCLASSEX window_class;
@@ -59,7 +59,7 @@ bool GL::init() {
 		}
 	}
 
-	HDC window_context = GetDC((HWND)OS::get_window_handle());
+	HDC window_context = GetDC((HWND)os_get_window_handle());
 
 	if (wglChoosePixelFormatARB) {
 		s32 attrib_list[] =
@@ -105,8 +105,8 @@ bool GL::init() {
 	return false;
 }
 
-void GL::swap_buffers() {
-	HWND window_handle = (HWND)OS::get_window_handle();
+void gl_swap_buffers() {
+	HWND window_handle = (HWND)os_get_window_handle();
 	HDC window_context = GetDC(window_handle);
 	SwapBuffers(window_context);
 	ReleaseDC(window_handle, window_context);

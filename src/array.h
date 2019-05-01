@@ -42,72 +42,16 @@ struct Array {
 
 	explicit Array(size_t allocate_amount) {
 		count = 0;
-		reserve(allocate_amount);
+		array_reserve(this, allocate_amount);
 	}
 
 	Array(std::initializer_list<T> list) {
 		count = 0;
-		reserve(list.size());
+		array_reserve(this, list.size());
 
 		for (const T& item : list) {
-			add(item);
+			array_add(this, item);
 		}
-	}
-
-	~Array() {
-		if (data) {
-			c_delete[] data;
-		}
-	}
-
-	size_t reserve(size_t amount) {
-		allocated += amount;
-
-		if (data) {
-			data = (T*)c_realloc(data, allocated * sizeof(T));
-		}
-		else {
-			data = c_new T[allocated];
-		}
-
-		return allocated;
-	}
-
-	size_t add(const T& item) {
-		return add_at_index(item, count);
-	}
-
-	size_t add_zeroed() {
-		T to_be_added;
-		return add(to_be_added);
-	}
-
-	void empty() {
-		count = 0;
-	}
-
-	size_t add_at_index(const T& item, size_t index) {
-		assert(index <= count);
-
-		if (count == allocated) {
-			reserve(1);
-		}
-
-		if (index != count) {
-			memmove(data + index + 1, data + index, (count - index) * sizeof(T));
-		}
-
-		data[index] = item;
-		count += 1;
-
-		return index;
-	}
-
-	T remove(size_t index) {
-		T result = data[index];
-		memmove(data + index, data + index + 1, (count - index) * sizeof(T));
-		count -= 1;
-		return result;
 	}
 
 	T* begin() {
@@ -127,3 +71,59 @@ struct Array {
 	}
 
 };
+
+template <typename T>
+size_t array_reserve(Array<T>* arr, size_t amount) {
+	arr->allocated += amount;
+
+	if (arr->data) {
+		arr->data = (T*)c_realloc(arr->data, arr->allocated * sizeof(T));
+	}
+	else {
+		arr->data = (T*)c_alloc(sizeof(T) * arr->allocated);
+	}
+
+	return arr->allocated;
+}
+
+template <typename T>
+size_t array_add(Array<T>* arr, const T& item) {
+	return array_add_at_index(arr, item, arr->count);
+}
+
+template <typename T>
+size_t array_add_zeroed(Array<T>* arr) {
+	T to_be_added;
+	return array_add(arr, to_be_added);
+}
+
+template <typename T>
+void array_empty(Array<T>* arr) {
+	arr->count = 0;
+}
+
+template <typename T>
+size_t array_add_at_index(Array<T>* arr, const T& item, size_t index) {
+	assert(index <= arr->count);
+
+	if (arr->count == arr->allocated) {
+		array_reserve(arr, 1);
+	}
+
+	if (index != arr->count) {
+		memmove(arr->data + index + 1, arr->data + index, (arr->count - index) * sizeof(T));
+	}
+
+	arr->data[index] = item;
+	arr->count += 1;
+
+	return index;
+}
+
+template <typename T>
+T array_remove(Array<T>* arr, size_t index) {
+	T result = arr->data[index];
+	memmove(arr->data + index, arr->data + index + 1, (arr->count - index) * sizeof(T));
+	arr->count -= 1;
+	return result;
+}

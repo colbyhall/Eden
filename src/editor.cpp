@@ -14,54 +14,28 @@
 #include <stdio.h>
 
 Font font;
-
 const float scroll_speed = 5.f;
-
-Editor Editor::g_editor;
-
 u32 frame_count = 0;
+u64 last_frame_time = 0;
+float dt = 0.f;
+u32 fps = 0;
+bool is_running = false;
 
-Editor& Editor::get() {
-	return g_editor;
-}
+Array<Buffer> loaded_buffers;
+u64 last_buffer_id = 0;
 
-Buffer* Editor::create_buffer() {
-	Buffer new_buffer(last_id);
-	last_id += 1;
-	size_t index = loaded_buffers.add(new_buffer);
-	return &loaded_buffers[index];
-}
+Buffer_View main_view;
 
-Buffer* Editor::find_buffer(Buffer_ID id) {
-	for (Buffer& buffer : loaded_buffers) {
-		if (buffer.id == id) {
-			return &buffer;
-		}
-	}
 
-	return nullptr;
-}
-
-bool Editor::destroy_buffer(Buffer_ID id) {
-	for (size_t i = 0; i < loaded_buffers.count; i++) {
-		if (loaded_buffers[i].id == id) {
-			loaded_buffers.remove(i);
-			return true;
-		}
-	}
-	
-	return false;
-}
-
-void Editor::init() {
-	assert(GL::init());
+void editor_init() {
+	assert(gl_init());
 	init_renderer();
 
-	Lua::get().init();
+	lua_init();
 
-	font = Font::load_font("data\\fonts\\FiraCode-Regular.ttf");
+	font = font_load_from_file("data\\fonts\\FiraCode-Regular.ttf");
 	
-	Buffer* buffer = create_buffer();
+	Buffer* buffer = buffer_alloc();
 	main_view.buffer = buffer;
 	// buffer->init_from_size(0);
 	buffer->load_from_file("src\\draw.cpp");
@@ -71,78 +45,47 @@ void Editor::init() {
 	is_running = true;
 }
 
-void Editor::loop() {
-	last_frame_time = OS::get_ms_time();
+void editor_loop() {
+	last_frame_time = os_get_ms_time();
 	static float counter = 0.f;
 	while (is_running) {
-		u64 current_time = OS::get_ms_time();
-		delta_time = (current_time - last_frame_time) / 1000.f;
+		u64 current_time = os_get_ms_time();
+		dt = (current_time - last_frame_time) / 1000.f;
 		last_frame_time = current_time;
 		
-		counter += delta_time;
+		counter += dt;
 		if (counter >= 1.f) {
 			counter = 0.f;
 			fps = frame_count;
 			frame_count = 0;
 		}
 
-		OS::poll_window_events();
+		editor_poll_input();
 
-		main_view.tick(delta_time);
+		editor_tick(dt);
 
-		draw();
+		editor_draw();
 	}
 }
 
-void Editor::shutdown() {
-	Lua::get().shutdown();
+void editor_shutdown() {
+	lua_shutdown();
 }
 
-void Editor::on_window_resized(u32 old_width, u32 old_height) {
-	glViewport(0, 0, OS::window_width(), OS::window_height());
-	render_right_handed();
+void editor_poll_input() {
+	os_poll_window_events();
 }
 
-void Editor::on_mousewheel_scrolled(float delta) {
-	main_view.target_scroll_y -= delta;
-
-	if (main_view.target_scroll_y < 0.f) main_view.target_scroll_y = 0.f;
-
-	const float font_height = FONT_SIZE;
-	const float max_scroll = main_view.get_buffer_height() - font_height;
-	if (main_view.target_scroll_y > max_scroll) main_view.target_scroll_y = max_scroll;
+void editor_tick(float dt) {
+	main_view.tick(dt);
 }
 
-void Editor::on_key_pressed(u8 key) {
-	Buffer_View* current_view = get_current_view();
-	if (!current_view) {
-		return;
-	}
-	current_view->on_key_pressed(key);
-}
-
-void Editor::on_mouse_down(Vector2 position) {
-	Buffer_View* current_view = get_current_view();
-	if (!current_view) {
-		return;
-	}
-	current_view->on_mouse_down(position);
-}
-
-void Editor::on_mouse_up(Vector2 position) {
-	Buffer_View* current_view = get_current_view();
-	if (!current_view) {
-		return;
-	}
-	current_view->on_mouse_up(position);
-}
-
-void Editor::draw() {
+void editor_draw() {
 	render_frame_begin();
 
-	const float window_width = (float)OS::window_width();
-	const float window_height = (float)OS::window_height();
-	
+	const float window_width = (float)os_window_width();
+	const float window_height = (float)os_window_height();
+
 	// @NOTE(Colby): Background
 	{
 		const float x0 = 0.f;
@@ -155,7 +98,7 @@ void Editor::draw() {
 
 	// @NOTE(Colby): Buffer drawing goes here
 	{
-		get_current_view()->draw();
+		editor_get_current_view()->draw();
 	}
 
 	{
@@ -174,4 +117,76 @@ void Editor::draw() {
 
 	frame_count += 1;
 	render_frame_end();
+}
+
+void editor_on_window_resized(u32 old_width, u32 old_height) {
+	glViewport(0, 0, os_window_width(), os_window_height());
+	render_right_handed();
+}
+
+void editor_on_mousewheel_scrolled(float delta) {
+	main_view.target_scroll_y -= delta;
+
+	if (main_view.target_scroll_y < 0.f) main_view.target_scroll_y = 0.f;
+
+	const float font_height = FONT_SIZE;
+	const float max_scroll = main_view.get_buffer_height() - font_height;
+	if (main_view.target_scroll_y > max_scroll) main_view.target_scroll_y = max_scroll;
+}
+
+void editor_on_key_pressed(u8 key) {
+	Buffer_View* current_view = editor_get_current_view();
+	if (!current_view) {
+		return;
+	}
+	current_view->on_key_pressed(key);
+}
+
+void editor_on_mouse_down(Vector2 position) {
+	Buffer_View* current_view = editor_get_current_view();
+	if (!current_view) {
+		return;
+	}
+	current_view->on_mouse_down(position);
+}
+
+void editor_on_mouse_up(Vector2 position) {
+	Buffer_View* current_view = editor_get_current_view();
+	if (!current_view) {
+		return;
+	}
+	current_view->on_mouse_up(position);
+}
+
+Buffer_View* editor_get_current_view() {
+	// @TODO(Colby): This is super temp as we don't have a buffer selection thing going on
+	return &main_view;
+}
+
+Buffer* editor_create_buffer() {
+	Buffer new_buffer(last_buffer_id);
+	last_buffer_id += 1;
+	size_t index = array_add(&loaded_buffers, new_buffer);
+	return &loaded_buffers[index];
+}
+
+Buffer* editor_find_buffer(Buffer_ID id) {
+	for (Buffer& buffer : loaded_buffers) {
+		if (buffer.id == id) {
+			return &buffer;
+		}
+	}
+
+	return nullptr;
+}
+
+bool editor_destroy_buffer(Buffer_ID id) {
+	for (size_t i = 0; i < loaded_buffers.count; i++) {
+		if (loaded_buffers[i].id == id) {
+			array_remove(&loaded_buffers, i);
+			return true;
+		}
+	}
+
+	return false;
 }

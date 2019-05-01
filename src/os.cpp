@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-String OS::load_file_into_memory(const char* path) {
+String os_load_file_into_memory(const char* path) {
 	FILE* f = fopen(path, "rb");
 	if (!f) {
 		return "";
@@ -15,10 +15,15 @@ String OS::load_file_into_memory(const char* path) {
 	size_t size = ftell(f);
 	fseek(f, 0, SEEK_SET);
 
-	u8* file_data = c_new u8[size];
+	u8* file_data = (u8*)c_alloc(size + 1);
 	fread(file_data, size, 1, f);
-
 	fclose(f);
+	file_data[size] = 0;
 
-	return String((const char*)file_data);
+	String result;
+	result.data = file_data;
+	result.allocated = size + 1;
+	result.count = size;
+
+	return result;
 }

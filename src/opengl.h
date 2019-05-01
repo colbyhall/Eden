@@ -227,7 +227,5 @@ macro(PFNGLBINDBUFFERRANGEPROC, glBindBufferRange)
 GL_BINDINGS(DECLARE_GL_FUNCTIONS);
 #undef  DECLARE_GL_FUNCTIONS
 
-namespace GL {
-	bool init();
-	void swap_buffers();
-}
+bool gl_init();
+void gl_swap_buffers();

@@ -61,21 +61,21 @@ void Buffer::refresh_cursor_info(bool update_desired) {
 }
 
 void Buffer::refresh_eol_table(size_t reserve_size) {
-	eol_table.empty();
+	array_empty(&eol_table);
 	if (eol_table.allocated <= reserve_size) {
-		eol_table.reserve(reserve_size - eol_table.allocated);
+		array_reserve(&eol_table, reserve_size - eol_table.allocated);
 	}
 
 	size_t current_line_size = 1;
 	for (size_t i = 0; i < get_size(); i++) {
 		if (is_eol(data[i])) {
-			eol_table.add(current_line_size);
+			array_add(&eol_table, current_line_size);
 			current_line_size = 1;
 		} else {
 			current_line_size += 1;
 		}
 	}
-	eol_table.add(current_line_size - 1);
+	array_add(&eol_table, current_line_size - 1);
 }
 
 void Buffer::resize_gap(size_t new_size) {
@@ -113,7 +113,7 @@ void Buffer::load_from_file(const char* path) {
 	size_t size = ftell(fd);
 	fseek(fd, 0, SEEK_SET);
 
-	u8* buffer_data = c_new u8[size + DEFAULT_GAP_SIZE];
+	u8* buffer_data = (u8*)c_alloc(size + DEFAULT_GAP_SIZE);
 	data = buffer_data;
 	allocated = size + DEFAULT_GAP_SIZE;
 
@@ -152,12 +152,12 @@ void Buffer::load_from_file(const char* path) {
 void Buffer::init_from_size(size_t size) {
 	if (size < DEFAULT_GAP_SIZE) size = DEFAULT_GAP_SIZE;
 
-	data = c_new u8[size];
+	data = (u8*)c_alloc(size);
 	allocated = size;
 	cursor = data;
 	gap = data;
 	gap_size = size;
-	eol_table.add(0);
+	array_add(&eol_table, (size_t)0);
 
 	refresh_cursor_info();
 }
@@ -173,7 +173,7 @@ void Buffer::add_char(u8 c) {
 	if (is_eol(c)) {
 		const size_t line_size = eol_table[current_line_number];
 		eol_table[current_line_number] = current_column_number + 1;
-		eol_table.add_at_index(line_size - current_column_number, current_line_number + 1);
+		array_add_at_index(&eol_table, line_size - current_column_number, current_line_number + 1);
 
 		current_line_number += 1;
 		current_column_number = 0;
@@ -261,7 +261,7 @@ void Buffer::remove_before_cursor() {
 
 	if (is_eol(*(cursor - 1))) {
 		const size_t amount_on_line = eol_table[current_line_number] + 1;
-		eol_table.remove(current_line_number);
+		array_remove(&eol_table, current_line_number);
 		eol_table[current_line_number - 1] += amount_on_line;
 	}
 
@@ -317,7 +317,7 @@ void Buffer_View::draw() {
 		float x = 0.f;
 		float y = font.ascent;
 
-		font.bind();
+		font_bind(&font);
 		immediate_begin();
 
 		const size_t lines_scrolled = (size_t)(current_scroll_y / font_height);
@@ -350,23 +350,23 @@ void Buffer_View::draw() {
 			u8 c_to_draw = buffer->data[i];
 			const u8* current_position = buffer->data + i;
 #endif
-			Vector4 color = 0xd6b58d;
+			Color color = 0xd6b58d;
 
 
 			if (current_position == buffer->cursor || (buffer->cursor == buffer->gap && current_position == buffer->get_gap_end())) {
 				immediate_flush();
 
-				const Font_Glyph& glyph = font[c_to_draw];
+				Font_Glyph glyph = font_find_glyph(&font, c_to_draw);
 
 				if (buffer->cursor == buffer->gap || is_eol(c_to_draw) || is_whitespace(c_to_draw)) {
-					draw_cursor(font.get_space_glyph(), position.x + x, position.y + y);
+					draw_cursor(font_find_glyph(&font, ' '), position.x + x, position.y + y);
 				}
 				else {
 					draw_cursor(glyph, position.x + x, position.y + y);
 				}
 				color = 0x052329;
 
-				font.bind();
+				font_bind(&font);
 				immediate_begin();
 			}
 
@@ -382,12 +382,12 @@ void Buffer_View::draw() {
 				color = 0xFFFF00;
 			} else {
 				if (c_to_draw == '\t') {
-					const Font_Glyph& space_glyph = font.get_space_glyph();
+					const Font_Glyph& space_glyph = font_find_glyph(&font, ' ');
 					x += space_glyph.advance  * 4.f;
 					verts_culled += 6 * 4;
 					continue;
 				} else if (c_to_draw == ' ') {
-					x += font.get_space_glyph().advance;
+					x += font_find_glyph(&font, ' ').advance;
 					verts_culled += 6;
 					continue;
 				} else if (is_eol(c_to_draw) && !LINE_COUNT_DEBUG) {
@@ -404,12 +404,12 @@ void Buffer_View::draw() {
 				verts_culled += 6;
 				continue;
 			} else if (c_to_draw == '\t') {
-				const Font_Glyph& space_glyph = font.get_space_glyph();
+				const Font_Glyph& space_glyph = font_find_glyph(&font, ' ');
 				x += space_glyph.advance  * 4.f;
 				verts_culled += 6 * 4;
 				continue;
 			} else if (c_to_draw == ' ') {
-				x += font.get_space_glyph().advance;
+				x += font_find_glyph(&font, ' ').advance;
 				verts_culled += 6;
 				continue;
 			}
@@ -432,7 +432,7 @@ void Buffer_View::draw() {
 
 			assert(!is_whitespace(c_to_draw));
 
-			const Font_Glyph& glyph = font[c_to_draw];
+			Font_Glyph glyph = font_find_glyph(&font, c_to_draw);
 
 			if (x + glyph.advance > size.x) {
 				x = 0.f;
@@ -452,8 +452,8 @@ void Buffer_View::draw() {
 			const u8* last_position = buffer->get_position(buffer->get_size() - 1) + 1;
 			if (last_position == buffer->cursor) {
 				immediate_flush();
-				draw_cursor(font.get_space_glyph(), position.x + x, position.y + y);
-				font.bind();
+				draw_cursor(font_find_glyph(&font, ' '), position.x + x, position.y + y);
+				font_bind(&font);
 				immediate_begin();
 			}
 		}
@@ -494,10 +494,10 @@ void Buffer_View::tick(float delta_time) {
 		return;
 	}
 	
-	current_scroll_y = Math::finterpto(current_scroll_y, target_scroll_y, delta_time, 10.f);
+	current_scroll_y = math_finterpto(current_scroll_y, target_scroll_y, delta_time, 10.f);
 
 	if (mouse_pressed_on) {
-		buffer->cursor = get_char_at(OS::get_mouse_position());
+		buffer->cursor = get_char_at(os_get_mouse_position());
 		buffer->refresh_cursor_info();
 	}
 }
@@ -508,7 +508,7 @@ Vector2 Buffer_View::get_size() const {
 }
 
 Vector2 Buffer_View::get_position() const {
-	return Vector2(0.f, 0.f);
+	return vec2(0.f, 0.f);
 }
 
 Vector2 Buffer_View::get_buffer_position() const {
@@ -526,7 +526,7 @@ float Buffer_View::get_buffer_height() const {
 }
 
 Vector2 Buffer_View::get_max_size() {
-	return Vector2(OS::window_width(), OS::window_height() - FONT_SIZE);
+	return vec2((float)os_window_width(), (float)(os_window_height() - FONT_SIZE));
 }
 
 u8* Buffer_View::get_char_at(Vector2 find_pos) {
@@ -565,10 +565,10 @@ u8* Buffer_View::get_char_at(Vector2 find_pos) {
 		u8* current_position = buffer->get_position(i);
 		u8 c = *current_position;
 
-		Font_Glyph& glyph = font[c];
-		const Font_Glyph& space_glyph = font.get_space_glyph();
+		Font_Glyph glyph = font_find_glyph(&font, c);
+		const Font_Glyph& space_glyph = font_find_glyph(&font, ' ');
 		if (is_whitespace(c)) {
-			glyph = font.get_space_glyph();
+			glyph = font_find_glyph(&font, ' ');
 		}
 
 		float width = glyph.advance;
@@ -636,7 +636,6 @@ void Buffer_View::on_key_pressed(u8 key) {
 		buffer->add_char(key);
 	}
 	input_pressed();
-
 }
 
 void Buffer_View::draw_cursor(const Font_Glyph& glyph, float x, float y) {
@@ -646,4 +645,10 @@ void Buffer_View::draw_cursor(const Font_Glyph& glyph, float x, float y) {
 	const float y1 = y - font.descent;
 
 	draw_rect(x0, y0, x1, y1, 0x81E38E);
+}
+
+Buffer* buffer_alloc() {
+	Buffer* result = (Buffer*)c_alloc(sizeof(Buffer));
+	memset(result, 0, sizeof(Buffer));
+	return result;
 }

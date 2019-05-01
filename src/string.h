@@ -11,15 +11,14 @@ struct String {
 	String(const char* cstr);
 
 	operator bool() const { return count > 0 && data != nullptr; }
-
-	u8 operator[](size_t index) const;
-
 	operator const char*() const { return (const char*)data; }
 
-	bool starts_with(const String& str, bool case_matters = true) const;
-	void append(const String& str);
-
-	void advance(size_t amount);
-	String eat_line();
-	void eat_whitespace();
+	u8 operator[](size_t index) const;
 };
+
+bool string_starts_with(const String& string, const String& compare, bool case_matters = true);
+void string_append(String* string, const String& addition);
+void string_advance(String* string, size_t amount);
+String string_eat_line(String* string);
+void string_eat_whitespace(String* string);
+

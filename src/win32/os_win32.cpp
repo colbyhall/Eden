@@ -19,11 +19,11 @@ extern "C"
 	__declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x0;
 }
 
-void* OS::get_window_handle() {
+void* os_get_window_handle() {
 	return window_handle;
 }
 
-void OS::poll_window_events() {
+void os_poll_window_events() {
 	MSG msg;
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
 		TranslateMessage(&msg);
@@ -31,11 +31,11 @@ void OS::poll_window_events() {
 	}
 }
 
-u32 OS::window_width() {
+u32 os_window_width() {
 	return ::window_width;
 }
 
-u32 OS::window_height() {
+u32 os_window_height() {
 	return ::window_height;
 }
 
@@ -48,9 +48,6 @@ typedef enum PROCESS_DPI_AWARENESS {
 typedef HRESULT(*Set_Process_DPI_Awareness)(PROCESS_DPI_AWARENESS value);
 
 static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_param) {
-	
-	Editor& editor = Editor::get();
-
 	switch (message) {
 		case WM_SIZE: {
 			RECT rect;
@@ -62,46 +59,46 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 			window_width = rect.right - rect.left;
 			window_height = rect.bottom - rect.top;
 
-			editor.on_window_resized(old_width, old_height);
+			editor_on_window_resized(old_width, old_height);
 			// game_state->on_window_resized(old_width, old_height);
 		} break;
 
 		case WM_DESTROY: {
 			// game_state->on_exit_requested();
-			editor.is_running = false;
+			is_running = false;
 		} break;
 		case WM_SIZING: {
-			editor.draw();
+			editor_draw();
 		} break;
 
 		case WM_MOUSEWHEEL: {
 			float delta = GET_WHEEL_DELTA_WPARAM(w_param);
-			editor.on_mousewheel_scrolled(delta);
+			editor_on_mousewheel_scrolled(delta);
 		} break;
 
 		case WM_CHAR: {
 			u8 key = (u8)w_param;
-			editor.on_key_pressed(key);
+			editor_on_key_pressed(key);
 		} break;
 
 		case WM_KEYDOWN: {
 			u8 key = (u8)w_param;
 			if (key >= KEY_LEFT && key <= KEY_DOWN) {
-				editor.on_key_pressed(key);
+				editor_on_key_pressed(key);
 			}
 		} break;
 
 		case WM_LBUTTONDOWN: {
-			editor.on_mouse_down(OS::get_mouse_position());
+			editor_on_mouse_down(os_get_mouse_position());
 		} break;
 
 		case WM_LBUTTONUP: {
-			editor.on_mouse_up(OS::get_mouse_position());
+			editor_on_mouse_up(os_get_mouse_position());
 		} break;
 
 		case WM_NCLBUTTONUP: 
 		case WM_KILLFOCUS: {
-			editor.on_mouse_up(0.f);
+			editor_on_mouse_up(vec2(0.f));
 		} break;
 	}
 
@@ -157,22 +154,25 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 		SetCurrentDirectory(TEXT(".."));
 	}
 
-	Editor& editor = Editor::get();
-	editor.init();
+	editor_init();
 	SetCurrentDirectory(path_at_start);
 	ShowWindow(window_handle, SW_SHOW);
+#if BUILD_DEBUG
 	wglSwapIntervalEXT(false);
-	editor.loop();
-	editor.shutdown();
+#else
+	wglSwapIntervalEXT(true);
+#endif
+	editor_loop();
+	editor_shutdown();
 
 	return 0;
 }
 
-u64 OS::get_ms_time() {
+u64 os_get_ms_time() {
 	return (u64)GetTickCount64();
 }
 
-void OS::set_cursor_type(OS_Cursor_Type type) {
+void os_set_cursor_type(OS_Cursor_Type type) {
 	HCURSOR new_cursor = NULL;
 	switch (type) {
 	case CT_Arrow:
@@ -189,10 +189,10 @@ void OS::set_cursor_type(OS_Cursor_Type type) {
 	SetCursor(new_cursor);
 }
 
-Vector2 OS::get_mouse_position() {
+Vector2 os_get_mouse_position() {
 	POINT p;
 	if (GetCursorPos(&p)) {
-		if (ScreenToClient((HWND)OS::get_window_handle(), &p)) {
+		if (ScreenToClient((HWND)os_get_window_handle(), &p)) {
 			return {(float) p.x, (float)p.y };
 		}
 	}

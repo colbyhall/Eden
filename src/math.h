@@ -11,38 +11,29 @@ struct Vector2 {
 		f32 uv[2];
 	};
 
-	Vector2() : x(0.f), y(0.f) {}
-	Vector2(float xy) : x(xy), y(xy) {}
-	Vector2(float x, float y) : x(x), y(y) {}
-
 	Vector2 operator+(const Vector2& right) const;
 	void operator+=(const Vector2& right);
 };
 
-struct Vector4 {
-	union {
-		struct { f32 x, y, z, w; };
-		struct { f32 r, g, b, a; };
-	};
+Vector2 vec2();
+Vector2 vec2(float scalar);
+Vector2 vec2(float x, float y);
 
-	Vector4() : x(0.f), y(0.f), z(0.f), w(0.f) {}
-	Vector4(float scalar) : x(scalar), y(scalar), z(scalar), w(scalar) {}
-	Vector4(int color);
+struct Color {
+	f32 r, g, b, a;
+
+	Color(int color);
+	Color() : r(0.f), g(0.f), b(0.f), a(0.f) {}
 };
 
-struct Matrix4 {
-	union {
-		f32 row_col[4][4];
-		f32 elems[4 * 4];
-	};
-
-	Matrix4();
-	static Matrix4 identity();
-	static Matrix4 ortho(float size, float aspect_ratio, float far, float near);
-	static Matrix4 translate(Vector2 pos);
-
+union Matrix4 {
+	f32 row_col[4][4];
+	f32 elems[4 * 4];
 };
 
-namespace Math {
-	float finterpto(float current, float target, float delta_time, float speed);
-}
+Matrix4 m4();
+Matrix4 m4_identity();
+Matrix4 m4_ortho(float size, float aspect_ratio, float far, float near);
+Matrix4 m4_translate(Vector2 position);
+
+float math_finterpto(float current, float target, float delta_time, float speed);

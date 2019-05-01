@@ -9,10 +9,15 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb/stb_truetype.h>
 
-Font Font::load_font(const char* path) {
+struct Bitmap {
+	s32 width, height;
+	u8* data;
+};
 
-	String font_data = OS::load_file_into_memory(path);
+Font* current_font = nullptr;
 
+Font font_load_from_file(const char* path) {
+	String font_data = os_load_file_into_memory(path);
 	assert(font_data.data != NULL);
 
 	Font result;
@@ -22,7 +27,7 @@ Font Font::load_font(const char* path) {
 
 	Bitmap atlas;
 	atlas.width = atlas.height = FONT_ATLAS_DIMENSION;
-	atlas.data = c_new u8[atlas.width * atlas.height];
+	atlas.data = (u8*) c_alloc(atlas.width * atlas.height);
 
 	stbtt_pack_context pc;
 	stbtt_packedchar pdata[NUM_CHARACTERS];
@@ -50,7 +55,7 @@ Font Font::load_font(const char* path) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlas.width, atlas.height, 0, GL_RED, GL_UNSIGNED_BYTE, atlas.data);
 
 	for (int i = 0; i < NUM_CHARACTERS; i++) {
-		Font_Glyph* glyph = &result.characters[i];
+		Font_Glyph* glyph = &result.glyphs[i];
 
 		glyph->x0 = pdata[i].x0;
 		glyph->x1 = pdata[i].x1;
@@ -75,20 +80,22 @@ Font Font::load_font(const char* path) {
 	result.descent = (float)descent * font_scale;
 	result.line_gap = (float)line_gap * font_scale;
 
-	c_delete[] font_data.data;
+	c_free(font_data.data);
 
 	return result;
 }
 
-Font_Glyph& Font::operator[](u8 c) {
-	return characters[c - 32];
+Font_Glyph font_find_glyph(Font* font, u8 c) {
+	return font->glyphs[c - 32];
 }
 
-void Font::bind() {
-	font_shader.bind();
+void font_bind(Font* font) {
+	shader_bind(&font_shader);
 	refresh_transformation();
 	glUniform1i(font_shader.texture_loc, 0);
 
-	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glBindTexture(GL_TEXTURE_2D, font->texture_id);
 	glActiveTexture(GL_TEXTURE0);
+
+	current_font = font;
 }

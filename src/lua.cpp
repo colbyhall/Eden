@@ -3,11 +3,7 @@
 
 #include <lua/lua.hpp>
 
-Lua Lua::g_lua;
-
-Lua& Lua::get() {
-	return g_lua;
-}
+lua_State* lua_state;
 
 // @NOTE(Colby): Based off of l_alloc from lauxlib.c
 static void* lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize) {
@@ -25,10 +21,10 @@ static void* lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize) {
 	return nullptr;
 }
 
-void Lua::init() {
+void lua_init() {
 	lua_state = lua_newstate(lua_alloc, nullptr);
 }
 
-void Lua::shutdown() {
+void lua_shutdown() {
 	lua_close(lua_state);
 }
