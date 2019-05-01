@@ -9,6 +9,7 @@
 #include "parsing.h"
 #include "font.h"
 #include "lua.h"
+#include "input.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -22,7 +23,7 @@ u32 fps = 0;
 bool is_running = false;
 
 Array<Buffer> loaded_buffers;
-u64 last_buffer_id = 0;
+Buffer_ID last_buffer_id = 0;
 
 Buffer_View main_view;
 
@@ -35,11 +36,12 @@ void editor_init() {
 
 	font = font_load_from_file("data\\fonts\\FiraCode-Regular.ttf");
 	
-	Buffer* buffer = buffer_alloc();
-	main_view.buffer = buffer;
-	// buffer->init_from_size(0);
-	buffer->load_from_file("src\\draw.cpp");
-	buffer->title = "(YEET project) src/draw.cpp";
+	Buffer* buffer = editor_create_buffer();
+	main_view.buffer_id = buffer->id;
+	buffer_load_from_file(buffer, "src\\buffer.cpp");
+	// buffer_init_from_size(buffer, 1024);
+	// buffer->load_from_file("src\\draw.cpp");
+	// buffer->title = "(YEET project) src/draw.cpp";
 
 
 	is_running = true;
@@ -77,7 +79,7 @@ void editor_poll_input() {
 }
 
 void editor_tick(float dt) {
-	main_view.tick(dt);
+	tick_buffer_view(&main_view, dt);
 }
 
 void editor_draw() {
@@ -96,23 +98,8 @@ void editor_draw() {
 		draw_rect(x0, y0, x1, y1, 0x052329);
 	}
 
-	// @NOTE(Colby): Buffer drawing goes here
 	{
-		editor_get_current_view()->draw();
-	}
-
-	{
-		// @NOTE(Colby): Command bar filling
-		const float command_bar_height = window_height - Buffer_View::get_max_size().y;
-		{
-			const float x0 = 0.f;
-			const float y0 = window_height - command_bar_height;
-			const float x1 = window_width;
-			const float y1 = window_height;
-
-			draw_rect(x0, y0, x1, y1, 0x052329);
-			draw_string("ctrl + alt + o", x0 + 10.f, y0, 0xFFFFFF);
-		}
+		draw_buffer_view(main_view);
 	}
 
 	frame_count += 1;
@@ -125,13 +112,7 @@ void editor_on_window_resized(u32 old_width, u32 old_height) {
 }
 
 void editor_on_mousewheel_scrolled(float delta) {
-	main_view.target_scroll_y -= delta;
 
-	if (main_view.target_scroll_y < 0.f) main_view.target_scroll_y = 0.f;
-
-	const float font_height = FONT_SIZE;
-	const float max_scroll = main_view.get_buffer_height() - font_height;
-	if (main_view.target_scroll_y > max_scroll) main_view.target_scroll_y = max_scroll;
 }
 
 void editor_on_key_pressed(u8 key) {
@@ -139,7 +120,24 @@ void editor_on_key_pressed(u8 key) {
 	if (!current_view) {
 		return;
 	}
-	current_view->on_key_pressed(key);
+	Buffer* buffer = editor_find_buffer(current_view->buffer_id);
+	if (!buffer) {
+		return;
+	}
+	switch (key) {
+	case KEY_ENTER:
+		buffer_add_char(buffer, '\n');
+		break;
+	case KEY_LEFT:
+		buffer_move_cursor_horizontal(buffer, -1);
+		break;
+	case KEY_RIGHT:
+		buffer_move_cursor_horizontal(buffer, 1);
+		break;
+	default:
+		buffer_add_char(buffer, key);
+	}
+	// current_view->on_key_pressed(key);
 }
 
 void editor_on_mouse_down(Vector2 position) {
@@ -147,7 +145,7 @@ void editor_on_mouse_down(Vector2 position) {
 	if (!current_view) {
 		return;
 	}
-	current_view->on_mouse_down(position);
+	// current_view->on_mouse_down(position);
 }
 
 void editor_on_mouse_up(Vector2 position) {
@@ -155,7 +153,7 @@ void editor_on_mouse_up(Vector2 position) {
 	if (!current_view) {
 		return;
 	}
-	current_view->on_mouse_up(position);
+	// current_view->on_mouse_up(position);
 }
 
 Buffer_View* editor_get_current_view() {
@@ -164,7 +162,7 @@ Buffer_View* editor_get_current_view() {
 }
 
 Buffer* editor_create_buffer() {
-	Buffer new_buffer(last_buffer_id);
+	Buffer new_buffer = make_buffer(last_buffer_id);
 	last_buffer_id += 1;
 	size_t index = array_add(&loaded_buffers, new_buffer);
 	return &loaded_buffers[index];
