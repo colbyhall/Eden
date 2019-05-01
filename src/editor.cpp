@@ -15,7 +15,6 @@
 #include <stdio.h>
 
 Font font;
-const float scroll_speed = 5.f;
 u32 frame_count = 0;
 u64 last_frame_time = 0;
 float dt = 0.f;
@@ -30,8 +29,8 @@ Buffer_View main_view;
 
 void editor_init() {
 	assert(gl_init());
-	init_renderer();
-
+	
+	draw_init();
 	lua_init();
 
 	font = font_load_from_file("data\\fonts\\FiraCode-Regular.ttf");
@@ -40,8 +39,7 @@ void editor_init() {
 	main_view.buffer_id = buffer->id;
 	buffer_load_from_file(buffer, "src\\buffer.cpp");
 	// buffer_init_from_size(buffer, 1024);
-	// buffer->load_from_file("src\\draw.cpp");
-	// buffer->title = "(YEET project) src/draw.cpp";
+	buffer->title = "(YEET project) src/draw.cpp";
 
 
 	is_running = true;
@@ -98,9 +96,32 @@ void editor_draw() {
 		draw_rect(x0, y0, x1, y1, 0x052329);
 	}
 
+	// @NOTE(Colby): Command Bar and buffer drawing
 	{
-		draw_buffer_view(main_view);
+		const Vector2 padding = v2(10.f);
+		const float font_height = FONT_SIZE;
+		const float bar_height = font_height + padding.y;
+		{
+			const float x0 = 0.f;
+			const float y0 = 0.f;
+			const float x1 = x0 + window_width;
+			const float y1 = y0 + window_height - bar_height;
+			draw_buffer_view(main_view, x0, y0, x1, y1);
+		}
+		
+		{
+			const float x0 = 0.f;
+			const float y0 = window_height - bar_height;
+			const float x1 = x0 + window_width;
+			const float y1 = y0 + bar_height;
+			draw_rect(x0, y0, x1, y1, 0x052329);
+
+			const float x = x0 + padding.x / 2.f;
+			const float y = y0 + padding.y / 2.f;
+			draw_string("esc", x, y, 0xd6b58d);
+		}
 	}
+
 
 	frame_count += 1;
 	render_frame_end();
@@ -112,7 +133,14 @@ void editor_on_window_resized(u32 old_width, u32 old_height) {
 }
 
 void editor_on_mousewheel_scrolled(float delta) {
+	main_view.target_scroll_y -= delta;
 
+	if (main_view.target_scroll_y < 0.f) main_view.target_scroll_y = 0.f;
+
+	const float font_height = FONT_SIZE;
+	const float buffer_height = buffer_view_get_buffer_height(main_view);
+	const float max_scroll = buffer_height - font_height;
+	if (main_view.target_scroll_y > max_scroll) main_view.target_scroll_y = max_scroll;
 }
 
 void editor_on_key_pressed(u8 key) {
@@ -134,6 +162,15 @@ void editor_on_key_pressed(u8 key) {
 	case KEY_RIGHT:
 		buffer_move_cursor_horizontal(buffer, 1);
 		break;
+	case KEY_UP:
+		buffer_move_cursor_vertical(buffer, -1);
+		break;
+	case KEY_DOWN:
+		buffer_move_cursor_vertical(buffer, 1);
+		break;
+	case KEY_BACKSPACE:
+		buffer_remove_before_cursor(buffer);
+		break;
 	default:
 		buffer_add_char(buffer, key);
 	}
@@ -145,6 +182,15 @@ void editor_on_mouse_down(Vector2 position) {
 	if (!current_view) {
 		return;
 	}
+
+	Buffer* buffer = editor_find_buffer(current_view->buffer_id);
+	if (!buffer) {
+		return;
+	}
+
+	const size_t picked_index = buffer_view_pick_index(*current_view, 0.f, 0.f, position);
+	buffer_set_cursor_from_index(buffer, picked_index);
+
 	// current_view->on_mouse_down(position);
 }
 

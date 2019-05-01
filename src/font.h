@@ -4,7 +4,7 @@
 #include "opengl.h"
 
 // @TODO(Colby): Replace desired font size with something that checks a script or something
-#define FONT_SIZE      20.f
+#define FONT_SIZE      24.f
 #define FONT_ATLAS_DIMENSION 2048
 #define NUM_CHARACTERS 95
 

@@ -13,6 +13,30 @@
 #include <string.h>
 #include <assert.h>
 
+const float scroll_speed = 5.f;
+
+u32& Buffer::operator[](size_t index) {
+	assert(index < buffer_get_count(*this));
+
+	if (data + index < gap) {
+		return data[index];
+	}
+	else {
+		return data[index + gap_size];
+	}
+}
+
+u32 Buffer::operator[](size_t index) const{
+	assert(index < buffer_get_count(*this));
+
+	if (data + index < gap) {
+		return data[index];
+	}
+	else {
+		return data[index + gap_size];
+	}
+}
+
 Buffer make_buffer(Buffer_ID id) {
 	Buffer result;
 	result.id = id;
@@ -35,14 +59,20 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 
 	size_t extra = 0;
 	u32* current_char = buffer->data;
+	size_t line_size = 0;
 	while (current_char != buffer->data + buffer->allocated) {
 		const u8 c = fgetc(file);
 		if (c == '\r') {
 			extra += 1;
 			continue;
-		}
+		} 
 		*current_char = (u32)c;
 		current_char += 1;
+		line_size += 1;
+		if (c == '\n'){
+			array_add(&buffer->eol_table, line_size);
+			line_size = 0;
+		}
 	}
 	fclose(file);
 
@@ -50,6 +80,7 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	buffer->gap_size = DEFAULT_GAP_SIZE + extra;
 
 	buffer->cursor = buffer->data;	 
+	buffer_refresh_cursor_info(buffer);
 	return true;
 }
 
@@ -63,6 +94,11 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	buffer->gap_size = size;
 
 	buffer->cursor = buffer->data;
+
+	buffer->current_column_number = 0;
+	buffer->desired_column_number = 0;
+	buffer->current_line_number = 0;
+	array_add(&buffer->eol_table, (size_t)0);
 }
 
 static
@@ -95,22 +131,43 @@ void buffer_add_char(Buffer* buffer, u32 c) {
 	buffer->cursor += 1;
 	buffer->gap += 1;
 	buffer->gap_size -= 1;
+
+	if (is_eol(c)) {
+		const size_t line_size = buffer->eol_table[buffer->current_line_number];
+		buffer->eol_table[buffer->current_line_number] = buffer->current_column_number + 1;
+		array_add_at_index(&buffer->eol_table, line_size - buffer->current_column_number, buffer->current_line_number + 1);
+
+		buffer->current_line_number += 1;
+		buffer->current_column_number = 0;
+		buffer->desired_column_number = 0;
+	} else {
+		buffer->current_column_number += 1;
+		buffer->desired_column_number += 1;
+		buffer->eol_table[buffer->current_line_number] += 1;
+	}
 }
 
 void buffer_remove_before_cursor(Buffer* buffer) {
+	if (buffer->cursor == buffer->data) {
+		return;
+	}
+
 	buffer_move_gap_to_cursor(buffer);
 
 	buffer->cursor -= 1;
 	buffer->gap -= 1;
 	buffer->gap_size += 1;
 
+	buffer_refresh_cursor_info(buffer);
 }
 
 void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta) {
+	assert(delta != 0);
+
 	u32* new_cursor = buffer->cursor + delta;
 
 	if (new_cursor < buffer->data) new_cursor = buffer->data;
-	if (new_cursor >= buffer->data + buffer->allocated) new_cursor = buffer->data + buffer->allocated - 1;
+	if (new_cursor > buffer->data + buffer->allocated) new_cursor = buffer->data + buffer->allocated;
 
 	if (new_cursor > buffer->gap && new_cursor <= buffer->gap + buffer->gap_size) {
 		if (delta > 0) {
@@ -125,24 +182,71 @@ void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta) {
 	}
 
 	buffer->cursor = new_cursor;
+	buffer_refresh_cursor_info(buffer);
+}
+
+void buffer_move_cursor_vertical(Buffer* buffer, s64 delta) {
+	const size_t buffer_count = buffer_get_count(*buffer);
+	if (buffer_count == 0) {
+		return;
+	}
+
+	size_t new_line = buffer->current_line_number + delta;
+	if (delta < 0 && buffer->current_line_number == 0) {
+		new_line = 0;
+	} else if (new_line >= buffer->eol_table.count) {
+		new_line = buffer->eol_table.count - 1;
+	}
+
+	const size_t line_index = buffer_get_line_index(*buffer, new_line);
+
+	size_t new_cursor_index = line_index;
+	if (buffer->eol_table[new_line] <= buffer->desired_column_number) {
+		new_cursor_index += buffer->eol_table[new_line] - 1;
+	} else {
+		new_cursor_index += buffer->desired_column_number;
+	}
+
+	buffer_set_cursor_from_index(buffer, new_cursor_index);
+	buffer_refresh_cursor_info(buffer, false);
+}
+
+void buffer_set_cursor_from_index(Buffer* buffer, size_t index) {
+	if (index <= (size_t)(buffer->gap - buffer->data)) {
+		buffer->cursor = buffer->data + index;
+	} else {
+		buffer->cursor = buffer->data + index + buffer->gap_size;
+	}
+
+	buffer_refresh_cursor_info(buffer);
+}
+
+void buffer_refresh_cursor_info(Buffer* buffer, bool update_desired) {
+	buffer->current_line_number = 0;
+	buffer->current_column_number = 0;
+	for (size_t i = 0; i < buffer_get_cursor_index(*buffer); i++) {
+		const u32 c = (*buffer)[i];
+
+		buffer->current_column_number += 1;
+
+		if (is_eol(c)) {
+			buffer->current_line_number += 1;
+			buffer->current_column_number = 0;
+		}
+	}
+
+	if (update_desired) {
+		buffer->desired_column_number = buffer->current_column_number;
+	}
 }
 
 size_t buffer_get_count(const Buffer& buffer) {
 	return buffer.allocated - buffer.gap_size;
 }
 
-u32 buffer_get_char_at_index(const Buffer& buffer, size_t index) {
-	assert(index < buffer_get_count(buffer));
-
-	if (buffer.data + index < buffer.gap) {
-		return buffer.data[index];
-	} else {
-		return buffer.data[index + buffer.gap_size];
-	}
-}
-
 size_t buffer_get_cursor_index(const Buffer& buffer) {
-	// @TODO(Colby): Assert here if the cursor is not where it should be
+	assert(buffer.cursor <= buffer.gap || buffer.cursor > buffer.gap + buffer.gap_size);
+	assert(buffer.cursor >= buffer.data && buffer.cursor <= buffer.data + buffer.allocated);
 
 	if (buffer.cursor <= buffer.gap) {
 		return buffer.cursor - buffer.data;
@@ -151,71 +255,78 @@ size_t buffer_get_cursor_index(const Buffer& buffer) {
 	}
 }
 
-
-
-void draw_buffer_view(const Buffer_View& buffer_view) {
-	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
-	if (!buffer) {
-		return;
+size_t buffer_get_line_index(const Buffer& buffer, size_t index) {
+	assert(index < buffer.eol_table.count);
+	
+	size_t result = 0;
+	for (size_t i = 0; i < index; i++) {
+		result += buffer.eol_table[i];
 	}
 
-	const float starting_x = 0.f;
-	const float starting_y = 0.f;
-
-	float x = 0.f;
-	float y = font.ascent;
-
-	const float font_height = FONT_SIZE;
-
-	font_bind(&font);
-	immediate_begin();
-	for (size_t i = 0; i < buffer_get_count(*buffer); i++) {	
-		Color color = 0xd6b58d;
-		u32 c  = buffer_get_char_at_index(*buffer, i);
-
-		if (i == buffer_get_cursor_index(*buffer)) {
-			Font_Glyph glyph = font_find_glyph(&font, c);
-			
-			if (is_whitespace(c)) {
-				glyph = font_find_glyph(&font, ' ');
-			}
-
-			immediate_flush();
-			const float x0 = x;
-			const float y0 = y - font.ascent;
-			const float x1 = x0 + glyph.advance;
-			const float y1 = y - font.descent;
-			draw_rect(x0, y0, x1, y1, 0x81E38E);
-			color = 0x052329;
-			font_bind(&font);
-			immediate_begin();
-		}
-
-		Font_Glyph glyph = font_find_glyph(&font, ' ');
-
-		switch (c) {
-		case ' ':
-			x += glyph.advance;
-			continue;
-		case '\t':
-			x += glyph.advance * 4.f;
-			continue;
-		case '\n':
-			x = 0.f;
-			y += font_height;
-			continue;
-		default:
-			glyph = immediate_char((u8)c, x, y, color);
-			x += glyph.advance;
-		}
-
-		if (y > os_window_height()) {
-			break;
-		}
-	}
-	immediate_flush();
+	return result;
 }
 
-void tick_buffer_view(Buffer_View* buffer_view, float dt) {
 
+
+void tick_buffer_view(Buffer_View* buffer_view, float dt) {
+	buffer_view->current_scroll_y = math_finterpto(buffer_view->current_scroll_y, buffer_view->target_scroll_y, dt, scroll_speed);
+}
+
+float buffer_view_get_buffer_height(const Buffer_View& buffer_view) {
+	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
+	if (!buffer) {
+		return 0.f;
+	}
+
+	const float font_height = FONT_SIZE;
+	return buffer->eol_table.count * font_height;
+}
+
+size_t buffer_view_pick_index(const Buffer_View& buffer_view, float x, float y, Vector2 pick_position) {
+	const float font_height = FONT_SIZE;
+
+	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
+	if (!buffer) {
+		return 0;
+	}
+
+	size_t line_offset = (size_t)((buffer_view.current_scroll_y + pick_position.y) / font_height);
+	if (line_offset >= buffer->eol_table.count) {
+		line_offset = buffer->eol_table.count - 1;
+	}
+
+	y += line_offset * font_height - buffer_view.current_scroll_y;
+
+	const size_t start_index = buffer_get_line_index(*buffer, line_offset);
+	const size_t buffer_count = buffer_get_count(*buffer);
+	for (size_t i = start_index; i < buffer_count; i++) {
+		const u32 c = (*buffer)[i];
+
+		Font_Glyph glyph = font_find_glyph(&font, c);
+		if (is_whitespace(c)) {
+			glyph = font_find_glyph(&font, ' ');
+		}
+
+		float width = glyph.advance;
+		if (c == '\t') {
+			width += glyph.advance * 3;
+		}
+
+		const float x0 = x;
+		const float y0 = y;
+
+		const float x1 = x0 + width;
+		const float y1 = y0 + font_height;
+
+		if (pick_position.x >= x0 && pick_position.x <= x1 && pick_position.y >= y0 && pick_position.y <= y1) {
+			return i;
+		}
+		x += width;
+
+		if (is_eol(c)) {
+			return i;
+		}
+	}
+
+	return 0;
 }

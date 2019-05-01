@@ -151,7 +151,7 @@ Shader shader_load_from_file(const char* path) {
 	return result;
 }
 
-void init_renderer() {
+void draw_init() {
     glGenVertexArrays(1, &imm_vao);
     glBindVertexArray(imm_vao);
     
@@ -431,4 +431,103 @@ void render_frame_end() {
 #endif
 
 	gl_swap_buffers();
+}
+
+void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float x1, float y1) {
+	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
+	if (!buffer) {
+		return;
+	}
+
+	float x = x0;
+	float y = y0;
+
+	const float starting_x = x;
+	const float starting_y = y;
+
+	y += font.ascent - buffer_view.current_scroll_y;
+
+	const float font_height = FONT_SIZE;
+	const size_t buffer_count = buffer_get_count(*buffer);
+	const size_t cursor_index = buffer_get_cursor_index(*buffer);
+	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
+
+	font_bind(&font);
+	immediate_begin();
+	for (size_t i = 0; i < buffer_count; i++) {
+		Color color = 0xd6b58d;
+		const u32 c = (*buffer)[i];
+
+		if (x > x1) {
+			x = starting_x;
+			y += font_height;
+		}
+
+		if (i == cursor_index) {
+			Font_Glyph glyph = font_find_glyph(&font, c);
+
+			if (is_whitespace(c)) {
+				glyph = space_glyph;
+			}
+
+			immediate_flush();
+			const float cursor_x0 = x;
+			const float cursor_y0 = y - font.ascent;
+			const float cursor_x1 = cursor_x0 + glyph.advance;
+			const float cursor_y1 = y - font.descent;
+			draw_rect(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
+			color = 0x052329;
+			font_bind(&font);
+			immediate_begin();
+		}
+
+		switch (c) {
+		case ' ':
+			x += space_glyph.advance;
+			continue;
+		case '\t':
+			x += space_glyph.advance * 4.f;
+			continue;
+		case '\n':
+			x = starting_x;
+			y += font_height;
+			continue;
+		default:
+			Font_Glyph glyph = immediate_char((u8)c, x, y, color);
+			x += glyph.advance;
+		}
+
+		if (y - font.ascent > y1) {
+			verts_culled += (buffer_count - i) * 6;
+			break;
+		}
+	}
+	immediate_flush();
+
+	if (cursor_index == buffer_count) {
+		const float cursor_x0 = x;
+		const float cursor_y0 = y - font.ascent;
+		const float cursor_x1 = x0 + space_glyph.advance;
+		const float cursor_y1 = y - font.descent;
+		draw_rect(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
+	}
+
+	// @NOTE(Colby): Drawing info bar here
+	{
+		const Vector2 padding = v2(10.f);
+		const float bar_height = FONT_SIZE + padding.y;
+		{
+			const float info_bar_x0 = x0;
+			const float info_bar_y0 = y1 - bar_height;
+			const float info_bar_x1 = info_bar_x0 + x1;
+			const float info_bar_y1 = info_bar_y0 + bar_height;
+			draw_rect(info_bar_x0, info_bar_y0, info_bar_x1, info_bar_y1, 0xd6b58d);
+
+			const float x = 10.f;
+			const float y = info_bar_y0 + (padding.y / 2.f);
+			char output_string[1024];
+			sprintf_s(output_string, 1024, "%s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
+			draw_string(output_string, x, y, 0x052329);
+		}
+	}
 }
