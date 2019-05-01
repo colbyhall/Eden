@@ -116,12 +116,10 @@ void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta) {
 		if (delta > 0) {
 			if (buffer->gap + buffer->gap_size == buffer->data + buffer->allocated && new_cursor + buffer->gap_size >= buffer->data + buffer->allocated) {
 				new_cursor = buffer->gap;
-			}
-			else {
+			} else {
 				new_cursor += buffer->gap_size;
 			}
-		}
-		else {
+		} else {
 			new_cursor -= buffer->gap_size;
 		}
 	}
