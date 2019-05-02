@@ -452,9 +452,14 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 	const size_t cursor_index = buffer_get_cursor_index(*buffer);
 	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
 
+	const size_t lines_scrolled = (size_t)(buffer_view.current_scroll_y / font_height);
+	const size_t starting_index = buffer_get_line_index(*buffer, lines_scrolled);
+
+	y += lines_scrolled * font_height;
+
 	font_bind(&font);
 	immediate_begin();
-	for (size_t i = 0; i < buffer_count; i++) {
+	for (size_t i = starting_index; i < buffer_count; i++) {
 		Color color = 0xd6b58d;
 		const u32 c = (*buffer)[i];
 
@@ -514,7 +519,7 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 
 	// @NOTE(Colby): Drawing info bar here
 	{
-		const Vector2 padding = v2(10.f);
+		const Vector2 padding = v2(2.f);
 		const float bar_height = FONT_SIZE + padding.y;
 		{
 			const float info_bar_x0 = x0;

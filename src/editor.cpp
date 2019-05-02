@@ -98,7 +98,7 @@ void editor_draw() {
 
 	// @NOTE(Colby): Command Bar and buffer drawing
 	{
-		const Vector2 padding = v2(10.f);
+		const Vector2 padding = v2(2.f);
 		const float font_height = FONT_SIZE;
 		const float bar_height = font_height + padding.y;
 		{
@@ -190,6 +190,7 @@ void editor_on_mouse_down(Vector2 position) {
 
 	const size_t picked_index = buffer_view_pick_index(*current_view, 0.f, 0.f, position);
 	buffer_set_cursor_from_index(buffer, picked_index);
+	buffer_refresh_cursor_info(buffer);
 
 	// current_view->on_mouse_down(position);
 }
