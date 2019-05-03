@@ -172,10 +172,24 @@ void editor_on_key_pressed(u8 key) {
 	case KEY_BACKSPACE:
 		buffer_remove_before_cursor(buffer);
 		break;
-	default:
-		buffer_add_char(buffer, key);
+	case KEY_DELETE:
+		buffer_remove_at_cursor(buffer);
+		break;
 	}
 	// current_view->on_key_pressed(key);
+}
+
+void editor_on_char_entered(u8 c) {
+	Buffer_View* current_view = editor_get_current_view();
+	if (!current_view) {
+		return;
+	}
+	Buffer* buffer = editor_find_buffer(current_view->buffer_id);
+	if (!buffer) {
+		return;
+	}
+
+	buffer_add_char(buffer, c);
 }
 
 void editor_on_mouse_down(Vector2 position) {

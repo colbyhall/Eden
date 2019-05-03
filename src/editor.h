@@ -27,6 +27,7 @@ void editor_draw();
 void editor_on_window_resized(u32 old_width, u32 old_height);
 void editor_on_mousewheel_scrolled(float delta);
 void editor_on_key_pressed(u8 key);
+void editor_on_char_entered(u8 c);
 void editor_on_mouse_down(Vector2 position);
 void editor_on_mouse_up(Vector2 position);
 

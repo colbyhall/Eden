@@ -176,6 +176,28 @@ void buffer_remove_before_cursor(Buffer* buffer) {
 	buffer_refresh_cursor_info(buffer, false);
 }
 
+void buffer_remove_at_cursor(Buffer* buffer) {
+	if (buffer->cursor >= buffer->data + buffer->allocated - 1) {
+		return;
+	}
+
+	buffer_move_gap_to_cursor(buffer);
+
+	buffer->eol_table[buffer->current_line_number] -= 1;
+
+	const size_t cursor_index = buffer_get_cursor_index(*buffer);
+	const u32 c = (*buffer)[cursor_index];
+	if (is_eol(c)) {
+		const size_t amount_on_line = buffer->eol_table[buffer->current_line_number];
+		array_remove(&buffer->eol_table, buffer->current_line_number);
+		buffer->eol_table[buffer->current_line_number + 1] += amount_on_line;
+	}
+
+	buffer->gap_size += 1;
+
+	buffer_refresh_cursor_info(buffer, false);
+}
+
 void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta) {
 	assert(delta != 0);
 
