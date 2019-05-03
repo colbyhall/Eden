@@ -147,6 +147,12 @@ void buffer_add_char(Buffer* buffer, u32 c) {
 	}
 }
 
+void buffer_add_string(Buffer* buffer, const String& string) {
+	for (size_t i = 0; i < string.count; i++) {
+		buffer_add_char(buffer, string[i]);
+	}
+}
+
 void buffer_remove_before_cursor(Buffer* buffer) {
 	if (buffer->cursor == buffer->data) {
 		return;

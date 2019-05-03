@@ -2,6 +2,7 @@
 #include "os.h"
 #include "memory.h"
 #include "draw.h"
+#include "lua.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -14,7 +15,13 @@ struct Bitmap {
 	u8* data;
 };
 
+float font_size = 20.f;
+
 Font* current_font = nullptr;
+
+void font_init() {
+	lua_get_float("font_size", &font_size);
+}
 
 Font font_load_from_file(const char* path) {
 	String font_data = os_load_file_into_memory(path);

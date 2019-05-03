@@ -61,6 +61,7 @@ bool buffer_load_from_file(Buffer* buffer, const char* path);
 void buffer_init_from_size(Buffer* buffer, size_t size);
 
 void buffer_add_char(Buffer* buffer, u32 c);
+void buffer_add_string(Buffer* buffer, const String& string);
 void buffer_remove_before_cursor(Buffer* buffer);
 
 void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta);

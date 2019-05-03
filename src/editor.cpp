@@ -28,10 +28,11 @@ Buffer_View main_view;
 
 
 void editor_init() {
-	assert(gl_init());
-	
-	draw_init();
+	// @NOTE(Colby): init systems here
+	gl_init();
 	lua_init();
+	draw_init();
+	font_init();
 
 	font = font_load_from_file("data\\fonts\\FiraCode-Regular.ttf");
 	
