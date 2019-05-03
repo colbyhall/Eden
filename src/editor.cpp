@@ -189,6 +189,8 @@ void editor_on_char_entered(u8 c) {
 		return;
 	}
 
+	if (c == KEY_ENTER) return;
+
 	buffer_add_char(buffer, c);
 }
 

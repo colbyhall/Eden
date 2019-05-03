@@ -190,7 +190,7 @@ void buffer_remove_at_cursor(Buffer* buffer) {
 	if (is_eol(c)) {
 		const size_t amount_on_line = buffer->eol_table[buffer->current_line_number];
 		array_remove(&buffer->eol_table, buffer->current_line_number);
-		buffer->eol_table[buffer->current_line_number + 1] += amount_on_line;
+		buffer->eol_table[buffer->current_line_number] += amount_on_line;
 	}
 
 	buffer->gap_size += 1;

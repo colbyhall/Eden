@@ -459,6 +459,14 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 
 	font_bind(&font);
 	immediate_begin();
+
+	size_t line_index = lines_scrolled;
+	const char* format = "%llu: LS: %llu |";
+	char out_line_size[20];
+	sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+
+	x += immediate_string(out_line_size, x, y, 0xFFFF00).x;
+
 	for (size_t i = starting_index; i < buffer_count; i++) {
 		Color color = 0xd6b58d;
 		const u32 c = (*buffer)[i];
@@ -496,6 +504,13 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 		case '\n':
 			x = starting_x;
 			y += font_height;
+
+			line_index += 1;
+			char out_line_size[20];
+			sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+
+			x += immediate_string(out_line_size, x, y, 0xFFFF00).x;
+
 			continue;
 		default:
 			Font_Glyph glyph = immediate_char((u8)c, x, y, color);
