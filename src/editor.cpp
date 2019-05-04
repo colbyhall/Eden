@@ -144,6 +144,15 @@ void editor_on_mousewheel_scrolled(float delta) {
 	if (main_view.target_scroll_y > max_scroll) main_view.target_scroll_y = max_scroll;
 }
 
+static void editor_bring_view_to_cursor(Buffer_View *view, const Buffer *buffer) {
+    float view_min = (buffer->current_line_number - 1) * FONT_SIZE;
+    float view_max = (buffer->current_line_number + 4) * FONT_SIZE - os_window_height(); // @Temporary: there needs to be a way to get a height of the current view.
+    view->target_scroll_y = fclamp(view->target_scroll_y, view_max, view_min);
+    if (view->target_scroll_y < 0) {
+        view->target_scroll_y = 0;
+    }
+}
+
 void editor_on_key_pressed(u8 key) {
 	Buffer_View* current_view = editor_get_current_view();
 	if (!current_view) {
@@ -176,6 +185,7 @@ void editor_on_key_pressed(u8 key) {
 		buffer_remove_at_cursor(buffer);
 		break;
 	}
+    editor_bring_view_to_cursor(current_view, buffer);
 	// current_view->on_key_pressed(key);
 }
 
@@ -192,6 +202,8 @@ void editor_on_char_entered(u8 c) {
 	if (c == KEY_ENTER) return;
 
 	buffer_add_char(buffer, c);
+
+    editor_bring_view_to_cursor(current_view, buffer);
 }
 
 void editor_on_mouse_down(Vector2 position) {
@@ -209,6 +221,7 @@ void editor_on_mouse_down(Vector2 position) {
 	buffer_set_cursor_from_index(buffer, picked_index);
 	buffer_refresh_cursor_info(buffer);
 
+    editor_bring_view_to_cursor(current_view, buffer);
 	// current_view->on_mouse_down(position);
 }
 

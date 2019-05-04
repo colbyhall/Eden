@@ -4,12 +4,6 @@
 
 #define SMALL_NUMBER		(1.e-8f)
 
-float fclamp(float value, float min, float max) {
-	if (value < min) return min;
-	if (value > max) return max;
-	return value;
-}
-
 float math_finterpto(float current, float target, float delta_time, float speed) {
 
 	if (speed <= 0.f) {

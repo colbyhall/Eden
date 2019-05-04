@@ -37,3 +37,9 @@ Matrix4 m4_ortho(float size, float aspect_ratio, float far, float near);
 Matrix4 m4_translate(Vector2 position);
 
 float math_finterpto(float current, float target, float delta_time, float speed);
+
+inline float fclamp(float value, float min, float max) {
+	if (value < min) return min;
+	if (value > max) return max;
+	return value;
+}

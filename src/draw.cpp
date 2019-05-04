@@ -507,7 +507,12 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 
 			line_index += 1;
 			char out_line_size[20];
-			sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+            {
+                Array<size_t> *eol_table = &buffer->eol_table;
+                if (line_index < eol_table->count) {
+			        sprintf_s(out_line_size, 20, format, line_index, (*eol_table)[line_index]);
+                }
+            }
 
 			x += immediate_string(out_line_size, x, y, 0xFFFF00).x;
 
