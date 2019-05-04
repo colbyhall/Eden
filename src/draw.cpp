@@ -26,8 +26,7 @@ u32 imm_vertex_count;
 Matrix4 view_to_projection;
 Matrix4 world_to_view;
 
-Shader solid_shape_shader;
-Shader font_shader;
+Shader global_shader;
 
 u32 draw_calls;
 size_t verts_drawn;
@@ -35,77 +34,58 @@ size_t verts_culled;
 
 Shader* current_shader = nullptr;
 
-enum Shader_Type {
-	ST_NONE,
-	ST_FRAG,
-	ST_VERT,
-};
+const GLchar* frag_shader = R"foo(
+#version 330 core
 
-void shader_bind(Shader* shader) {	
-	glUseProgram(shader->program_id);
-	current_shader = shader;
+out vec4 frag_color;
+
+in vec4 out_color;
+in vec2 out_uv;
+
+uniform sampler2D ftex;
+
+void main() {
+	if (out_uv.x < 0 || out_uv.y < 0) {
+		frag_color = out_color;
+	} else {
+		vec4 result = texture(ftex, out_uv);
+
+		result.w = 1.0;
+
+		frag_color = vec4(out_color.xyz, texture(ftex, out_uv).r);
+	}
 }
+)foo";
 
-static 
-void parse_shader_source(String* fd, Shader_Type type, String* out_source) {
-	if (type == ST_NONE) return;
+const GLchar* vert_shader = R"foo(
+#version 330 core
 
-	Shader_Type current_type = ST_NONE;
-	String line;
-	do {
-		line = string_eat_line(fd);
+layout(location = 0) in vec2 position;
+layout(location = 1) in vec4 color;
+layout(location = 2) in vec2 uv;
 
-		// @NOTE(Colby): this is super basic but it works.
-		if (string_starts_with(line, "#if VERT", false) || string_starts_with(line, "#elif VERT", false)) {
-			current_type = ST_VERT;
-		}
-		else if (string_starts_with(line, "#if FRAG", false) || string_starts_with(line, "#elif FRAG", false)) {
-			current_type = ST_FRAG;
-		}
-		// @BUG(Colby): This needs to be true for some reason
-		else if (string_starts_with(line, "#endif", true)) {
-			current_type = ST_NONE;
-		}
-		else {
-			if (current_type == type || current_type == ST_NONE) {
-				string_append(out_source, line);
-				string_append(out_source, "\n");
-			}
-		}
+uniform mat4 view_to_projection;
+uniform mat4 world_to_view;
 
-	} while (line.count > 0);
+out vec4 out_color;
+out vec2 out_uv;
 
-	out_source->data[out_source->count] = 0;
+void main() {
+    gl_Position =  view_to_projection * world_to_view * vec4(position, 0.0, 1.0);
+	out_color = color;
+	out_uv = uv;
 }
+)foo";
 
-Shader shader_load_from_file(const char* path) {
+Shader load_global_shader() {
 	Shader result;
 	GLuint program_id = glCreateProgram();
 
 	GLuint vertex_id = glCreateShader(GL_VERTEX_SHADER);
 	GLuint frag_id = glCreateShader(GL_FRAGMENT_SHADER);
 
-	String shader_source = os_load_file_into_memory(path);
-
-	u8* buffer = (u8*)c_alloc(shader_source.count * 2 + 2);
-
-	String vert_source;
-	vert_source.count = 0;
-	vert_source.allocated = shader_source.count + 1;
-	vert_source.data = buffer;
-
-	String frag_source;
-	frag_source.count = 0;
-	frag_source.allocated = shader_source.count + 1;
-	frag_source.data = buffer + shader_source.count + 1;
-
-	String fd = shader_source;
-	parse_shader_source(&fd, ST_VERT, &vert_source);
-	fd = shader_source;
-	parse_shader_source(&fd, ST_FRAG, &frag_source);
-
-	glShaderSource(vertex_id, 1, (const char**)&vert_source.data, 0);
-	glShaderSource(frag_id, 1, (const char**)&frag_source.data, 0);
+	glShaderSource(vertex_id, 1, &vert_shader, 0);
+	glShaderSource(frag_id, 1, &frag_shader, 0);
 
 	glCompileShader(vertex_id);
 	glCompileShader(frag_id);
@@ -145,9 +125,6 @@ Shader shader_load_from_file(const char* path) {
 	result.color_loc = 1;
 	result.uv_loc = 2;
 
-	c_free(buffer);
-	c_free(shader_source.data);
-
 	return result;
 }
 
@@ -166,8 +143,9 @@ void draw_init() {
 	glEnable(GL_BLEND);
 	glEnable(GL_MULTISAMPLE);
 
-	solid_shape_shader = shader_load_from_file("data\\shaders\\solid_shape.glsl");
-	font_shader = shader_load_from_file("data\\shaders\\font.glsl");
+	global_shader = load_global_shader();
+	glUseProgram(global_shader.program_id);
+	current_shader = &global_shader;
 }
 
 void immediate_begin() {
@@ -232,21 +210,17 @@ void immediate_vertex(float x, float y, const Color& color, Vector2 uv) {
 }
 
 void immediate_quad(float x0, float y0, float x1, float y1, const Color& color) {
-    immediate_vertex(x0, y0, color, v2(0.f, 0.f));
-    immediate_vertex(x0, y1, color, v2(0.f, 1.f));
-    immediate_vertex(x1, y0, color, v2(1.f, 0.f));
+    immediate_vertex(x0, y0, color, v2(-1.f, -1.f));
+    immediate_vertex(x0, y1, color, v2(-1.f, -1.f));
+    immediate_vertex(x1, y0, color, v2(-1.f, -1.f));
     
-    immediate_vertex(x0, y1, color, v2(0.f, 1.f));
-    immediate_vertex(x1, y1, color, v2(1.f, 1.f));
-    immediate_vertex(x1, y0, color, v2(1.f, 0.f));
+    immediate_vertex(x0, y1, color, v2(-1.f, -1.f));
+    immediate_vertex(x1, y1, color, v2(-1.f, -1.f));
+    immediate_vertex(x1, y0, color, v2(-1.f, -1.f));
 }
 
 
-void draw_rect(float x0, float y0, float x1, float y1, const Color& color) {
-	shader_bind(&solid_shape_shader);
-
-    refresh_transformation();
-    
+void draw_rect(float x0, float y0, float x1, float y1, const Color& color) {    
     immediate_begin();
     immediate_quad(x0, y0, x1, y1, color);
     immediate_flush();
@@ -260,6 +234,8 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 
 	float largest_x = 0.f;
 	float largest_y = 0.f;
+
+	y += font.ascent;
 
 	for (size_t i = 0; i < str.count; i++) {
 		if (is_eol(str.data[i])) {
@@ -325,7 +301,6 @@ Font_Glyph immediate_char(u8 c, float x, float y, const Color& color) {
 }
 
 void draw_string(const String& str, float x, float y, const Color& color) {
-	font_bind(&font);
 	y += font.ascent;
 
 	immediate_begin();
@@ -413,6 +388,7 @@ void render_frame_end() {
 	float x = os_window_width() - (string_size.x + padding.x);
 	float y = 0.f;
 
+	immediate_begin();
 	{
 
 		float x0 = x;
@@ -420,14 +396,15 @@ void render_frame_end() {
 		float x1 = x0 + string_size.x + padding.x;
 		float y1 = y0 + string_size.y + padding.y;
 
-		draw_rect(x0, y0, x1, y1, 0xAAAAAA);
+		immediate_quad(x0, y0, x1, y1, 0xAAAAAA);
 	}
 
 	{
 		float x0 = x + padding.x / 2.f;
 		float y0 = y + padding.y / 2.f;
-		draw_string(buffer, x0, y0, 0xFFFFFF);
+		immediate_string(buffer, x0, y0, 0xFFFFFF);
 	}
+	immediate_flush();
 #endif
 
 	gl_swap_buffers();
@@ -457,16 +434,7 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 
 	y += lines_scrolled * font_height;
 
-	font_bind(&font);
 	immediate_begin();
-
-	size_t line_index = lines_scrolled;
-	const char* format = "%llu: LS: %llu |";
-	char out_line_size[20];
-	sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
-
-	x += immediate_string(out_line_size, x, y, 0xFFFF00).x;
-
 	for (size_t i = starting_index; i < buffer_count; i++) {
 		Color color = 0xd6b58d;
 		const u32 c = (*buffer)[i];
@@ -483,15 +451,12 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 				glyph = space_glyph;
 			}
 
-			immediate_flush();
 			const float cursor_x0 = x;
 			const float cursor_y0 = y - font.ascent;
 			const float cursor_x1 = cursor_x0 + glyph.advance;
 			const float cursor_y1 = y - font.descent;
-			draw_rect(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
+			immediate_quad(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
 			color = 0x052329;
-			font_bind(&font);
-			immediate_begin();
 		}
 
 		switch (c) {
@@ -504,18 +469,6 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 		case '\n':
 			x = starting_x;
 			y += font_height;
-
-			line_index += 1;
-			char out_line_size[20];
-            {
-                Array<size_t> *eol_table = &buffer->eol_table;
-                if (line_index < eol_table->count) {
-			        sprintf_s(out_line_size, 20, format, line_index, (*eol_table)[line_index]);
-                }
-            }
-
-			x += immediate_string(out_line_size, x, y, 0xFFFF00).x;
-
 			continue;
 		default:
 			Font_Glyph glyph = immediate_char((u8)c, x, y, color);
@@ -527,14 +480,13 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 			break;
 		}
 	}
-	immediate_flush();
 
 	if (cursor_index == buffer_count) {
 		const float cursor_x0 = x;
 		const float cursor_y0 = y - font.ascent;
-		const float cursor_x1 = x0 + space_glyph.advance;
+		const float cursor_x1 = cursor_x0 + space_glyph.advance;
 		const float cursor_y1 = y - font.descent;
-		draw_rect(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
+		immediate_quad(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
 	}
 
 	// @NOTE(Colby): Drawing info bar here
@@ -546,13 +498,14 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 			const float info_bar_y0 = y1 - bar_height;
 			const float info_bar_x1 = info_bar_x0 + x1;
 			const float info_bar_y1 = info_bar_y0 + bar_height;
-			draw_rect(info_bar_x0, info_bar_y0, info_bar_x1, info_bar_y1, 0xd6b58d);
+			immediate_quad(info_bar_x0, info_bar_y0, info_bar_x1, info_bar_y1, 0xd6b58d);
 
 			const float x = 10.f;
 			const float y = info_bar_y0 + (padding.y / 2.f);
 			char output_string[1024];
 			sprintf_s(output_string, 1024, "%s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
-			draw_string(output_string, x, y, 0x052329);
+			immediate_string(output_string, x, y, 0x052329);
 		}
 	}
+	immediate_flush();
 }

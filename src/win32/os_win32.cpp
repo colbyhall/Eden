@@ -12,6 +12,7 @@
 
 HWND window_handle;
 u32 window_width, window_height;
+char path_at_start[MAX_PATH];
 
 extern "C"
 {
@@ -138,19 +139,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	window_handle = CreateWindow(window_class.lpszClassName, TEXT(WINDOW_TITLE), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
 
-	char path_at_start[MAX_PATH];
 	GetCurrentDirectory(MAX_PATH, path_at_start);
-
-
-	{
-		// @NOTE(Colby): This sucks really bad. I just wanted to set my working direction to parent directory of the exe's directory
-		char exe_path[MAX_PATH];
-		GetModuleFileName(NULL, exe_path, MAX_PATH);
-		// HACK(Colby): This is deprecated but oh well
-		PathRemoveFileSpec(exe_path);
-		SetCurrentDirectory(exe_path);
-		SetCurrentDirectory(TEXT(".."));
-	}
 
 	editor_init();
 	SetCurrentDirectory(path_at_start);
@@ -196,4 +185,17 @@ Vector2 os_get_mouse_position() {
 	}
 
 	return { 0.f, 0.f };
+}
+
+void os_set_path_to_fonts() {
+	char buffer[MAX_PATH];
+	GetWindowsDirectory(buffer, MAX_PATH);
+	SetCurrentDirectory(buffer);
+	SetCurrentDirectory(TEXT("Fonts"));
+
+	GetCurrentDirectory(MAX_PATH, buffer);
+}
+
+void os_reset_path() {
+	SetCurrentDirectory(path_at_start);
 }

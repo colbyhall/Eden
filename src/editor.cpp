@@ -34,12 +34,12 @@ void editor_init() {
 	draw_init();
 	font_init();
 
-	font = font_load_from_file("data\\fonts\\FiraCode-Regular.ttf");
+	font = font_load_from_os("consola.ttf");
 	
 	Buffer* buffer = editor_create_buffer();
 	main_view.buffer_id = buffer->id;
-	buffer_load_from_file(buffer, "src\\buffer.cpp");
-	// buffer_init_from_size(buffer, 1024);
+	// buffer_load_from_file(buffer, "src\\buffer.cpp");
+	buffer_init_from_size(buffer, 1024);
 	buffer->title = "(YEET project) src/draw.cpp";
 
 
@@ -111,15 +111,17 @@ void editor_draw() {
 		}
 		
 		{
+			immediate_begin();
 			const float x0 = 0.f;
 			const float y0 = window_height - bar_height;
 			const float x1 = x0 + window_width;
 			const float y1 = y0 + bar_height;
-			draw_rect(x0, y0, x1, y1, 0x052329);
+			immediate_quad(x0, y0, x1, y1, 0x052329);
 
 			const float x = x0 + padding.x / 2.f;
 			const float y = y0 + padding.y / 2.f;
-			draw_string("esc", x, y, 0xd6b58d);
+			immediate_string("esc", x, y, 0xd6b58d);
+			immediate_flush();
 		}
 	}
 

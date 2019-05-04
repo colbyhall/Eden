@@ -22,22 +22,20 @@ struct Shader {
 	GLuint texture_loc;
 };
 
-void shader_bind(Shader* shader);
-Shader shader_load_from_file(const char* path);
+Shader load_global_shader();
 
 extern Matrix4 view_to_projection;
 extern Matrix4 world_to_view;
  
-extern Shader solid_shape_shader;
-extern Shader font_shader;
+extern Shader global_shader;
 
 void draw_init();
 
 void immediate_begin();
 void immediate_flush();
 
+void immediate_quad(float x0, float y0, float x1, float y1, const Color& color);
 Vector2 immediate_string(const String& str, float x, float y, const Color& color);
-
 void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color);
 Font_Glyph immediate_char(u8 c, float x, float y, const Color& color);
 

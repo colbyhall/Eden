@@ -23,8 +23,9 @@ void font_init() {
 	lua_get_float("font_size", &font_size);
 }
 
-Font font_load_from_file(const char* path) {
-	String font_data = os_load_file_into_memory(path);
+Font font_load_from_os(const char* file_name) {
+	os_set_path_to_fonts();
+	String font_data = os_load_file_into_memory(file_name);
 	assert(font_data.data != NULL);
 
 	Font result;
@@ -89,6 +90,9 @@ Font font_load_from_file(const char* path) {
 
 	c_free(font_data.data);
 
+	font_bind(&result);
+	os_reset_path();
+
 	return result;
 }
 
@@ -97,9 +101,8 @@ Font_Glyph font_find_glyph(Font* font, u8 c) {
 }
 
 void font_bind(Font* font) {
-	shader_bind(&font_shader);
 	refresh_transformation();
-	glUniform1i(font_shader.texture_loc, 0);
+	glUniform1i(global_shader.texture_loc, 0);
 
 	glBindTexture(GL_TEXTURE_2D, font->texture_id);
 	glActiveTexture(GL_TEXTURE0);
