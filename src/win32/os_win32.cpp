@@ -123,6 +123,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	window_class.lpszClassName = TEXT("class");
 	window_class.hCursor = LoadCursor(NULL, IDC_ARROW);
 
+
 	if (!RegisterClassEx(&window_class)) {
 		return 1;
 	}
