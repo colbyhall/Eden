@@ -12,7 +12,6 @@
 
 HWND window_handle;
 u32 window_width, window_height;
-char path_at_start[MAX_PATH];
 
 extern "C"
 {
@@ -139,10 +138,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	window_handle = CreateWindow(window_class.lpszClassName, TEXT(WINDOW_TITLE), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
 
-	GetCurrentDirectory(MAX_PATH, path_at_start);
-
 	editor_init();
-	SetCurrentDirectory(path_at_start);
 	ShowWindow(window_handle, SW_SHOW);
 #if BUILD_DEBUG
 	wglSwapIntervalEXT(false);
@@ -196,6 +192,18 @@ void os_set_path_to_fonts() {
 	GetCurrentDirectory(MAX_PATH, buffer);
 }
 
-void os_reset_path() {
-	SetCurrentDirectory(path_at_start);
+String os_get_path() {
+	u8* buffer = (u8*)c_alloc(MAX_PATH);
+	GetCurrentDirectory(MAX_PATH, (char*)buffer);
+	
+	String result;
+	result.data = buffer;
+	result.allocated = MAX_PATH;
+	result.count = strlen((const char*)buffer);
+
+	return result;
+}
+
+bool os_set_path(const String& string) {
+	return SetCurrentDirectory(string);
 }

@@ -29,7 +29,6 @@ struct Font {
 
 extern Font* current_font;
 
-void font_init();
 Font font_load_from_os(const char* file_name);
 Font_Glyph font_find_glyph(Font* font, u8 c);
 void font_bind(Font* font);

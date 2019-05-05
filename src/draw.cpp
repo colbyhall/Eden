@@ -491,8 +491,9 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 
 	// @NOTE(Colby): Drawing info bar here
 	{
-		const Vector2 padding = v2(2.f);
-		const float bar_height = FONT_SIZE + padding.y;
+		const float font_height = FONT_SIZE;
+		const Vector2 padding = v2(font_height / 2.f);
+		const float bar_height = font_height + padding.y;
 		{
 			const float info_bar_x0 = x0;
 			const float info_bar_y0 = y1 - bar_height;
@@ -500,10 +501,10 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 			const float info_bar_y1 = info_bar_y0 + bar_height;
 			immediate_quad(info_bar_x0, info_bar_y0, info_bar_x1, info_bar_y1, 0xd6b58d);
 
-			const float x = 10.f;
+			const float x = x0 + padding.x / 2.f;
 			const float y = info_bar_y0 + (padding.y / 2.f);
 			char output_string[1024];
-			sprintf_s(output_string, 1024, "%s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
+			sprintf(output_string, "%s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
 			immediate_string(output_string, x, y, 0x052329);
 		}
 	}

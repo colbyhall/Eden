@@ -1,0 +1,1 @@
+call thirdparty\premake5.exe xcode4

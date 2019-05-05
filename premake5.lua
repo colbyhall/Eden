@@ -11,8 +11,6 @@ workspace "YEET"
 	targetdir ("bin")
     objdir ("bin")
 
-	include "libs/lua"
-
 project "YEET"
     kind "WindowedApp"
     language "C++"

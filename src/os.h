@@ -17,8 +17,8 @@ u32 os_window_width();
 u32 os_window_height();
 
 void os_set_path_to_fonts();
-// @NOTE(Colby): Set the path back to where we were when we started
-void os_reset_path();
+String os_get_path();
+bool os_set_path(const String& string);
 
 u64 os_get_ms_time();
 

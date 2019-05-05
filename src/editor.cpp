@@ -8,7 +8,6 @@
 #include "string.h"
 #include "parsing.h"
 #include "font.h"
-#include "lua.h"
 #include "input.h"
 
 #include <assert.h>
@@ -30,17 +29,14 @@ Buffer_View main_view;
 void editor_init() {
 	// @NOTE(Colby): init systems here
 	gl_init();
-	lua_init();
 	draw_init();
-	font_init();
 
 	font = font_load_from_os("consola.ttf");
 	
 	Buffer* buffer = editor_create_buffer();
 	main_view.buffer_id = buffer->id;
-	// buffer_load_from_file(buffer, "src\\buffer.cpp");
-	buffer_init_from_size(buffer, 1024);
-	buffer->title = "(YEET project) src/draw.cpp";
+	buffer_load_from_file(buffer, "src\\editor.cpp");
+	buffer->title = "Scratch Buffer";
 
 
 	is_running = true;
@@ -62,15 +58,12 @@ void editor_loop() {
 		}
 
 		editor_poll_input();
-
 		editor_tick(dt);
-
 		editor_draw();
 	}
 }
 
 void editor_shutdown() {
-	lua_shutdown();
 }
 
 void editor_poll_input() {
@@ -99,8 +92,8 @@ void editor_draw() {
 
 	// @NOTE(Colby): Command Bar and buffer drawing
 	{
-		const Vector2 padding = v2(2.f);
 		const float font_height = FONT_SIZE;
+		const Vector2 padding = v2(font_height / 2.f);
 		const float bar_height = font_height + padding.y;
 		{
 			const float x0 = 0.f;
@@ -147,12 +140,13 @@ void editor_on_mousewheel_scrolled(float delta) {
 }
 
 static void editor_bring_view_to_cursor(Buffer_View *view, const Buffer *buffer) {
-    float view_min = (buffer->current_line_number - 1) * FONT_SIZE;
+    float view_min = (buffer->current_line_number) * FONT_SIZE;
     float view_max = (buffer->current_line_number + 4) * FONT_SIZE - os_window_height(); // @Temporary: there needs to be a way to get a height of the current view.
     view->target_scroll_y = fclamp(view->target_scroll_y, view_max, view_min);
     if (view->target_scroll_y < 0) {
         view->target_scroll_y = 0;
     }
+	view->current_scroll_y = view->target_scroll_y;
 }
 
 void editor_on_key_pressed(u8 key) {

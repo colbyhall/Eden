@@ -12,6 +12,7 @@ struct String {
 
 	operator bool() const { return count > 0 && data != nullptr; }
 	operator const char*() const { return (const char*)data; }
+	operator char*() const { return (char*)data; }
 
 	u8 operator[](size_t index) const;
 };

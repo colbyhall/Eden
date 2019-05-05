@@ -2,7 +2,6 @@
 #include "os.h"
 #include "memory.h"
 #include "draw.h"
-#include "lua.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -19,12 +18,10 @@ float font_size = 20.f;
 
 Font* current_font = nullptr;
 
-void font_init() {
-	lua_get_float("font_size", &font_size);
-}
-
 Font font_load_from_os(const char* file_name) {
+	const String current_path = os_get_path();
 	os_set_path_to_fonts();
+
 	String font_data = os_load_file_into_memory(file_name);
 	assert(font_data.data != NULL);
 
@@ -91,7 +88,7 @@ Font font_load_from_os(const char* file_name) {
 	c_free(font_data.data);
 
 	font_bind(&result);
-	os_reset_path();
+	os_set_path(current_path);
 
 	return result;
 }
