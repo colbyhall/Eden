@@ -2,10 +2,8 @@
 
 ## Project Information
 * Very much in progress
-* Built enitrely in C
 * Uses [stb](https://github.com/nothings/stb) from [Sean Barrett](https://twitter.com/nothings)
 * Currently using [premake5](https://premake.github.io/download.html)
-* Lua Scripting Engine planned
 * Todo list is [here](https://trello.com/b/nOWap4k8/yeet-production)
 * Currently supported on Windows with Linux, and Mac support coming soon
 
