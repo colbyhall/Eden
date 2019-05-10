@@ -412,9 +412,9 @@ void render_frame_end() {
 
 void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float x1, float y1) {
 	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
-	if (!buffer) {
-		return;
-	}
+    if (!buffer) {
+        return;
+    }
 
 	float x = x0;
 	float y = y0;
@@ -425,26 +425,43 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 	y += font.ascent - buffer_view.current_scroll_y;
 
 	const float font_height = FONT_SIZE;
+#if GAP_BUFFER_DEBUG
+    const size_t buffer_count = buffer->allocated;
+#else
 	const size_t buffer_count = buffer_get_count(*buffer);
+#endif
 	const size_t cursor_index = buffer_get_cursor_index(*buffer);
 	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
 
 	const size_t lines_scrolled = (size_t)(buffer_view.current_scroll_y / font_height);
-	const size_t starting_index = buffer_get_line_index(*buffer, lines_scrolled);
+	const size_t starting_index = buffer->eol_table.count ? buffer_get_line_index(*buffer, lines_scrolled) : 0;
 
 	y += lines_scrolled * font_height;
 
 	immediate_begin();
 	for (size_t i = starting_index; i < buffer_count; i++) {
 		Color color = 0xd6b58d;
+#if GAP_BUFFER_DEBUG
+        u32 c = buffer->data[i];
+        if (buffer->data + i >= buffer->gap && buffer->data + i < &buffer->gap[buffer->gap_size]) {
+            if (c < 32 || c > 126 && c < 256) c = '\\';
+		    color = 0xff00ff;
+        }
+#else
 		const u32 c = (*buffer)[i];
+#endif
 
 		if (x > x1) {
 			x = starting_x;
 			y += font_height;
 		}
 
-		if (i == cursor_index) {
+#if GAP_BUFFER_DEBUG
+        if (i == buffer->cursor - buffer->data)
+#else
+		if (i == cursor_index)
+#endif
+        {
 			Font_Glyph glyph = font_find_glyph(&font, c);
 
 			if (is_whitespace(c)) {

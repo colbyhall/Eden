@@ -4,6 +4,7 @@
 
 #include <initializer_list>
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 
 template <typename T>

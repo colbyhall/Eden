@@ -38,7 +38,7 @@ u32 Buffer::operator[](size_t index) const{
 }
 
 Buffer make_buffer(Buffer_ID id) {
-	Buffer result;
+    Buffer result = {0};
 	result.id = id;
 	return result;
 }
@@ -101,12 +101,17 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	array_add(&buffer->eol_table, (size_t)0);
 }
 
+static void buffer_assert_cursor_outside_gap(Buffer *buffer) {
+	if (buffer->gap == buffer->cursor) return;
+    // @NOTE(Colby): Make sure we're not in the gap because if we are there is a serious issue
+	assert(buffer->cursor < buffer->gap || buffer->cursor >= buffer->gap + buffer->gap_size);
+}
+
 static
 void buffer_move_gap_to_cursor(Buffer* buffer) {
 	if (buffer->gap == buffer->cursor) return;
 
-	// @NOTE(Colby): Make sure we're not in the gap because if we are there is a serious issue
-	assert(buffer->cursor < buffer->gap || buffer->cursor >= buffer->gap + buffer->gap_size);
+	buffer_assert_cursor_outside_gap(buffer);
 
 	if (buffer->cursor < buffer->gap) {
 		const size_t amount_to_move = buffer->gap - buffer->cursor;
@@ -125,6 +130,30 @@ void buffer_move_gap_to_cursor(Buffer* buffer) {
 }
 
 void buffer_add_char(Buffer* buffer, u32 c) {
+    if (buffer->gap_size <= 0) { // @Refactor into buffer_resize
+        size_t old_size = buffer->allocated;
+        size_t new_gap_size = DEFAULT_GAP_SIZE;
+        size_t new_size = old_size + new_gap_size;
+
+        size_t cursor_as_index_into_buffer = buffer_get_cursor_index(*buffer);
+
+        u32 *old_data = buffer->data;
+        u32 *new_data = (u32 *)c_realloc(old_data, new_size * sizeof(u32));
+        if (!new_data) {
+            assert(0); // @Todo: handle reallocation failures.
+        }
+        buffer->data = new_data;
+        buffer->cursor = (new_data + cursor_as_index_into_buffer);
+        buffer->allocated = new_size;
+        buffer->gap = (buffer->data + old_size);
+        buffer->gap_size = new_gap_size;
+
+        if (!old_data) { // bit of a @Hack.
+            assert(buffer->eol_table.count == 0);
+            array_add(&buffer->eol_table, (size_t)0);
+        }
+    }
+
 	buffer_move_gap_to_cursor(buffer);
 
 	*buffer->cursor = c;
@@ -177,7 +206,7 @@ void buffer_remove_before_cursor(Buffer* buffer) {
 }
 
 void buffer_remove_at_cursor(Buffer* buffer) {
-	if (buffer->cursor >= buffer->data + buffer->allocated - 1) {
+	if (buffer_get_cursor_index(*buffer) >= buffer_get_count(*buffer)) {
 		return;
 	}
 
@@ -200,6 +229,8 @@ void buffer_remove_at_cursor(Buffer* buffer) {
 
 void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta) {
 	assert(delta != 0);
+
+    buffer_assert_cursor_outside_gap(buffer);
 
 	u32* new_cursor = buffer->cursor + delta;
 
@@ -228,6 +259,8 @@ void buffer_move_cursor_vertical(Buffer* buffer, s64 delta) {
 		return;
 	}
 
+    buffer_assert_cursor_outside_gap(buffer);
+
 	size_t new_line = buffer->current_line_number + delta;
 	if (delta < 0 && buffer->current_line_number == 0) {
 		new_line = 0;
@@ -246,6 +279,27 @@ void buffer_move_cursor_vertical(Buffer* buffer, s64 delta) {
 
 	buffer_set_cursor_from_index(buffer, new_cursor_index);
 	buffer_refresh_cursor_info(buffer, false);
+}
+
+void buffer_seek_line_begin(Buffer *buffer) {
+    // @Todo: indent-sensitive home seeking
+    size_t cursor_index = buffer_get_cursor_index(*buffer);
+    cursor_index -= buffer->current_column_number;
+    buffer_set_cursor_from_index(buffer, cursor_index);
+    buffer_refresh_cursor_info(buffer);
+}
+void buffer_seek_line_end(Buffer *buffer) {
+    size_t cursor_index = buffer_get_cursor_index(*buffer);
+    if (buffer->eol_table.count) {
+        const size_t line_length = buffer->eol_table[buffer->current_line_number];
+        if (!line_length) {
+            assert(buffer->current_column_number == 0);
+        } else {
+            cursor_index += line_length - buffer->current_column_number - 1;
+        }
+    }
+    buffer_set_cursor_from_index(buffer, cursor_index);
+    buffer_refresh_cursor_info(buffer);
 }
 
 void buffer_set_cursor_from_index(Buffer* buffer, size_t index) {
@@ -321,7 +375,7 @@ size_t buffer_view_pick_index(const Buffer_View& buffer_view, float x, float y, 
 	const float font_height = FONT_SIZE;
 
 	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
-	if (!buffer) {
+	if (!buffer || !buffer->allocated) {
 		return 0;
 	}
 

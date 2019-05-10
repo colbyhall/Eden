@@ -68,6 +68,9 @@ void buffer_remove_at_cursor(Buffer* buffer);
 void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta);
 void buffer_move_cursor_vertical(Buffer* buffer, s64 delta);
 
+void buffer_seek_line_begin(Buffer *buffer);
+void buffer_seek_line_end(Buffer *buffer);
+
 void buffer_set_cursor_from_index(Buffer* buffer, size_t index);
 void buffer_refresh_cursor_info(Buffer* buffer, bool update_desired = true);
 

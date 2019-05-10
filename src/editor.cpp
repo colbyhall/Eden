@@ -174,6 +174,12 @@ void editor_on_key_pressed(u8 key) {
 	case KEY_DOWN:
 		buffer_move_cursor_vertical(buffer, 1);
 		break;
+    case KEY_HOME:
+        buffer_seek_line_begin(buffer);
+        break;
+    case KEY_END:
+        buffer_seek_line_end(buffer);
+        break;
 	case KEY_BACKSPACE:
 		buffer_remove_before_cursor(buffer);
 		break;
@@ -196,6 +202,14 @@ void editor_on_char_entered(u8 c) {
 	}
 
 	if (c == KEY_ENTER) return;
+    if (c == KEY_LEFT) return;
+    if (c == KEY_RIGHT) return;
+    if (c == KEY_UP) return;
+    if (c == KEY_DOWN) return;
+    if (c == KEY_HOME) return;
+    if (c == KEY_END) return;
+    if (c == KEY_BACKSPACE) return;
+    if (c == KEY_DELETE) return;
 
 	buffer_add_char(buffer, c);
 

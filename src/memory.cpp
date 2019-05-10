@@ -1,8 +1,44 @@
 #include "memory.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
+#if BUILD_DEBUG && defined(_WIN32) // mega debug
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+void* memory_alloc(size_t size) {
+	return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+}
+
+void memory_free(void* block) {
+    if (!block) return;
+    VirtualFree(block, 0, MEM_DECOMMIT);
+}
+
+void* memory_realloc(void* ptr, size_t new_size) {
+	if (!ptr) return memory_alloc(new_size);
+    if (!new_size) {
+        memory_free(ptr);
+        return 0;
+    }
+
+    void *new_block = memory_alloc(new_size);
+    if (!new_block) return nullptr;
+    MEMORY_BASIC_INFORMATION mbi = {0};
+    VirtualQuery(ptr, &mbi, sizeof(mbi));
+    size_t bytes_to_copy = mbi.RegionSize;
+    if (bytes_to_copy > new_size) {
+        bytes_to_copy = new_size;
+    }
+    memcpy(new_block, ptr, bytes_to_copy);
+    memory_free(ptr);
+    return new_block;
+}
+
+
+#else
 void* memory_alloc(size_t size) {
 	return malloc(size);
 }
@@ -14,6 +50,7 @@ void* memory_realloc(void* ptr, size_t new_size) {
 void memory_free(void* block) {
 	free(block);
 }
+#endif
 
 #if BUILD_DEBUG
 struct Memory_Header {
@@ -62,21 +99,39 @@ void* memory_alloc_debug(size_t size, const char* file, u32 line) {
 	return header->data;
 }
 
-void* memory_realloc_debug(void* ptr, size_t new_size) {
+void* memory_realloc_debug(void* ptr, size_t new_size, const char *file, u32 line) {
+    if (!ptr) return memory_alloc_debug(new_size, file, line);
 	u8* original_block = (u8*)ptr - sizeof(Memory_Header);
-	Memory_Header* header = (Memory_Header*)original_block;
-
+    Memory_Header *old_header = (Memory_Header *)original_block;
 	// @NOTE(Colby): Order matters here
-	const size_t original_size = header->size + sizeof(Memory_Header);
-	header->size = new_size;
+	const size_t original_size = old_header->size + sizeof(Memory_Header);
+	old_header->size = new_size;
 	new_size = new_size + sizeof(Memory_Header);
 
 	amount_allocated += new_size - original_size;
-
-	return (u8*)memory_realloc(original_block, new_size) + sizeof(Memory_Header);
+	u8 *new_block = (u8*)memory_realloc(original_block, new_size);
+    if (!new_block) return nullptr;
+    Memory_Header *new_header = (Memory_Header *)new_block;
+    
+    Memory_Header *child = new_header->child;
+    Memory_Header *parent = new_header->parent;
+    if (child) {                   
+        assert(child->parent == old_header);
+        child->parent = new_header;
+    }
+    if (parent) {
+        assert(parent->child == old_header);
+        parent->child = new_header;
+    } else {
+        assert(old_header == first_node);
+        first_node = new_header;
+    }
+    
+    return new_block + sizeof(Memory_Header);
 }
 
 void memory_free_debug(void* block) {
+    if (!block) return;
 	u8* original_block = (u8*)block - sizeof(Memory_Header);
 	Memory_Header* header = (Memory_Header*)original_block;
 
@@ -86,14 +141,18 @@ void memory_free_debug(void* block) {
 	Memory_Header* child = header->child;
 	Memory_Header* parent = header->parent;
 	if (child) {
+        assert(child->parent == header);
 		if (parent) {
+            assert(first_node != header);
 			parent->child = child;
-		} else {
+		} else {                     
+            assert(first_node == header);
 			first_node = child;
 		}
 	} else if (parent) {
 		parent->child = nullptr;
 	} else {
+        assert(first_node == header);
 		first_node = nullptr;
 	}
 
