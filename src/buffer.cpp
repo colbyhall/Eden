@@ -60,7 +60,7 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	size_t extra = 0;
 	u32* current_char = buffer->data;
 	size_t line_size = 0;
-	while (current_char != buffer->data + buffer->allocated) {
+	while (current_char != buffer->data + file_size) {
 		const u8 c = fgetc(file);
 		if (c == '\r') {
 			extra += 1;
@@ -74,13 +74,18 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 			line_size = 0;
 		}
 	}
+    // @Cleanup: why does + 1 make things work here?
+    array_add(&buffer->eol_table, line_size - extra + 1);
 	fclose(file);
 
 	buffer->gap = buffer->data + file_size - extra;
 	buffer->gap_size = DEFAULT_GAP_SIZE + extra;
 
 	buffer->cursor = buffer->data;	 
-	buffer_refresh_cursor_info(buffer);
+	buffer_refresh_cursor_info(buffer);        
+
+    // @Temporary
+    parse_syntax(&buffer->syntax, buffer, "c");
 	return true;
 }
 
@@ -99,6 +104,9 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	buffer->desired_column_number = 0;
 	buffer->current_line_number = 0;
 	array_add(&buffer->eol_table, (size_t)0);
+
+    // @Temporary
+    parse_syntax(&buffer->syntax, buffer, "c");
 }
 
 static void buffer_assert_cursor_outside_gap(Buffer *buffer) {

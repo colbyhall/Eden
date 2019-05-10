@@ -410,6 +410,25 @@ void render_frame_end() {
 	gl_swap_buffers();
 }
 
+static Color get_color(Syntax_Highlight_Type type) {
+    switch (type) {
+    default: assert(0); case SHT_NONE: return 0;
+    case SHT_COMMENT: return 0x40c040;
+    case SHT_IDENT: return 0xd6b58d;
+    case SHT_KEYWORD: return 0xffffff;
+    case SHT_OPERATOR: return 0xcccccc; // @Temporary
+    case SHT_TYPE: return 0x66d9ef; // @Temporary
+    case SHT_FUNCTION: return 0x7777f7; // @Temporary
+    //SHT_GENERIC_TYPE,
+    //SHT_GENERIC_FUNCTION,
+    //SHT_MACRO,
+    case SHT_NUMERIC_LITERAL: return 0x80f0e0;
+    case SHT_STRING_LITERAL: return 0x40b0A0;
+    case SHT_DIRECTIVE: return 0xb0ffb0;
+    case SHT_ANNOTATION: return 0xb0ffb0;
+    }
+}
+
 void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float x1, float y1) {
 	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
     if (!buffer) {
@@ -422,7 +441,7 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 	const float starting_x = x;
 	const float starting_y = y;
 
-	y += font.ascent - buffer_view.current_scroll_y;
+    y += font.ascent;
 
 	const float font_height = FONT_SIZE;
 #if GAP_BUFFER_DEBUG
@@ -436,11 +455,27 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 	const size_t lines_scrolled = (size_t)(buffer_view.current_scroll_y / font_height);
 	const size_t starting_index = buffer->eol_table.count ? buffer_get_line_index(*buffer, lines_scrolled) : 0;
 
+	if (buffer_count) y -= buffer_view.current_scroll_y;
+
 	y += lines_scrolled * font_height;
+
+    const Syntax_Highlight *current_highlight = nullptr;
+    if (buffer->syntax.count) current_highlight = &buffer->syntax[0];
 
 	immediate_begin();
 	for (size_t i = starting_index; i < buffer_count; i++) {
-		Color color = 0xd6b58d;
+
+        while (i >= current_highlight->where + current_highlight->size) {
+            current_highlight += 1;
+            assert(current_highlight < buffer->syntax.cend());
+        }
+
+        assert(i >= current_highlight->where);
+        assert(i < current_highlight->where + current_highlight->size);
+
+		Color color = get_color(current_highlight->type);
+
+        
 #if GAP_BUFFER_DEBUG
         u32 c = buffer->data[i];
         if (buffer->data + i >= buffer->gap && buffer->data + i < &buffer->gap[buffer->gap_size]) {

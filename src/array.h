@@ -68,7 +68,7 @@ struct Array {
 	}
 
 	const T* cend() const {
-		return data + count - 1;
+		return data + count;
 	}
 
 };

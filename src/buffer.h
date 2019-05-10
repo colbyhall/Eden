@@ -4,6 +4,7 @@
 #include "string.h"
 #include "array.h"
 #include "math.h"
+#include "parsing.h"
 
 #define GAP_BUFFER_DEBUG 0
 #define LINE_COUNT_DEBUG 0
@@ -47,6 +48,8 @@ struct Buffer {
 	u32* cursor;
 
 	Array<size_t> eol_table;
+
+    Array<Syntax_Highlight> syntax;
 
 	operator bool() const { return data != nullptr; }
 

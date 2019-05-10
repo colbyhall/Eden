@@ -188,6 +188,7 @@ void editor_on_key_pressed(u8 key) {
 		break;
 	}
     editor_bring_view_to_cursor(current_view, buffer);
+    parse_syntax(&buffer->syntax, buffer, "c");
 	// current_view->on_key_pressed(key);
 }
 
@@ -201,19 +202,12 @@ void editor_on_char_entered(u8 c) {
 		return;
 	}
 
-	if (c == KEY_ENTER) return;
-    if (c == KEY_LEFT) return;
-    if (c == KEY_RIGHT) return;
-    if (c == KEY_UP) return;
-    if (c == KEY_DOWN) return;
-    if (c == KEY_HOME) return;
-    if (c == KEY_END) return;
-    if (c == KEY_BACKSPACE) return;
-    if (c == KEY_DELETE) return;
+    if (c < 32 || c > 126) return;
 
 	buffer_add_char(buffer, c);
 
     editor_bring_view_to_cursor(current_view, buffer);
+    parse_syntax(&buffer->syntax, buffer, "c");
 }
 
 void editor_on_mouse_down(Vector2 position) {
