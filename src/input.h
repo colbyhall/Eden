@@ -1,35 +1,78 @@
 #pragma once
 
-#define KEY_LEFT  37
-#define KEY_UP    38
-#define KEY_RIGHT 39
-#define KEY_DOWN  40
+#include "types.h"
+#include "math.h"
+#include "array.h"
 
-#define KEY_ENTER        13
-#define KEY_BACKSPACE     8
-#define KEY_ESC          27
-#define KEY_ALT          18
-#define KEY_CTRL         17
-#define KEY_SHIFT        16
-#define KEY_CAPSLOCK     20
-#define KEY_DELETE       46
-#define KEY_HOME         36
-#define KEY_INSERT       45
-#define KEY_END          35
-#define KEY_PAGEUP       33
-#define KEY_PAGEDOWN     34
-#define KEY_PAUSE        19
-#define KEY_PTRINTSCREEN 44
+enum Event_Type {
+	ET_None,
+	ET_Window_Resize,
+	ET_Exit_Requested,
+	ET_Mouse_Down,
+	ET_Mouse_Up,
+	ET_Mouse_Moved,
+	ET_Mouse_Wheel_Scrolled,
+	ET_Key_Pressed,
+	ET_Key_Released,
+	ET_Char_Entered,
+};
 
-#define KEY_F1  112
-#define KEY_F2  113
-#define KEY_F3  114
-#define KEY_F4  115
-#define KEY_F5  116 
-#define KEY_F6  117
-#define KEY_F7  118
-#define KEY_F8  119
-#define KEY_F9  120
-#define KEY_F10 121
-#define KEY_F11 122
-#define KEY_F12 123
+struct Event {
+	Event_Type type;
+
+	union {
+		struct {
+			u32 old_width;
+			u32 old_height;
+		};
+		Vector2 mouse_position;
+		float delta;
+		u8 key_code;
+		u8 c;
+	};
+
+	bool handled;
+};
+
+Event make_window_resize_event(u32 old_width, u32 old_height);
+Event make_exit_requested_event();
+Event make_mouse_down_event(Vector2 mouse_position);
+Event make_mouse_up_event(Vector2 mouse_position);
+Event make_mouse_moved_event(Vector2 mouse_position);
+Event make_mouse_wheel_scrolled_event(float delta);
+Event make_key_pressed_event(u8 key_code);
+Event make_key_released_event(u8 key_code);
+Event make_char_entered_event(u8 c);
+
+using Process_Event = void(*)(void* owner, Event* event);
+
+struct Event_Listener {
+	void* owner;
+	Process_Event process_func;
+	Event_Type type;
+
+	explicit operator bool() const { return owner && process_func; }
+	bool operator==(const Event_Listener& right) const { return owner == right.owner && process_func == right.process_func; }
+};
+
+Event_Listener make_event_listener(void* owner, Process_Event process_event, Event_Type type);
+
+struct Input_State {
+	bool mouse_went_down;
+	bool mouse_went_up;
+
+	Vector2 last_mouse_position;
+	Vector2 current_mouse_position;
+
+	u8 last_key_pressed;
+
+	bool ctrl_is_down;
+	bool alt_is_down;
+
+	Array<Event_Listener> event_listeners;
+};
+
+void process_input_event(Input_State* input, Event* event);
+
+bool bind_event_listener(Input_State* input, const Event_Listener* event_listener);
+bool unbind_event_listener(Input_State* input, const Event_Listener* event_listener);

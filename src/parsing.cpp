@@ -1,7 +1,5 @@
 #include "parsing.h"
 
-#define EOF 0
-
 bool is_eof(u8 c) {
 	return c == EOF;
 }
@@ -79,7 +77,7 @@ u8 to_uppercase(u8 c) {
 struct Buffer_Iterator {
     const Buffer &b;
     size_t i;
-    const u32 &operator*() { return b[i]; }
+    u32 operator*() { return b[i]; }
     void operator++() { ++i; }
 };
 
@@ -104,14 +102,18 @@ static bool c_is_ident(u32 c) {
     return false;
 }
 
-static bool c_is_keyword(const Buffer &b, size_t where, size_t toklen) {
-            
 #define MATCHES(tok,N) (toklen == N && buffer_match_string(b, where, tok, N))
-#define CPP_KEYWORD_ASCII(tok) \
-    || MATCHES(tok, sizeof(tok) - 1)
-
+#define CPP_MATCH_ASCII(tok) || MATCHES(tok, sizeof(tok) - 1)
 #include "cpp_syntax.h"
-    if (false CPP_KEYWORDS(CPP_KEYWORD_ASCII)) {
+static bool c_is_keyword(const Buffer &b, size_t where, size_t toklen) {
+    if (false CPP_KEYWORDS(CPP_MATCH_ASCII)) {
+        return true;
+    }
+    return false;
+}
+
+static bool c_is_type(const Buffer& b, size_t where, size_t toklen) {
+    if (false CPP_TYPES(CPP_MATCH_ASCII)) {
         return true;
     }
     return false;
@@ -203,7 +205,7 @@ static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String
                 } else {
                     assert(undef);
                     Buf_String *which = find_buf_string(b, macros, macro);
-                    if (which) array_remove(macros, which - macros->data);
+                    if (which) array_remove_index(macros, which - macros->data);
                 }
             }
         } else if (include) {
@@ -251,7 +253,7 @@ static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String
         WHITESPACE();
         result.size = i - result.where;
     } else if (c_is_ident(b[i])) {
-        result.type = SHT_NONE;
+        result.type = SHT_IDENT;
         i++;
         while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
         size_t toklen = i - result.where;
@@ -264,7 +266,11 @@ static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String
         } else if (c_is_keyword(b, result.where, toklen)) {
             result.type = SHT_KEYWORD;
             // @Speed: duplicate checks
-            if (toklen == 5 && buffer_match_string(b, result.where, "using", toklen)) {
+            if (toklen == 5 && buffer_match_string(b, result.where, "using", toklen) ||
+                toklen == 6 && buffer_match_string(b, result.where, "struct", toklen) ||
+                toklen == 5 && buffer_match_string(b, result.where, "class", toklen) ||
+                toklen == 4 && buffer_match_string(b, result.where, "enum", toklen) ||
+                toklen == 8 && buffer_match_string(b, result.where, "typename", toklen)) {
                 if (c_is_ident(b[i])) {
                     Buf_String type = {};
                     type.i = i;
@@ -280,10 +286,10 @@ static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String
             } else if (toklen == 7 && buffer_match_string(b, result.where, "typedef", toklen)) {
                 // @Todo.
             }
-        } else if (find_buf_string(b, types, Buf_String{result.where, toklen})) {
-            result.type = SHT_TYPE;
         } else if (toklen == 7 && buffer_match_string(b, result.where, "defined", toklen)) {
             result.type = SHT_DIRECTIVE;
+        } else if (c_is_type(b, result.where, toklen)) {
+            result.type = SHT_TYPE;
         } else { // @Temporary: crude function detector.
             i = result.where + result.size;
             while (i < len && is_whitespace(b[i])) i++;
@@ -292,11 +298,11 @@ static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String
             } else if (i < len) {
                 // @Temporary: crude ident detector.
                 switch (u32 c = b[i]) {
+                    /*
                 case '~':
                 case '!':
                 case '%':
                 case '^':
-                case ')':
                 case '-':
                 case '=':
                 case '+':
@@ -304,21 +310,29 @@ static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String
                 case ']':
                 case '|':
                 case '\'':
-                case ';':
-                case ':':
                 case '"':
                 case ',':
                 case '.':
                 case '/':
                 case '?':
+                case '}':
                     result.type = SHT_IDENT;
                     break;
+                    */
+                case ';':
+                case ':':
                 case '&':
                 case '*':
-                case '{':
-                case '}':
                 case '<':
                 case '>':
+                case ')':
+                case '{':
+                    if (find_buf_string(b, types, Buf_String{result.where, toklen})) {
+                        result.type = SHT_TYPE;
+                    } else {
+                        result.type = SHT_IDENT;
+                    }
+                    break;
                     result.type = SHT_TYPE;
                     break;
                 default:
@@ -419,6 +433,6 @@ void parse_syntax(Array<Syntax_Highlight> *result, const Buffer *buffer, const c
         i = tok.where + tok.size;
     }
 
-    c_free(macros.data);
-    c_free(types.data);
+    array_destroy(&macros);
+    array_destroy(&types);
 }

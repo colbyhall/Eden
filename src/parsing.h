@@ -18,7 +18,7 @@ u8 to_uppercase(u8 c);
 
 #include "array.h"
 
-typedef enum Syntax_Highlight_Type {
+enum Syntax_Highlight_Type {
     SHT_NONE,
     SHT_COMMENT,
     SHT_IDENT,
@@ -33,10 +33,10 @@ typedef enum Syntax_Highlight_Type {
     SHT_STRING_LITERAL,
     SHT_DIRECTIVE,
     SHT_ANNOTATION,
-} Syntax_Highlight_Type;
-typedef struct Syntax_Highlight {
+};
+struct Syntax_Highlight {
     u64 where;
     u64 size;
     Syntax_Highlight_Type type;
-} Syntax_Highlight;
+};
 void parse_syntax(Array<Syntax_Highlight> *result, const struct Buffer *buffer, const char *language);

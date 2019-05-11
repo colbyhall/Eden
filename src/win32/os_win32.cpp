@@ -1,8 +1,8 @@
 #include "../os.h"
 #include "../editor.h"
 #include "../parsing.h"
-#include "../input.h"
 #include "../opengl.h"
+#include "../memory.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -48,6 +48,12 @@ typedef enum PROCESS_DPI_AWARENESS {
 typedef HRESULT(*Set_Process_DPI_Awareness)(PROCESS_DPI_AWARENESS value);
 
 static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_param) {
+
+	Editor_State* editor = (Editor_State*)GetWindowLongPtr(window_handle, GWLP_USERDATA);
+
+	Event event_to_send;
+	bool send_event = false;
+
 	switch (message) {
 		case WM_SIZE: {
 			RECT rect;
@@ -59,45 +65,65 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 			window_width = rect.right - rect.left;
 			window_height = rect.bottom - rect.top;
 
-			editor_on_window_resized(old_width, old_height);
-			// game_state->on_window_resized(old_width, old_height);
+			event_to_send = make_window_resize_event(old_width, old_height);
+			send_event = true;
 		} break;
 
 		case WM_DESTROY: {
-			// game_state->on_exit_requested();
-			is_running = false;
+			event_to_send = make_exit_requested_event();
+			send_event = true;
 		} break;
 		case WM_SIZING: {
-			editor_draw();
+			// @HACK(Colby): can be fixed by a sizing event
+			editor_draw(editor);
 		} break;
 
 		case WM_MOUSEWHEEL: {
-			float delta = GET_WHEEL_DELTA_WPARAM(w_param);
-			editor_on_mousewheel_scrolled(delta);
+			const float delta = GET_WHEEL_DELTA_WPARAM(w_param);
+			event_to_send = make_mouse_wheel_scrolled_event(delta);
+			send_event = true;
 		} break;
 
 		case WM_CHAR: {
-			u8 c = (u8)w_param;
-			editor_on_char_entered(c);
+			const u8 key_code = (u8)w_param;
+			if (key_code < 32 || key_code > 126) break;
+			event_to_send = make_char_entered_event(key_code);
+			send_event = true;
 		} break;
 
 		case WM_KEYDOWN: {
-			u8 key = (u8)w_param;
-			editor_on_key_pressed(key);
+			const u8 key_code = (u8)w_param;
+			// if (key_code < 32 || key_code > 126) break;
+			event_to_send = make_key_pressed_event(key_code);
+			send_event = true;
+		} break;
+
+		case WM_KEYUP: {
+			const u8 key_code = (u8)w_param;
+			// if (key_code < 32 || key_code > 126) break;
+			event_to_send = make_key_released_event(key_code);
+			send_event = true;
 		} break;
 
 		case WM_LBUTTONDOWN: {
-			editor_on_mouse_down(os_get_mouse_position());
+			event_to_send = make_mouse_down_event(os_get_mouse_position());
+			send_event = true;
 		} break;
 
 		case WM_LBUTTONUP: {
-			editor_on_mouse_up(os_get_mouse_position());
+			event_to_send = make_mouse_up_event(os_get_mouse_position());
+			send_event = true;
 		} break;
 
 		case WM_NCLBUTTONUP: 
 		case WM_KILLFOCUS: {
-			editor_on_mouse_up(v2(0.f));
+			event_to_send = make_mouse_up_event(v2(0.f));
+			send_event = true;
 		} break;
+	}
+
+	if (send_event) {
+		process_input_event(&editor->input_state, &event_to_send);
 	}
 
 	return DefWindowProc(handle, message, w_param, l_param);
@@ -139,15 +165,18 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	window_handle = CreateWindow(window_class.lpszClassName, TEXT(WINDOW_TITLE), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
 
-	editor_init();
+	Editor_State editor;
+	SetWindowLongPtr(window_handle, GWLP_USERDATA, (LONG_PTR)&editor);
+
+	editor_init(&editor);
 	ShowWindow(window_handle, SW_SHOW);
 #if BUILD_DEBUG
 	wglSwapIntervalEXT(false);
 #else
 	wglSwapIntervalEXT(true);
 #endif
-	editor_loop();
-	editor_shutdown();
+	editor_loop(&editor);
+	editor_shutdown(&editor);
 
 	return 0;
 }
@@ -181,7 +210,7 @@ Vector2 os_get_mouse_position() {
 		}
 	}
 
-	return { 0.f, 0.f };
+	return v2(0.f);
 }
 
 void os_set_path_to_fonts() {

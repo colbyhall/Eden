@@ -96,3 +96,33 @@
     X("xor"             ) \
     X("xor_eq"          ) \
 
+#define CPP_TYPES(X)    \
+    X("int8_t"        ) \
+    X("int16_t"       ) \
+    X("int32_t"       ) \
+    X("int64_t"       ) \
+    X("uint8_t"       ) \
+    X("uint16_t"      ) \
+    X("uint32_t"      ) \
+    X("uint64_t"      ) \
+    X("int_least8_t"  ) \
+    X("int_least16_t" ) \
+    X("int_least32_t" ) \
+    X("int_least64_t" ) \
+    X("uint_least8_t" ) \
+    X("uint_least16_t") \
+    X("uint_least32_t") \
+    X("uint_least64_t") \
+    X("int_fast8_t"   ) \
+    X("int_fast16_t"  ) \
+    X("int_fast32_t"  ) \
+    X("int_fast64_t"  ) \
+    X("uint_fast8_t"  ) \
+    X("uint_fast16_t" ) \
+    X("uint_fast32_t" ) \
+    X("uint_fast64_t" ) \
+    X("intmax_t"      ) \
+    X("uintmax_t"     ) \
+    X("size_t"        ) \
+    X("ptrdiff_t"     ) \
+    X("intptr_t"      ) \

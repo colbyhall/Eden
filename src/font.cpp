@@ -87,22 +87,13 @@ Font font_load_from_os(const char* file_name) {
 
 	c_free(font_data.data);
 
-	font_bind(&result);
 	os_set_path(current_path);
+
+	bind_font(&result);
 
 	return result;
 }
 
-Font_Glyph font_find_glyph(Font* font, u8 c) {
+Font_Glyph font_find_glyph(const Font* font, u8 c) {
 	return font->glyphs[c - 32];
-}
-
-void font_bind(Font* font) {
-	refresh_transformation();
-	glUniform1i(global_shader.texture_loc, 0);
-
-	glBindTexture(GL_TEXTURE_2D, font->texture_id);
-	glActiveTexture(GL_TEXTURE0);
-
-	current_font = font;
 }
