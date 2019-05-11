@@ -15,6 +15,9 @@ struct String {
 	operator char*() const { return (char*)data; }
 
 	u8 operator[](size_t index) const;
+
+	bool operator==(const String& right) const;
+	bool operator==(const char* cstr) const;
 };
 
 bool string_starts_with(const String& string, const String& compare, bool case_matters = true);

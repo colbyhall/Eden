@@ -1,4 +1,5 @@
 #include "parsing.h"
+#include "string.h"
 
 bool is_eof(u8 c) {
 	return c == EOF;
@@ -243,14 +244,16 @@ static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
     return result;
 }
 
-void parse_syntax(Array<Syntax_Highlight> *result, const Buffer *buffer, const char *language) {
-    array_empty(result);
-    assert(String{"c"} == language);
+void parse_syntax(Buffer* buffer) {
+	if (!buffer->language) return;
+
+    array_empty(&buffer->syntax);
+    assert(buffer->language == "c" || buffer->language == "cpp");
 
     size_t buffer_count = buffer_get_count(*buffer);
     for (size_t i = 0; i < buffer_count;) {
         Syntax_Highlight tok = c_next_token(*buffer, i);
-        array_add(result, tok);
+        array_add(&buffer->syntax, tok);
         i = tok.where + tok.size;
     }
 }

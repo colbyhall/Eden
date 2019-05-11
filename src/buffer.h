@@ -35,6 +35,8 @@ struct Buffer {
 	String path;
 	String title;
 
+	String language;
+
 	u32* data;
 	size_t allocated;
 

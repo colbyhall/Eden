@@ -82,10 +82,25 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	buffer->gap_size = DEFAULT_GAP_SIZE + extra;
 
 	buffer->cursor = buffer->data;	 
-	buffer_refresh_cursor_info(buffer);        
+	buffer_refresh_cursor_info(buffer);
+
+	// @NOTE(Colby): Basic file name parsing
+	for (size_t i = buffer->path.count - 1; i >= 0; i--) {
+		if (buffer->path[i] == '.') {
+			buffer->language.data = buffer->path.data + i + 1;
+			buffer->language.count = buffer->path.count - i - 1;
+			buffer->language.allocated = buffer->language.count;
+		}
+
+		if (buffer->path[i] == '/' || buffer->path[i] == '\\') {
+			buffer->title.data = buffer->path.data + i + 1;
+			buffer->title.count = buffer->path.count - i - 1;
+			break;
+		}
+	}
 
     // @Temporary
-    parse_syntax(&buffer->syntax, buffer, "c");
+    parse_syntax(buffer);
 	return true;
 }
 
@@ -105,8 +120,10 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	buffer->current_line_number = 0;
 	array_add(&buffer->eol_table, (size_t)0);
 
+	buffer->language = "cpp";
+
     // @Temporary
-    parse_syntax(&buffer->syntax, buffer, "c");
+    parse_syntax(buffer);
 }
 
 static void buffer_assert_cursor_outside_gap(Buffer *buffer) {
@@ -182,10 +199,14 @@ void buffer_add_char(Buffer* buffer, u32 c) {
 		buffer->desired_column_number += 1;
 		buffer->eol_table[buffer->current_line_number] += 1;
 	}
+
+	// @TODO(Colby): Pass in actual language
+	parse_syntax(buffer);
 }
 
 void buffer_add_string(Buffer* buffer, const String& string) {
 	for (size_t i = 0; i < string.count; i++) {
+		// @TODO(Colby): This is slow because we parse syntax after ever char
 		buffer_add_char(buffer, string[i]);
 	}
 }
@@ -211,6 +232,9 @@ void buffer_remove_before_cursor(Buffer* buffer) {
 	buffer->gap_size += 1;
 
 	buffer_refresh_cursor_info(buffer, false);
+
+	// @TODO(Colby): Pass in actual language
+	parse_syntax(buffer);
 }
 
 void buffer_remove_at_cursor(Buffer* buffer) {
@@ -233,6 +257,8 @@ void buffer_remove_at_cursor(Buffer* buffer) {
 	buffer->gap_size += 1;
 
 	buffer_refresh_cursor_info(buffer, false);
+	// @TODO(Colby): Pass in actual language
+	parse_syntax(buffer);
 }
 
 void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta) {
