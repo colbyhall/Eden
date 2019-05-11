@@ -5,7 +5,7 @@
 #include "memory.h"
 #include "draw.h"
 #include "font.h"
-#include "input.h"
+#include "keys.h"
 #include "editor.h"
 
 #include <stdlib.h>
@@ -202,7 +202,7 @@ void buffer_remove_before_cursor(Buffer* buffer) {
 	const u32 c = *(buffer->cursor - 1);
 	if (is_eol(c)) {
 		const size_t amount_on_line = buffer->eol_table[buffer->current_line_number];
-		array_remove(&buffer->eol_table, buffer->current_line_number);
+		array_remove_index(&buffer->eol_table, buffer->current_line_number);
 		buffer->eol_table[buffer->current_line_number - 1] += amount_on_line;
 	}
 
@@ -226,7 +226,7 @@ void buffer_remove_at_cursor(Buffer* buffer) {
 	const u32 c = (*buffer)[cursor_index];
 	if (is_eol(c)) {
 		const size_t amount_on_line = buffer->eol_table[buffer->current_line_number];
-		array_remove(&buffer->eol_table, buffer->current_line_number);
+		array_remove_index(&buffer->eol_table, buffer->current_line_number);
 		buffer->eol_table[buffer->current_line_number] += amount_on_line;
 	}
 
@@ -361,69 +361,4 @@ size_t buffer_get_line_index(const Buffer& buffer, size_t index) {
 	}
 
 	return result;
-}
-
-
-
-void tick_buffer_view(Buffer_View* buffer_view, float dt) {
-	buffer_view->current_scroll_y = math_finterpto(buffer_view->current_scroll_y, buffer_view->target_scroll_y, dt, scroll_speed);
-}
-
-float buffer_view_get_buffer_height(const Buffer_View& buffer_view) {
-	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
-	if (!buffer) {
-		return 0.f;
-	}
-
-	const float font_height = FONT_SIZE;
-	return buffer->eol_table.count * font_height;
-}
-
-size_t buffer_view_pick_index(const Buffer_View& buffer_view, float x, float y, Vector2 pick_position) {
-	const float font_height = FONT_SIZE;
-
-	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
-	if (!buffer || !buffer->allocated) {
-		return 0;
-	}
-
-	size_t line_offset = (size_t)((buffer_view.current_scroll_y + pick_position.y) / font_height);
-	if (line_offset >= buffer->eol_table.count) {
-		line_offset = buffer->eol_table.count - 1;
-	}
-
-	y += line_offset * font_height - buffer_view.current_scroll_y;
-
-	const size_t start_index = buffer_get_line_index(*buffer, line_offset);
-	const size_t buffer_count = buffer_get_count(*buffer);
-	for (size_t i = start_index; i < buffer_count; i++) {
-		const u32 c = (*buffer)[i];
-
-		Font_Glyph glyph = font_find_glyph(&font, c);
-		if (is_whitespace(c)) {
-			glyph = font_find_glyph(&font, ' ');
-		}
-
-		float width = glyph.advance;
-		if (c == '\t') {
-			width += glyph.advance * 3;
-		}
-
-		const float x0 = x;
-		const float y0 = y;
-
-		const float x1 = x0 + width;
-		const float y1 = y0 + font_height;
-
-		if (pick_position.x >= x0 && pick_position.x <= x1 && pick_position.y >= y0 && pick_position.y <= y1) {
-			return i;
-		}
-		x += width;
-
-		if (is_eol(c)) {
-			return i;
-		}
-	}
-
-	return 0;
 }

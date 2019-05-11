@@ -1,7 +1,5 @@
 #include "parsing.h"
 
-#define EOF 0
-
 bool is_eof(u8 c) {
 	return c == EOF;
 }

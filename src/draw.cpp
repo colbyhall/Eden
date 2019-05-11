@@ -19,6 +19,19 @@ struct Vertex {
 	Vector2 uv;
 };
 
+struct Shader {
+	GLuint program_id;
+
+	GLint view_to_projection_loc;
+	GLint world_to_view_loc;
+
+	GLint position_loc;
+	GLint color_loc;
+	GLint uv_loc;
+
+	GLuint texture_loc;
+};
+
 GLuint imm_vao;
 GLuint imm_vbo;
 Vertex imm_vertices[MAX_VERTICES];
@@ -128,6 +141,14 @@ Shader load_global_shader() {
 	return result;
 }
 
+void bind_font(Font* font) {
+	refresh_transformation();
+	glUniform1i(global_shader.texture_loc, 0);
+
+	glBindTexture(GL_TEXTURE_2D, font->texture_id);
+	glActiveTexture(GL_TEXTURE0);
+}
+
 void draw_init() {
     glGenVertexArrays(1, &imm_vao);
     glBindVertexArray(imm_vao);
@@ -226,7 +247,7 @@ void draw_rect(float x0, float y0, float x1, float y1, const Color& color) {
     immediate_flush();
 }
 
-Vector2 immediate_string(const String& str, float x, float y, const Color& color) {
+Vector2 immediate_string(const String& str, float x, float y, const Color& color, const Font& font) {
 	const float font_height = FONT_SIZE;
 
 	const float original_x = x;
@@ -254,7 +275,7 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 
 		Font_Glyph& glyph = font_find_glyph(&font, str.data[i]);
 
-		immediate_glyph(glyph, x, y, color);
+		immediate_glyph(glyph, x, y, color, font);
 
 		x += glyph.advance ;
 
@@ -265,7 +286,7 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 	return v2(largest_x, largest_y);
 }
 
-void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color) {
+void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color, const Font& font) {
 	const Color v4_color = color;
 
 	const float x0 = x + glyph.bearing_x;
@@ -292,23 +313,23 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& col
 	immediate_vertex(x1, y0, v4_color, bottom_left);
 }
 
-Font_Glyph immediate_char(u8 c, float x, float y, const Color& color) {
+Font_Glyph immediate_char(u8 c, float x, float y, const Color& color, const Font& font) {
 	Font_Glyph glyph = font_find_glyph(&font, c);
 
-	immediate_glyph(glyph, x, y, color);
+	immediate_glyph(glyph, x, y, color, font);
 
 	return glyph;
 }
 
-void draw_string(const String& str, float x, float y, const Color& color) {
+void draw_string(const String& str, float x, float y, const Color& color, const Font& font) {
 	y += font.ascent;
 
 	immediate_begin();
-	immediate_string(str, x, y, color);
+	immediate_string(str, x, y, color, font);
 	immediate_flush();
 }
 
-Vector2 get_draw_string_size(const String& str) {
+Vector2 get_draw_string_size(const String& str, const Font& font) {
 	const float font_height = FONT_SIZE;
 
 	float y = 0.f;
@@ -373,40 +394,11 @@ void render_frame_begin() {
 	verts_drawn = 0;
 	verts_culled = 0;
 	glClear(GL_COLOR_BUFFER_BIT);
+	glViewport(0, 0, os_window_width(), os_window_height());
+	render_right_handed();
 }
 
 void render_frame_end() {
-
-#if BUILD_DEBUG
-	char buffer[256];
-	sprintf_s(
-		buffer, 256, "Draw Calls: %i\nVerts Drawn: %llu\nVerts Culled: %llu\nFPS: %i\nAllocations: %llu\nAllocated: %f KB",
-		draw_calls, verts_drawn, verts_culled, fps, memory_num_allocations(), memory_amount_allocated() / 1024.f
-	);
-	Vector2 string_size = get_draw_string_size(buffer);
-	Vector2 padding = v2(10.f);
-	float x = os_window_width() - (string_size.x + padding.x);
-	float y = 0.f;
-
-	immediate_begin();
-	{
-
-		float x0 = x;
-		float y0 = y;
-		float x1 = x0 + string_size.x + padding.x;
-		float y1 = y0 + string_size.y + padding.y;
-
-		immediate_quad(x0, y0, x1, y1, 0xAAAAAA);
-	}
-
-	{
-		float x0 = x + padding.x / 2.f;
-		float y0 = y + padding.y / 2.f;
-		immediate_string(buffer, x0, y0, 0xFFFFFF);
-	}
-	immediate_flush();
-#endif
-
 	gl_swap_buffers();
 }
 
@@ -429,11 +421,7 @@ static Color get_color(Syntax_Highlight_Type type) {
     }
 }
 
-void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float x1, float y1) {
-	Buffer* buffer = editor_find_buffer(buffer_view.buffer_id);
-    if (!buffer) {
-        return;
-    }
+void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float y1, const Font& font) {
 
 	float x = x0;
 	float y = y0;
@@ -452,10 +440,10 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 	const size_t cursor_index = buffer_get_cursor_index(*buffer);
 	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
 
-	const size_t lines_scrolled = (size_t)(buffer_view.current_scroll_y / font_height);
+	const size_t lines_scrolled = 0; // (size_t)(buffer_view.current_scroll_y / font_height);
 	const size_t starting_index = buffer->eol_table.count ? buffer_get_line_index(*buffer, lines_scrolled) : 0;
 
-	if (buffer_count) y -= buffer_view.current_scroll_y;
+	// if (buffer_count) y -= buffer_view.current_scroll_y;
 
 	y += lines_scrolled * font_height;
 
@@ -523,7 +511,7 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 			y += font_height;
 			continue;
 		default:
-			Font_Glyph glyph = immediate_char((u8)c, x, y, color);
+			Font_Glyph glyph = immediate_char((u8)c, x, y, color, font);
 			x += glyph.advance;
 		}
 
@@ -557,7 +545,7 @@ void draw_buffer_view(const Buffer_View& buffer_view, float x0, float y0, float 
 			const float y = info_bar_y0 + (padding.y / 2.f);
 			char output_string[1024];
 			sprintf(output_string, "%s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
-			immediate_string(output_string, x, y, 0x052329);
+			immediate_string(output_string, x, y, 0x052329, font);
 		}
 	}
 	immediate_flush();

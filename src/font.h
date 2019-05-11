@@ -27,8 +27,5 @@ struct Font {
 	Font_Glyph glyphs[NUM_CHARACTERS];
 };
 
-extern Font* current_font;
-
 Font font_load_from_os(const char* file_name);
-Font_Glyph font_find_glyph(Font* font, u8 c);
-void font_bind(Font* font);
+Font_Glyph font_find_glyph(const Font* font, u8 c);
