@@ -412,18 +412,18 @@ void render_frame_end() {
 
 static Color get_color(Syntax_Highlight_Type type) {
     switch (type) {
-    default: assert(0); case SHT_NONE: return 0;
+    default: assert(0); case SHT_NONE: return 0xd6b58d;
     case SHT_COMMENT: return 0x40c040;
-    case SHT_IDENT: return 0xd6b58d;
+    case SHT_IDENT: return 0xf07040;//255<<16 |72<<8 |48;// @Temporary
     case SHT_KEYWORD: return 0xffffff;
     case SHT_OPERATOR: return 0xcccccc; // @Temporary
     case SHT_TYPE: return 0x66d9ef; // @Temporary
-    case SHT_FUNCTION: return 0x7777f7; // @Temporary
+    case SHT_FUNCTION: return 0x77f777; // @Temporary
     //SHT_GENERIC_TYPE,
     //SHT_GENERIC_FUNCTION,
-    //SHT_MACRO,
+    case SHT_MACRO: return 0x7777f7; // @Temporary?
     case SHT_NUMERIC_LITERAL: return 0x80f0e0;
-    case SHT_STRING_LITERAL: return 0x40b0A0;
+    case SHT_STRING_LITERAL: return 0x40b0a0;
     case SHT_DIRECTIVE: return 0xb0ffb0;
     case SHT_ANNOTATION: return 0xb0ffb0;
     }

@@ -14,6 +14,10 @@ bool is_whitespace(u8 c) {
 	return is_eol(c) || c == ' ' || c == '\t';
 }
 
+bool is_whitespace_not_eol(u8 c) {
+    return is_whitespace(c) && !is_eol(c);
+}
+
 bool is_letter(u8 c) {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
@@ -72,14 +76,21 @@ u8 to_uppercase(u8 c) {
 
 #include "buffer.h"
 
+struct Buffer_Iterator {
+    const Buffer &b;
+    size_t i;
+    const u32 &operator*() { return b[i]; }
+    void operator++() { ++i; }
+};
+
 // @Cleanup: make this do some utf8 parsing or something; currently we just template on char type.
-template <typename Char>
-static bool buffer_match_string(const Buffer &b, size_t start, const Char *compare_to, size_t size) {
+template <typename Char_Iterator>
+static bool buffer_match_string(const Buffer &b, size_t start, Char_Iterator compare_to, size_t size) {
     size_t len = buffer_get_count(b);
-    for (size_t i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++, ++compare_to) {
         const size_t j = start + i;
         if (j < 0 || j >= len) return false;
-        if (b[j] != compare_to[i]) return false;
+        if (b[j] != *compare_to) return false;
     }
     return true;
 }
@@ -93,12 +104,45 @@ static bool c_is_ident(u32 c) {
     return false;
 }
 
+static bool c_is_keyword(const Buffer &b, size_t where, size_t toklen) {
+            
+#define MATCHES(tok,N) (toklen == N && buffer_match_string(b, where, tok, N))
+#define CPP_KEYWORD_ASCII(tok) \
+    || MATCHES(tok, sizeof(tok) - 1)
+
+#include "cpp_syntax.h"
+    if (false CPP_KEYWORDS(CPP_KEYWORD_ASCII)) {
+        return true;
+    }
+    return false;
+}
+
+static bool c_is_eol(const Buffer &b, size_t i) {
+    assert(i - 1 >= 0);
+    return is_eol(b[i]) && b[i - 1] != '\\';
+}
+
 static size_t c_scan_line(const Buffer &b, size_t len, size_t i) {
-    while (i < len && (!is_eol(b[i]) || b[i - 1] == '\\')) i++;
+    while (i < len && !c_is_eol(b, i)) i++;
     return i;
 }
 
-static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
+#define WHITESPACE() do { while (i < len && is_whitespace(b[i])) i++; } while(0)
+
+struct Buf_String {
+    size_t i;
+    size_t size;
+};
+
+static Buf_String *find_buf_string(const Buffer &b, Array<Buf_String> *haystack, Buf_String needle) {
+    for (auto &&it : *haystack) {
+        if (it.size != needle.size) continue;
+        if (buffer_match_string(b, it.i, Buffer_Iterator{b, needle.i}, needle.size)) return &it;
+    }
+    return nullptr;
+}
+
+static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String> *types, const Buffer &b, size_t i) {
     Syntax_Highlight result = {};
     result.where = i;
     size_t len = buffer_get_count(b);
@@ -108,6 +152,7 @@ static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
         if (i < len && b[i] == '/') {
             result.type = SHT_COMMENT;
             i = c_scan_line(b, len, i);
+            WHITESPACE();
             result.size = i - result.where;
         } else if (i < len && b[i] == '*') {
             result.type = SHT_COMMENT;
@@ -115,66 +160,173 @@ static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
             while (i < len && (b[i - 1] != '*' || b[i] != '/')) i++;
             i++;
             if (i >= len) i = len; // @Hack just to make sure it's clamped.
+
+            WHITESPACE();
             result.size = i - result.where;
         } else {
             result.type = SHT_OPERATOR;
-            result.size = 1;
+            WHITESPACE();
+            result.size = i - result.where;
         }
     } else if (b[i] == '#') {
         result.type = SHT_DIRECTIVE;
-        i = c_scan_line(b, len, i);
+        i++;
+        // @Todo: skip backslash-escaped newlines
+        while (i < len && is_whitespace_not_eol(b[i])) i++;
+        size_t tokstart = i;
+        while (i < len && is_letter(b[i])) i++;
+        size_t toklen = i - tokstart;
+
+        while (i < len && is_whitespace_not_eol(b[i])) i++;
         result.size = i - result.where;
+
+        bool define = (toklen == 6 && buffer_match_string(b, tokstart, "define", toklen));
+        bool elif = (toklen == 4 && buffer_match_string(b, tokstart, "elif", toklen));
+        bool else_ = (toklen == 4 && buffer_match_string(b, tokstart, "else", toklen));
+        bool endif = (toklen == 5 && buffer_match_string(b, tokstart, "endif", toklen));
+        bool error = (toklen == 5 && buffer_match_string(b, tokstart, "error", toklen));
+        bool if_ = (toklen == 2 && buffer_match_string(b, tokstart, "if", toklen));
+        bool ifdef = (toklen == 5 && buffer_match_string(b, tokstart, "ifdef", toklen));
+        bool ifndef = (toklen == 6 && buffer_match_string(b, tokstart, "ifndef", toklen));
+        bool include = (toklen == 7 && buffer_match_string(b, tokstart, "include", toklen));
+        bool line = (toklen == 4 && buffer_match_string(b, tokstart, "line", toklen));
+        bool pragma = (toklen == 6 && buffer_match_string(b, tokstart, "pragma", toklen));
+        bool undef = (toklen == 5 && buffer_match_string(b, tokstart, "undef", toklen));
+        if (define || undef) {
+            Buf_String macro = {};
+            macro.i = i;
+            while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
+            macro.size = i - macro.i;
+            if (macro.size) {
+                if (define) {
+                    if (!find_buf_string(b, macros, macro)) array_add(macros, macro);
+                } else {
+                    assert(undef);
+                    Buf_String *which = find_buf_string(b, macros, macro);
+                    if (which) array_remove(macros, which - macros->data);
+                }
+            }
+        } else if (include) {
+            // speculatively check for #include <asdf>, if not, backtrack.
+            if (i < len && b[i] == '<') {
+                while (i < len && !is_eol(b[i]) && b[i] != '>') i++;
+                if (!is_eol(b[i])) {
+                    i++;
+                    WHITESPACE();
+                    result.size = i - result.where;
+                }
+            }
+        } else if (error || line || pragma) {
+            i = c_scan_line(b, len, i);
+            WHITESPACE();
+            result.size = i - result.where;
+        } else if (elif  || else_ || endif || if_ || ifdef || ifndef) {
+        } else {
+            // Fake directive; only highlight the '#' and backtrack to the ident.
+            result.size = tokstart - result.where;
+            i = tokstart;
+        }
     } else if (b[i] == '@') {
-        result.type = SHT_DIRECTIVE;
+        result.type = SHT_ANNOTATION;
         i++;
         while (i < len && !is_whitespace(b[i])) i++;
+        WHITESPACE();
         result.size = i - result.where;
     } else if (is_whitespace(b[i])) {
         result.type = SHT_NONE;
         i++;
-        while (i < len && is_whitespace(b[i])) i++;
+        WHITESPACE();
         result.size = i - result.where;
-    } else if (b[i] == '"') {
+    } else if (b[i] == '"' || b[i] == '\'') {
         result.type = SHT_STRING_LITERAL;
+        u32 end_char = b[i];
         i++;
-        while (i < len && (!is_eol(b[i]) && b[i] != '"')) {
+        while (i < len && (!is_eol(b[i]) && b[i] != end_char)) {
             if (i < len && b[i] == '\\') {
                 i++;
             }
             i++;
         }
         i++;
+        WHITESPACE();
         result.size = i - result.where;
-    } /*else if (b[i] == '\'') {
-        result.type = SHT_STRING_LITERAL;
-        while (
-    }*/ else if (c_is_ident(b[i])) {
-        result.type = SHT_IDENT; // @Temporary: no symbol table yet
+    } else if (c_is_ident(b[i])) {
+        result.type = SHT_NONE;
+        i++;
         while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
+        size_t toklen = i - result.where;
+
+        WHITESPACE();
         result.size = i - result.where;
-        
-#define MATCHES(tok,N) (result.size == N && buffer_match_string(b, result.where, tok, N))
-#define CPP_KEYWORD_ASCII(tok) \
-    || MATCHES(tok, sizeof(tok) - 1)
 
-#include "cpp_syntax.h"
-
-        if (false CPP_KEYWORDS(CPP_KEYWORD_ASCII)) {
+        if (find_buf_string(b, macros, Buf_String{result.where, toklen})) {
+            result.type = SHT_MACRO;
+        } else if (c_is_keyword(b, result.where, toklen)) {
             result.type = SHT_KEYWORD;
-        } else if (false CPP_KEYWORD_ASCII("u8")
-                         CPP_KEYWORD_ASCII("u16")
-                         CPP_KEYWORD_ASCII("u32")
-                         CPP_KEYWORD_ASCII("u64")
-                         CPP_KEYWORD_ASCII("s8")
-                         CPP_KEYWORD_ASCII("s16")
-                         CPP_KEYWORD_ASCII("s32")
-                         CPP_KEYWORD_ASCII("s64")) { // @Temporary: crude type detector.
+            // @Speed: duplicate checks
+            if (toklen == 5 && buffer_match_string(b, result.where, "using", toklen)) {
+                if (c_is_ident(b[i])) {
+                    Buf_String type = {};
+                    type.i = i;
+                    i++; 
+                    while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
+                    type.size = i - type.i;
+                    if (c_is_keyword(b, type.i, type.size)) {
+                        // Already a keyword.
+                    } else if (!find_buf_string(b, types, type)) {
+                        array_add(types, type);
+                    }
+                }
+            } else if (toklen == 7 && buffer_match_string(b, result.where, "typedef", toklen)) {
+                // @Todo.
+            }
+        } else if (find_buf_string(b, types, Buf_String{result.where, toklen})) {
             result.type = SHT_TYPE;
+        } else if (toklen == 7 && buffer_match_string(b, result.where, "defined", toklen)) {
+            result.type = SHT_DIRECTIVE;
         } else { // @Temporary: crude function detector.
             i = result.where + result.size;
             while (i < len && is_whitespace(b[i])) i++;
             if (i < len && b[i] == '(') {
                 result.type = SHT_FUNCTION;
+            } else if (i < len) {
+                // @Temporary: crude ident detector.
+                switch (u32 c = b[i]) {
+                case '~':
+                case '!':
+                case '%':
+                case '^':
+                case ')':
+                case '-':
+                case '=':
+                case '+':
+                case '[':
+                case ']':
+                case '|':
+                case '\'':
+                case ';':
+                case ':':
+                case '"':
+                case ',':
+                case '.':
+                case '/':
+                case '?':
+                    result.type = SHT_IDENT;
+                    break;
+                case '&':
+                case '*':
+                case '{':
+                case '}':
+                case '<':
+                case '>':
+                    result.type = SHT_TYPE;
+                    break;
+                default:
+                    if (c_is_ident(c)) {
+                        result.type = SHT_TYPE;
+                    }
+                    break;
+                }
             }
         }
     } else if (is_number(b[i])) {
@@ -193,7 +345,7 @@ static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
                 type = HEX;
             } else if (is_number(b[i])) {
                 i++;
-                type = OCT;
+                type = OCT; // @Todo: broken.
             }
         }
         if (type == OCT) {
@@ -207,6 +359,7 @@ static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
                 type = FLOAT;
             } else {
                 type = ERROR;
+                WHITESPACE();
                 result.size = i - result.where;
             }
             i++;
@@ -217,6 +370,7 @@ static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
                 type = FLOAT;
             } else if (type != FLOAT) {
                 type = ERROR;
+                WHITESPACE();
                 result.size = i - result.where;
             }
             i++;
@@ -226,20 +380,26 @@ static Syntax_Highlight c_next_token(const Buffer &b, size_t i) {
                 while (i < len && is_number(b[i])) i++;
             } else {
                 type = ERROR;
+                WHITESPACE();
                 result.size = i - result.where;
             }
         }
         if (type == FLOAT && i < len && b[i] == 'f') i++;
         if (type != ERROR) {
+            WHITESPACE();
             result.size = i - result.where;
-        } else {
-            //result.type = SHT_IDENT;
         }
     } else if (is_symbol(b[i])) {
         result.type = SHT_OPERATOR;
-        result.size = 1;
+        i++;
+        WHITESPACE();
+        result.size = i - result.where;
     } else {
         assert(0);
+    }
+    if (result.size < 1) {
+        assert(0);
+        result.size = 1;
     }
 
     return result;
@@ -249,10 +409,16 @@ void parse_syntax(Array<Syntax_Highlight> *result, const Buffer *buffer, const c
     array_empty(result);
     assert(String{"c"} == language);
 
+    Array<Buf_String> macros = {};
+    Array<Buf_String> types = {};
+
     size_t buffer_count = buffer_get_count(*buffer);
     for (size_t i = 0; i < buffer_count;) {
-        Syntax_Highlight tok = c_next_token(*buffer, i);
+        Syntax_Highlight tok = c_next_token(&macros, &types, *buffer, i);
         array_add(result, tok);
         i = tok.where + tok.size;
     }
+
+    c_free(macros.data);
+    c_free(types.data);
 }

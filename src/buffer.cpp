@@ -210,7 +210,7 @@ void buffer_remove_before_cursor(Buffer* buffer) {
 	buffer->gap -= 1;
 	buffer->gap_size += 1;
 
-	buffer_refresh_cursor_info(buffer, false);
+	buffer_refresh_cursor_info(buffer, true);
 }
 
 void buffer_remove_at_cursor(Buffer* buffer) {
@@ -232,7 +232,7 @@ void buffer_remove_at_cursor(Buffer* buffer) {
 
 	buffer->gap_size += 1;
 
-	buffer_refresh_cursor_info(buffer, false);
+	buffer_refresh_cursor_info(buffer, true);
 }
 
 void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta) {

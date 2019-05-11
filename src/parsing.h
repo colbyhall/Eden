@@ -5,6 +5,7 @@
 bool is_eof(u8 c);
 bool is_eol(u8 c);
 bool is_whitespace(u8 c);
+bool is_whitespace_not_eol(u8 c);
 bool is_letter(u8 c);   
 bool is_oct_digit(u8 c);
 bool is_hex_digit(u8 c);

@@ -54,7 +54,6 @@ void memory_free(void* block) {
 
 #if BUILD_DEBUG
 struct Memory_Header {
-	void* data;
 	size_t size;
 
 	const char* file;
@@ -75,11 +74,12 @@ void* memory_alloc_debug(size_t size, const char* file, u32 line) {
 	u8* result = (u8*)memory_alloc(size);
 
 	Memory_Header* header = (Memory_Header*)result;
-	memset(header, 0, sizeof(Memory_Header));
-	header->data = result += sizeof(Memory_Header);
+    result += sizeof(Memory_Header);
 	header->size = original_size;
 	header->file = file;
 	header->line = line;
+    header->child = nullptr;
+    header->parent = nullptr;
 
 	if (!first_node) {
 		first_node = header;
@@ -96,7 +96,7 @@ void* memory_alloc_debug(size_t size, const char* file, u32 line) {
 	amount_allocated += size;
 	num_allocations += 1;
 
-	return header->data;
+	return result;
 }
 
 void* memory_realloc_debug(void* ptr, size_t new_size, const char *file, u32 line) {
@@ -145,9 +145,11 @@ void memory_free_debug(void* block) {
 		if (parent) {
             assert(first_node != header);
 			parent->child = child;
-		} else {                     
+            child->parent = parent;
+		} else {
             assert(first_node == header);
 			first_node = child;
+            child->parent = nullptr;
 		}
 	} else if (parent) {
 		parent->child = nullptr;
