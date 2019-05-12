@@ -256,8 +256,6 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 	float largest_x = 0.f;
 	float largest_y = 0.f;
 
-	y += font.ascent;
-
 	for (size_t i = 0; i < str.count; i++) {
 		if (is_eol(str.data[i])) {
 			y += font_height;
@@ -404,7 +402,7 @@ void render_frame_end() {
 
 static Color get_color(Syntax_Highlight_Type type) {
     switch (type) {
-    default: assert(0); case SHT_NONE: return 0;
+	case SHT_NONE: return 0xd6b58d;
     case SHT_COMMENT: return 0x40c040;
     case SHT_IDENT: return 0xd6b58d;//0xf07040;//255<<16 |72<<8 |48;// @Temporary
     case SHT_KEYWORD: return 0xffffff;
@@ -418,6 +416,7 @@ static Color get_color(Syntax_Highlight_Type type) {
     case SHT_STRING_LITERAL: return 0x40b0a0;
     case SHT_DIRECTIVE: return 0xb0ffb0;
     case SHT_ANNOTATION: return 0xb0ffb0;
+    default: assert(0); 
     }
 }
 
@@ -434,7 +433,11 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
     y += font.ascent;
 
 	const float font_height = FONT_SIZE;
+#if GAP_BUFFER_DEBUG
+	const size_t buffer_count = buffer->allocated;
+#else
 	const size_t buffer_count = get_count(*buffer);
+#endif
 	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
 
 	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
@@ -449,27 +452,50 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
     size_t current_highlight_index = 0;
 
 	immediate_begin();
+
+#if LINE_COUNT_DEBUG
+	size_t line_index = lines_scrolled;
+	const char* format = "%llu: LS: %llu |";
+	char out_line_size[20];
+	sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+
+	x += immediate_string(out_line_size, x, y, 0xFFFF00, font).x;
+#endif
+
 	for (size_t i = starting_index; i < buffer_count; i++) {
+		Color color = 0xd6b58d; //  get_color((Syntax_Highlight_Type)current_highlight->type);
 
-        while (i >= current_highlight_index + current_highlight->length) {
-            current_highlight_index += current_highlight->length;
-            current_highlight += 1;
-            assert(current_highlight < buffer->syntax.cend());
-        }
+#if GAP_BUFFER_DEBUG
+		u32* current_point = buffer->data + i;
+		u32 c = *current_point;
 
-        assert(i >= current_highlight_index);
-        assert(i < current_highlight_index + current_highlight->length);
+		if (current_point >= buffer->gap && current_point < buffer->gap + buffer->gap_size)
+		{
+			color = 0xFF00FF;
+			c = '*';
+			if (current_point == buffer->gap) {
+				c = '[';
+				color = 0xFFFF00;
+			} else if (current_point == buffer->gap + buffer->gap_size - 1) {
+				c = ']';
+				color = 0xFFFF00;
+			}
 
-		Color color = get_color((Syntax_Highlight_Type)current_highlight->type);
-
+		}
+#else
 		const u32 c = (*buffer)[i];
+#endif
 
 		if (x > x1) {
 			x = starting_x;
 			y += font_height;
 		}
 
+#if GAP_BUFFER_DEBUG
+		if (current_point == get_index_as_cursor(buffer, view->cursor))
+#else
 		if (i == view->cursor)
+#endif
         {
 			Font_Glyph glyph = font_find_glyph(&font, c);
 
@@ -495,6 +521,18 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 		case '\n':
 			x = starting_x;
 			y += font_height;
+
+#if LINE_COUNT_DEBUG
+			line_index += 1;
+
+			if (buffer->eol_table.count > line_index)
+			{
+				char out_line_size[20];
+				sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
+
+				x += immediate_string(out_line_size, x, y, 0xFFFF00, font).x;
+			}
+#endif
 			continue;
 		default:
 			Font_Glyph glyph = immediate_char((u8)c, x, y, color, font);
@@ -520,7 +558,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			immediate_quad(info_bar_x0, info_bar_y0, info_bar_x1, info_bar_y1, 0xd6b58d);
 
 			const float x = x0 + padding.x / 2.f;
-			const float y = info_bar_y0 + (padding.y / 2.f);
+			const float y = info_bar_y0 + (padding.y / 2.f) + font.ascent;
 			char output_string[1024];
 			sprintf(output_string, "%s      LN: %llu     COL: %llu", buffer->title.data, view->current_line_number, view->current_column_number);
 			immediate_string(output_string, x, y, 0x052329, font);
