@@ -96,7 +96,7 @@ void editor_init(Editor_State* editor) {
 	editor->loaded_font = font_load_from_os("consola.ttf");
 	
 	Buffer* buffer = editor_create_buffer(editor);
-	buffer_load_from_file(buffer, "C:/burnival/first.c");
+	buffer_load_from_file(buffer, "src\\editor.cpp");
 
 
 	editor->is_running = true;
