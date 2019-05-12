@@ -61,7 +61,8 @@ project "YEET"
 		defines 
 		{
 			"BUILD_RELEASE#1",
-			"BUILD_DEBUG#0"
+			"BUILD_DEBUG#0",
+			"NDEBUG"
 		}
 		runtime "Release"
         optimize "On"
