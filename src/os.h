@@ -20,7 +20,7 @@ void os_set_path_to_fonts();
 String os_get_path();
 bool os_set_path(const String& string);
 
-u64 os_get_ms_time();
+double os_get_time();
 
 String os_load_file_into_memory(const char* path);
 

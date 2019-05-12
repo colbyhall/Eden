@@ -128,7 +128,14 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 	return DefWindowProc(handle, message, w_param, l_param);
 }
 
+double invfreq;
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show) {
+    {
+        LARGE_INTEGER f;
+        QueryPerformanceFrequency(&f);
+        invfreq = 1.0 / f.QuadPart;
+    }
 	HMODULE dll_handle = LoadLibrary(TEXT("Shcore.dll"));
 	if (dll_handle) {
 		Set_Process_DPI_Awareness SetProcessDpiAwareness = (Set_Process_DPI_Awareness)GetProcAddress(dll_handle, "SetProcessDpiAwareness");
@@ -180,8 +187,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 	return 0;
 }
 
-u64 os_get_ms_time() {
-	return (u64)GetTickCount64();
+double os_get_time() {
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+	return t.QuadPart * invfreq;
 }
 
 void os_set_cursor_type(OS_Cursor_Type type) {

@@ -546,7 +546,9 @@ static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String
 }
 
 
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include "os.h"
 
 void parse_syntax(Buffer* buffer) {
 	if (!buffer->language) return;
@@ -561,21 +563,21 @@ void parse_syntax(Buffer* buffer) {
         OutputDebugStringA("Reserving!!\n");
     }
 
-    LARGE_INTEGER begin;
-    QueryPerformanceCounter(&begin);
+    auto begin = os_get_time();
+
     size_t buffer_count = get_count(*buffer);
     for (size_t i = 0; i < buffer_count;) {
         Syntax_Highlight tok = c_next_token(&buffer->macros, &buffer->types, *buffer, i);
         array_add(&buffer->syntax, tok);
         i = tok.where + tok.size;
     }
-    LARGE_INTEGER end;
-    QueryPerformanceCounter(&end);
+    
+    auto end = os_get_time();
 
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
-
-    double microseconds = ((end.QuadPart - begin.QuadPart) / (double)freq.QuadPart);
+    
+    double microseconds = (end - begin);
     microseconds *= 1000000;
     char buf[512];
     sprintf(buf, "%f microseconds.\n", microseconds);
