@@ -7,6 +7,7 @@
 #include "input.h"
 
 #define WINDOW_TITLE "YEET"
+const size_t views_allocated = 5;
 
 struct Editor_State {
 	bool is_running;
@@ -16,6 +17,10 @@ struct Editor_State {
 	Font loaded_font;
 
 	float dt;
+
+	Buffer_View views[views_allocated];
+	size_t views_count = 1;
+	Buffer_View* current_view = nullptr;
 
 	Array<Buffer> loaded_buffers;
 	Buffer_ID last_buffer_id;
@@ -32,5 +37,7 @@ void editor_draw(Editor_State* editor);
 Buffer* editor_create_buffer(Editor_State* editor);
 Buffer* editor_find_buffer(Editor_State* editor, Buffer_ID id);
 bool editor_destroy_buffer(Editor_State* editor, Buffer_ID id);
+
+void editor_set_current_view(Editor_State* editor, size_t view_index);
 
 

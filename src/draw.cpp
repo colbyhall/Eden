@@ -421,29 +421,26 @@ static Color get_color(Syntax_Highlight_Type type) {
     }
 }
 
-void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float y1, const Font& font) {
-
+void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font) {
 	float x = x0;
 	float y = y0;
 
 	const float starting_x = x;
 	const float starting_y = y;
 
+	Buffer* buffer = editor_find_buffer(view->editor, view->id);
+	assert(buffer);
+
     y += font.ascent;
 
 	const float font_height = FONT_SIZE;
-#if GAP_BUFFER_DEBUG
-    const size_t buffer_count = buffer->allocated;
-#else
-	const size_t buffer_count = buffer_get_count(*buffer);
-#endif
-	const size_t cursor_index = buffer_get_cursor_index(*buffer);
+	const size_t buffer_count = get_count(*buffer);
 	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
 
-	const size_t lines_scrolled = 0; // (size_t)(buffer_view.current_scroll_y / font_height);
-	const size_t starting_index = buffer->eol_table.count ? buffer_get_line_index(*buffer, lines_scrolled) : 0;
+	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+	const size_t starting_index = get_line_index(*buffer, lines_scrolled);
 
-	// if (buffer_count) y -= buffer_view.current_scroll_y;
+	if (buffer_count) y -= view->current_scroll_y;
 
 	y += lines_scrolled * font_height;
 
@@ -463,27 +460,14 @@ void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float 
 
 		Color color = get_color(current_highlight->type);
 
-        
-#if GAP_BUFFER_DEBUG
-        u32 c = buffer->data[i];
-        if (buffer->data + i >= buffer->gap && buffer->data + i < &buffer->gap[buffer->gap_size]) {
-            if (c < 32 || c > 126 && c < 256) c = '\\';
-		    color = 0xff00ff;
-        }
-#else
 		const u32 c = (*buffer)[i];
-#endif
 
 		if (x > x1) {
 			x = starting_x;
 			y += font_height;
 		}
 
-#if GAP_BUFFER_DEBUG
-        if (i == buffer->cursor - buffer->data)
-#else
-		if (i == cursor_index)
-#endif
+		if (i == view->cursor)
         {
 			Font_Glyph glyph = font_find_glyph(&font, c);
 
@@ -521,14 +505,6 @@ void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float 
 		}
 	}
 
-	if (cursor_index == buffer_count) {
-		const float cursor_x0 = x;
-		const float cursor_y0 = y - font.ascent;
-		const float cursor_x1 = cursor_x0 + space_glyph.advance;
-		const float cursor_y1 = y - font.descent;
-		immediate_quad(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
-	}
-
 	// @NOTE(Colby): Drawing info bar here
 	{
 		const float font_height = FONT_SIZE;
@@ -544,7 +520,7 @@ void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float 
 			const float x = x0 + padding.x / 2.f;
 			const float y = info_bar_y0 + (padding.y / 2.f);
 			char output_string[1024];
-			sprintf(output_string, "%s      LN: %llu     COL: %llu", buffer->title.data, buffer->current_line_number, buffer->current_column_number);
+			sprintf(output_string, "%s      LN: %llu     COL: %llu", buffer->title.data, view->current_line_number, view->current_column_number);
 			immediate_string(output_string, x, y, 0x052329, font);
 		}
 	}

@@ -86,14 +86,13 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 
 		case WM_CHAR: {
 			const u8 key_code = (u8)w_param;
-			if (key_code < 32 || key_code > 126) break;
+			if ((key_code < 32 && key_code != '\t') || key_code > 126) break;
 			event_to_send = make_char_entered_event(key_code);
 			send_event = true;
 		} break;
 
 		case WM_KEYDOWN: {
 			const u8 key_code = (u8)w_param;
-			// if (key_code < 32 || key_code > 126) break;
 			event_to_send = make_key_pressed_event(key_code);
 			send_event = true;
 		} break;

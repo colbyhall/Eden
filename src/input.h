@@ -58,21 +58,23 @@ struct Event_Listener {
 Event_Listener make_event_listener(void* owner, Process_Event process_event, Event_Type type);
 
 struct Input_State {
-	bool mouse_went_down;
-	bool mouse_went_up;
+	bool mouse_went_down = false;
+	bool mouse_went_up = false;
 
 	Vector2 last_mouse_position;
 	Vector2 current_mouse_position;
 
-	u8 last_key_pressed;
+	u8 last_key_pressed = 0;
 
-	bool ctrl_is_down;
-	bool alt_is_down;
+	bool ctrl_is_down = false;
+	bool alt_is_down = false;
 
 	Array<Event_Listener> event_listeners;
+
+	Input_State();
 };
 
 void process_input_event(Input_State* input, Event* event);
 
-bool bind_event_listener(Input_State* input, const Event_Listener* event_listener);
-bool unbind_event_listener(Input_State* input, const Event_Listener* event_listener);
+bool bind_event_listener(Input_State* input, const Event_Listener& event_listener);
+bool unbind_event_listener(Input_State* input, const Event_Listener& event_listener);

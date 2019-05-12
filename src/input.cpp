@@ -1,4 +1,5 @@
 #include "input.h"
+#include "keys.h"
 
 Event make_window_resize_event(u32 old_width, u32 old_height) {
 	Event result = {};
@@ -87,20 +88,33 @@ void process_input_event(Input_State* input, Event* event) {
 		case ET_Mouse_Up:
 			input->mouse_went_up = true;
 			break;
+		case ET_Key_Pressed:
+		case ET_Key_Released:
+			const u8 key_code = event->key_code;
+			if (key_code == KEY_CTRL) {
+				input->ctrl_is_down = event->type == ET_Key_Pressed;
+			} else if (key_code == KEY_ALT) {
+				input->alt_is_down = event->type == ET_Key_Pressed;
+			}
+			break;
 		}
 	}
 }
 
-bool bind_event_listener(Input_State* input, const Event_Listener* event_listener) {
-	if (array_contains(&input->event_listeners, *event_listener)) {
+bool bind_event_listener(Input_State* input, const Event_Listener& event_listener) {
+	if (array_contains(&input->event_listeners, event_listener)) {
 		return false;
 	}
 
-	assert(*event_listener);
-	array_add(&input->event_listeners, *event_listener);
+	assert(event_listener);
+	array_add(&input->event_listeners, event_listener);
 	return true;
 }
 
-bool unbind_event_listener(Input_State* input, const Event_Listener* event_listener) {
-	return array_remove(&input->event_listeners, *event_listener);
+bool unbind_event_listener(Input_State* input, const Event_Listener& event_listener) {
+	return array_remove(&input->event_listeners, event_listener);
+}
+
+Input_State::Input_State() {
+	array_reserve(&event_listeners, 1024);
 }

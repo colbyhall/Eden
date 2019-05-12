@@ -8,6 +8,7 @@
 struct Buffer;
 struct Buffer_View;
 struct String;
+struct Editor_State;
 
 void draw_init();
 
@@ -28,7 +29,7 @@ void render_right_handed();
 
 void draw_rect(float x0, float y0, float x1, float y1, const Color& color);
 void draw_string(const String& str, float x, float y, const Color& color, const Font& font);
-void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float y1, const Font& font);
+void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font);
 Vector2 get_draw_string_size(const String& str, const Font& font);
 
 void immediate_quad(float x0, float y0, float x1, float y1, const Color& color);
