@@ -174,27 +174,28 @@ void add_char(Buffer* buffer, u32 c, size_t index) {
 	buffer->gap += 1;
 	buffer->gap_size -= 1;
 
-	if (is_eol(c)) {
-		size_t index_line = 0;
-		size_t index_column = 0;
+    size_t index_line = 0;
+	size_t index_column = 0;
 
-		size_t current_index = 0;
-		for (size_t i = 0; i < buffer->eol_table.count; i++) {
-			size_t line_size = buffer->eol_table[i];
+	size_t current_index = 0;
+	for (size_t i = 0; i < buffer->eol_table.count; i++) {
+		size_t line_size = buffer->eol_table[i];
 
-			if (index < current_index + line_size) {
-				index_column = index - current_index;
-				break;
-			}
-
-			current_index += line_size;
-			index_line += 1;
+		if (index < current_index + line_size) {
+			index_column = index - current_index;
+			break;
 		}
 
-		const size_t line_size = buffer->eol_table[index_line];
-		buffer->eol_table[index_line] = index_column + 1;
-		array_add_at_index(&buffer->eol_table, line_size - index_column, index_column + 1);
+		current_index += line_size;
+		index_line += 1;
 	}
+	if (is_eol(c)) {
+        const size_t line_size = buffer->eol_table[index_line];
+		buffer->eol_table[index_line] = index_column + 1;
+		array_add_at_index(&buffer->eol_table, line_size - index_column, index_line + 1);
+	} else {
+        buffer->eol_table[index_line] += 1;
+    }
 
 	parse_syntax(buffer);
 }
@@ -258,6 +259,7 @@ static void char_entered(void* owner, Event* event) {
 	Buffer* buffer = get_buffer(view);
 
 	add_char(buffer, event->c, view->cursor);
+    refresh_cursor_info(view);
 	view->cursor += 1;
 }
 
