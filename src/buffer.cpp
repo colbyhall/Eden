@@ -126,6 +126,30 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
     parse_syntax(buffer);
 }
 
+void buffer_resize(Buffer* buffer, size_t new_gap_size) {
+	assert(buffer->gap_size == 0);
+	size_t old_size = buffer->allocated;
+	size_t new_size = old_size + new_gap_size;
+
+	size_t cursor_as_index_into_buffer = buffer_get_cursor_index(*buffer);
+
+	u32 *old_data = buffer->data;
+	u32 *new_data = (u32 *)c_realloc(old_data, new_size * sizeof(u32));
+	if (!new_data) {
+		assert(0); // @Todo: handle reallocation failures.
+	}
+	buffer->data = new_data;
+	buffer->cursor = (new_data + cursor_as_index_into_buffer);
+	buffer->allocated = new_size;
+	buffer->gap = (buffer->data + old_size);
+	buffer->gap_size = new_gap_size;
+
+	if (!old_data) { // bit of a @Hack.
+		assert(buffer->eol_table.count == 0);
+		array_add(&buffer->eol_table, (size_t)0);
+	}
+}
+
 static void buffer_assert_cursor_outside_gap(Buffer *buffer) {
 	if (buffer->gap == buffer->cursor) return;
     // @NOTE(Colby): Make sure we're not in the gap because if we are there is a serious issue
@@ -156,27 +180,7 @@ void buffer_move_gap_to_cursor(Buffer* buffer) {
 
 void buffer_add_char(Buffer* buffer, u32 c) {
     if (buffer->gap_size <= 0) { // @Refactor into buffer_resize
-        size_t old_size = buffer->allocated;
-        size_t new_gap_size = DEFAULT_GAP_SIZE;
-        size_t new_size = old_size + new_gap_size;
-
-        size_t cursor_as_index_into_buffer = buffer_get_cursor_index(*buffer);
-
-        u32 *old_data = buffer->data;
-        u32 *new_data = (u32 *)c_realloc(old_data, new_size * sizeof(u32));
-        if (!new_data) {
-            assert(0); // @Todo: handle reallocation failures.
-        }
-        buffer->data = new_data;
-        buffer->cursor = (new_data + cursor_as_index_into_buffer);
-        buffer->allocated = new_size;
-        buffer->gap = (buffer->data + old_size);
-        buffer->gap_size = new_gap_size;
-
-        if (!old_data) { // bit of a @Hack.
-            assert(buffer->eol_table.count == 0);
-            array_add(&buffer->eol_table, (size_t)0);
-        }
+		buffer_resize(buffer, DEFAULT_GAP_SIZE);
     }
 
 	buffer_move_gap_to_cursor(buffer);
@@ -190,7 +194,7 @@ void buffer_add_char(Buffer* buffer, u32 c) {
 		const size_t line_size = buffer->eol_table[buffer->current_line_number];
 		buffer->eol_table[buffer->current_line_number] = buffer->current_column_number + 1;
 		array_add_at_index(&buffer->eol_table, line_size - buffer->current_column_number, buffer->current_line_number + 1);
-
+		
 		buffer->current_line_number += 1;
 		buffer->current_column_number = 0;
 		buffer->desired_column_number = 0;
@@ -235,7 +239,6 @@ void buffer_remove_before_cursor(Buffer* buffer) {
 
 	buffer_refresh_cursor_info(buffer, true);
 
-    // @TODO(Colby): Pass in actual language
 	parse_syntax(buffer);
 }
 
@@ -259,7 +262,6 @@ void buffer_remove_at_cursor(Buffer* buffer) {
 	buffer->gap_size += 1;
 
 	buffer_refresh_cursor_info(buffer, true);
-	// @TODO(Colby): Pass in actual language
 	parse_syntax(buffer);
 }
 
