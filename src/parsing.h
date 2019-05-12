@@ -36,11 +36,12 @@ enum Syntax_Highlight_Type {
     SHT_STRING_LITERAL,
     SHT_DIRECTIVE,
     SHT_ANNOTATION,
+    
+    SHT__WAITING,
 };
 struct Syntax_Highlight {
-    u64 where;
-    u64 size;
-    Syntax_Highlight_Type type;
+    u64 type : 4;
+    u64 length : 60;
 };
 
 void parse_syntax(Buffer* buffer);

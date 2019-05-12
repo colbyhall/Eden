@@ -93,13 +93,23 @@ static bool buffer_match_string(const Buffer &b, size_t start, Char_Iterator com
     return true;
 }
 
-// Doesn't include is_number.
-static bool c_is_ident(u32 c) {
+static bool buffer_match_string(u32 *start, size_t len_in_buf, const char *str, size_t len_in_lit) {
+    if (len_in_buf != len_in_lit) return false;
+    for (size_t i = 0; i < len_in_buf; i++) {
+        if (start[i] != str[i]) return false;
+    }
+    return true;
+}
+
+static bool c_starts_ident(u32 c) {
     if (c >= 128) return true;
     if (is_letter(c)) return true;
     if (c == '_') return true;
     if (c == '$') return true;
     return false;
+}
+static bool c_is_ident(u32 c) {
+    return c_starts_ident(c) || is_number(c);
 }
 
 static bool c_is_op(u32 c) {
@@ -138,15 +148,14 @@ static bool c_is_type(const Buffer& b, size_t where, size_t toklen) {
     return false;
 }
 
-static bool c_is_eol(const Buffer &b, size_t i) {
-    assert(i - 1 >= 0);
-    return is_eol(b[i]) && b[i - 1] != '\\';
+static bool c_is_eol(u32 *p) {
+    return is_eol(p[0]) && p[-1] != '\\';
 }
 
-static size_t c_scan_line(const Buffer &b, size_t len, size_t i) {
-    while (i < len && !c_is_eol(b, i)) i++;
-    return i;
-}
+//static size_t c_scan_line(const Buffer &b, size_t len, size_t i) {
+//    while (i < len && !c_is_eol(b, i)) i++;
+//    return i;
+//}
 
 #define WHITESPACE() do { while (i < len && is_whitespace(b[i])) i++; } while(0)
 
@@ -184,365 +193,148 @@ static bool macro_has_params(const Buffer &b, Buf_String macro) {
     return false;
 }
 
+static void move_gap_to_end(Buffer& b) {
+    u32 *buf_end = b.data + b.allocated;
+    u32 *gap_end = b.gap + b.gap_size;
+    size_t num_to_move = buf_end - gap_end;
+    u32 *dest = b.gap;
+    u32 *src = gap_end;
+    memcpy(dest, src, num_to_move * sizeof(u32));
+    b.gap += num_to_move;
+    assert(b.gap + b.gap_size == buf_end);
+}
 
-//
-// So what's the deal with this function being extremely long and complicated?
-// You might think it looks like spaghetti. That's because it's almost a C parser
-// but it maintains no parsing state except symbol tables. This is not something
-// that most people would do because it's not really a good idea.
-// However we don't currently want to spin up an actual C parser to highlight syntax.
-// So instead we live with the miles and miles of lookahead this parser performs.
-// -phillip 2019-05-11
-static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String> *types, const Buffer &b, size_t i) {
-    Syntax_Highlight result = {};
-    result.where = i;
-    size_t len = get_count(b);
-    assert(i < len);
-    if (b[i] == '/') {
-        i++;
-        if (i < len && b[i] == '/') {
-            result.type = SHT_COMMENT;
-            i = c_scan_line(b, len, i);
-            WHITESPACE();
-            result.size = i - result.where;
-        } else if (i < len && b[i] == '*') {
-            result.type = SHT_COMMENT;
-            i++;
-            i++;
-            while (i < len && (b[i - 1] != '*' || b[i] != '/')) i++;
-            i++;
+#define BUFFER_STOP_PARSING 0xffffffff
 
-            WHITESPACE();
-            result.size = i - result.where;
-        } else {
-            result.type = SHT_OPERATOR;
-            WHITESPACE();
-            result.size = i - result.where;
-        }
-    } else if (b[i] == '#') {
-        result.type = SHT_DIRECTIVE;
-        i++;
-        // @Todo: skip backslash-escaped newlines
-        while (i < len && is_whitespace_not_eol(b[i])) i++;
-        size_t tokstart = i;
-        while (i < len && is_letter(b[i])) i++;
-        size_t toklen = i - tokstart;
+#define PUSH(new_type)                                                         \
+    do {                                                                       \
+        if (type != new_type && p > begin) {                                   \
+            array_add(&b.syntax,                                               \
+                      Syntax_Highlight{(u64)type, (u64)(p - begin)});          \
+            begin = p;                                                         \
+        }                                                                      \
+        type = new_type;                                                       \
+    } while (0)
+#define END() PUSH(SHT_NONE)
 
-        while (i < len && is_whitespace_not_eol(b[i])) i++;
-        result.size = i - result.where;
+// advance in the buffer, skipping whitespace & escaped newlines, and pushing comments.
+static void scan_lexeme(Buffer &b, u32 *&p, u32 *&begin, Syntax_Highlight_Type &type) {
+    Syntax_Highlight_Type old_type = type;
+    for (;;) switch (p[0]) {
+    case BUFFER_STOP_PARSING: default: goto done; // symbols or newlines, we're done!!
 
-        bool define = (toklen == 6 && buffer_match_string(b, tokstart, "define", toklen));
-        bool elif = (toklen == 4 && buffer_match_string(b, tokstart, "elif", toklen));
-        bool else_ = (toklen == 4 && buffer_match_string(b, tokstart, "else", toklen));
-        bool endif = (toklen == 5 && buffer_match_string(b, tokstart, "endif", toklen));
-        bool error = (toklen == 5 && buffer_match_string(b, tokstart, "error", toklen));
-        bool if_ = (toklen == 2 && buffer_match_string(b, tokstart, "if", toklen));
-        bool ifdef = (toklen == 5 && buffer_match_string(b, tokstart, "ifdef", toklen));
-        bool ifndef = (toklen == 6 && buffer_match_string(b, tokstart, "ifndef", toklen));
-        bool include = (toklen == 7 && buffer_match_string(b, tokstart, "include", toklen));
-        bool line = (toklen == 4 && buffer_match_string(b, tokstart, "line", toklen));
-        bool pragma = (toklen == 6 && buffer_match_string(b, tokstart, "pragma", toklen));
-        bool undef = (toklen == 5 && buffer_match_string(b, tokstart, "undef", toklen));
-        if (define || undef) {
-            Buf_String macro = {};
-            macro.i = i;
-            while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
-            macro.size = i - macro.i;
-            if (macro.size) {
-                if (define) {
-                    if (!is_macro(b, macros, macro)) array_add(macros, macro);
+    case '\\':
+        // escape: if it's a newline, skip it, otherwise ignore the backslash.
+        p++;
+        if (p[0] == '\r' || p[0] == '\n') p++;
+        break;
+
+    case '/': {
+        // slash: divide, block comment, or line comment
+        bool line = false;
+        switch (p[1]) {
+        case '/': // line comment
+            line = true;
+        case '*':
+            PUSH(SHT_COMMENT);
+            p++;
+            p++;
+            for (;;) switch (p[0]) {
+            case BUFFER_STOP_PARSING: goto done;
+            case '\r':
+            case '\n':
+                if (line) {
+                    if (p[-1] != '\\') goto comment_done;
                 } else {
-                    assert(undef);
-                    Buf_String *which = find_buf_string(b, macros, macro);
-                    if (which) array_remove_index(macros, which - macros->data);
+                    if (p[-1] == '*') goto comment_done;
                 }
-            }
-        } else if (include) {
-            // speculatively check for #include <asdf>, if not, backtrack.
-            if (i < len && b[i] == '<') {
-                while (i < len && !is_eol(b[i]) && b[i] != '>') i++;
-                if (!is_eol(b[i])) {
-                    i++;
-                    WHITESPACE();
-                    result.size = i - result.where;
-                }
-            }
-        } else if (error || line || pragma) {
-            i = c_scan_line(b, len, i);
-            WHITESPACE();
-            result.size = i - result.where;
-        } else if (elif  || else_ || endif || if_ || ifdef || ifndef) {
-        } else {
-            // Fake directive; only highlight the '#' and backtrack to the ident.
-            result.size = tokstart - result.where;
-            i = tokstart;
-        }
-    } else if (b[i] == '@') {
-        result.type = SHT_ANNOTATION;
-        i++;
-        while (i < len && !is_whitespace(b[i])) i++;
-        WHITESPACE();
-        result.size = i - result.where;
-    } else if (is_whitespace(b[i])) {
-        result.type = SHT_NONE;
-        i++;
-        WHITESPACE();
-        result.size = i - result.where;
-    } else if (b[i] == '"' || b[i] == '\'') {
-        result.type = SHT_STRING_LITERAL;
-        u32 end_char = b[i];
-        i++;
-        while (i < len && (!is_eol(b[i]) && b[i] != end_char)) {
-            if (i < len && b[i] == '\\') i++;
-            i++;
-        }
-        i++;
-        WHITESPACE();
-        result.size = i - result.where;
-    } else if (c_is_ident(b[i])) {
-        result.type = SHT_NONE;
-        i++;
-        while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
-        size_t toklen = i - result.where;
-        Buf_String tok = {result.where, toklen};
-
-        WHITESPACE();
-        result.size = i - result.where;
-        
-        Buf_String *macro = find_buf_string(b, macros, tok);
-        if (macro &&
-            // Function-style macros need to have parentheses following them, or else
-            // they don't actually get expanded. Example:
-            //     #define ABC()
-            //     #define DEF
-            //     int x = ABC  ; <-- This won't get expanded.
-            //     int y = ABC(); <-- This will.
-            //     int x = DEF  ; <-- This will.
-            //     int y = DEF(); <-- This will.
-            (!macro_has_params(b, *macro) || (b[i] == '('))) {
-            result.type = SHT_MACRO;
-        } else if (c_is_keyword(b, result.where, toklen)) {
-            result.type = SHT_KEYWORD;
-            // @Speed: duplicate checks
-            if (toklen == 5 && buffer_match_string(b, result.where, "using", toklen) ||
-                toklen == 5 && buffer_match_string(b, result.where, "union", toklen) ||
-                toklen == 6 && buffer_match_string(b, result.where, "struct", toklen) ||
-                toklen == 5 && buffer_match_string(b, result.where, "class", toklen) ||
-                toklen == 4 && buffer_match_string(b, result.where, "enum", toklen) ||
-                toklen == 8 && buffer_match_string(b, result.where, "typename", toklen)) {
-                // The next ident is a type (probably).
-                if (c_is_ident(b[i])) {
-                    Buf_String type = {};
-                    type.i = i;
-                    i++;
-                    while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
-                    type.size = i - type.i;
-                    if (c_is_keyword(b, type.i, type.size)) {
-                        // Already a keyword.
-                    } else if (is_macro(b, macros, type)) {
-                        // The macro probably expands to something else;
-                        // so play it safe and don't register a type.
-                    } else if (!is_type(b, types, type)) {
-                        array_add(types, type);
-                    }
-                }
-            } else if (toklen == 7 && buffer_match_string(b, result.where, "typedef", toklen)) {
-                // @Todo.
-            }
-        } else if (toklen == 7 && buffer_match_string(b, result.where, "defined", toklen)) {
-            // Despite the complex workarounds that happen elsewhere in this function,
-            // 'defined' is still the worst casualty of the stateless parser.
-            result.type = SHT_DIRECTIVE;
-        } else if (c_is_type(b, result.where, toklen)) {
-            result.type = SHT_TYPE;
-        } else { // @Temporary: crude function detector.
-            i = result.where + result.size;
-            while (i < len && is_whitespace(b[i])) i++;
-            if (i < len && b[i] == '(') {
-                if (is_type(b, types, tok)) {
-                    result.type = SHT_TYPE;
-                } else {
-                    result.type = SHT_FUNCTION;
-                }
-            } else if (i < len) {
-                // @Temporary: crude ident detector.
-                switch (u32 c = b[i]) {
-                case '~':
-                case '!':
-                case '%':
-                case '^':
-                case '-':
-                case '+':
-                case ']':
-                case '|':
-                case '\'':
-                case '"':
-                case '.':
-                case '/':
-                case '?':
-                case '}':
-                result.type = SHT_IDENT;
+            default:
+                p++;
                 break;
-                case '<':
-                case '>':
-                i++;
-                if (i < len && b[i] == '=') {
-                    result.type = SHT_IDENT;
-                } else {
-                case '=':
-                case ',':
-                case '[':
-                case ';':
-                case ':':
-                case ')':
-                case '{':
-                if (is_type(b, types, tok)) {
-                    result.type = SHT_TYPE;
-                } else {
-                    result.type = SHT_IDENT;
-                }
-                }
-                break;
-                case '&':
-                case '*':
-                i++;
-                if (b[i] == '=') {
-                    result.type = SHT_IDENT;
-                } else {
-                    while (i < len && (b[i] == '*' || b[i] == '&' || is_whitespace(b[i]))) i++;
-                    if (i < len && c_is_ident(b[i])) {
-                        while (i < len && (c_is_ident(b[i]) || is_number(b[i]))) i++;
-                        while (i < len && is_whitespace(b[i])) i++;
-                        if (i < len) switch (u32 c = b[i]) {
-                        case '=':
-                        i++;
-                        if (i < len && b[i] == '=') {
-                            result.type = SHT_IDENT;
-                        } else {
-                            result.type = SHT_TYPE;
-                        }
-                        break;
-                        case ';':
-                        case ':':
-                        case ',':
-                        case ')':
-                        case '[':
-                        case '(':
-                        case '{':
-                        if (is_type(b, types, tok)) {
-                            result.type = SHT_TYPE;
-                        } else {
-                            result.type = SHT_IDENT;
-                        }
-                        break;
-                        default:
-                        result.type = SHT_IDENT;
-                        break;
-                        };
-                    } else if (i < len && (b[i] == ')' || b[i] == ';')) {
-                        // This is a situation where only a type name would be valid.
-                        // (There's also b[i] == '[' in C, but C++ lambdas change that.)
-                        result.type = SHT_TYPE;
-                        // So we can register the type. (@Temporary: this is cheating.)
-                        if (!is_type(b, types, tok)) {
-                            array_add(types, tok);
-                        }
-                    } else {
-                        result.type = SHT_IDENT;
-                    }
-                }
-
-                break;
-                default:
-                if (is_number(c)) {
-                    result.type = SHT_IDENT;
-                } else if (c_is_ident(c)) {
-                    result.type = SHT_TYPE;
-                } else {
-                    //result.type = SHT_IDENT;
-                }
-                break;
-                }
             }
+        comment_done:;
+            break;
+        default:
+            // it was just a divide.
+            goto done;
         }
-    } else if (is_number(b[i])) {
-        result.type = SHT_NUMERIC_LITERAL;
-        while (i < len && is_number(b[i])) i++;
-        enum {
-            NORMAL,
-            HEX,
-            OCT,
-            FLOAT,
-            ERROR,
-        } type = NORMAL;
-        if (b[i - 1] == '0') {
-            if (b[i] == 'x') {
-                i++;
-                type = HEX;
-            } else if (is_number(b[i])) {
-                i++;
-                type = OCT; // @Todo: broken.
-            }
-        }
-        if (type == OCT) {
-            while (is_oct_digit(b[i])) i++;
-        }
-        if (type == HEX) {
-            while (is_hex_digit(b[i])) i++;
-        }
-        if (i < len && b[i] == '.') {
-            if (type == NORMAL) {
-                type = FLOAT;
-            } else {
-                type = ERROR;
-                WHITESPACE();
-                result.size = i - result.where;
-            }
-            i++;
-            while (i < len && is_number(b[i])) i++;
-        }
-        if (i < len && b[i] == 'e') {
-            if (type == NORMAL) {
-                type = FLOAT;
-            } else if (type != FLOAT) {
-                type = ERROR;
-                WHITESPACE();
-                result.size = i - result.where;
-            }
-            i++;
-            if (i < len && (b[i] == '+' || b[i] == '-')) i++;
-            if (i < len && is_number(b[i])) {
-                i++;
-                while (i < len && is_number(b[i])) i++;
-            } else {
-                type = ERROR;
-                WHITESPACE();
-                result.size = i - result.where;
-            }
-        }
-        if (type == FLOAT && i < len && b[i] == 'f') i++;
-        if (type != FLOAT && type != ERROR) {
-            while (i < len && (b[i] == 'u' || b[i] == 'U' || b[i] == 'l' || b[i] == 'L')) i++;
-        }
-        if (type != ERROR) {
-            WHITESPACE();
-            result.size = i - result.where;
-        }
-    } else if (c_is_op(b[i])) {
-        result.type = SHT_OPERATOR;
-        i++;
-        while (i < len && c_is_op_except_comment(b[i])) i++;
-        WHITESPACE();
-        result.size = i - result.where;
-    } else {
-        assert(0);
+        break;
     }
-    if (result.size < 1) {
-        assert(0);
-        result.size = 1;
+    case ' ':
+    case '\t':
+        // whitespace, scan ahead.
+        p++;
+        break;
     }
+done:;
+    PUSH(old_type);
+}
 
-    return result;
+#define STOP(p) (p[0] == BUFFER_STOP_PARSING)
+static void parse_pp(Buffer &b, u32 *&p, u32 *&begin, Syntax_Highlight_Type &type) {
+    assert(p[0] == '#');
+    PUSH(SHT_DIRECTIVE);
+    p++;
+    scan_lexeme(b, p, begin, type);
+    u32 *directive = p;
+    while (is_letter(p[0])) p++;
+    bool define = buffer_match_string(directive, p - directive, "define", 6);
+    bool include = buffer_match_string(directive, p - directive, "include", 7);
+    scan_lexeme(b, p, begin, type);
+    if (!STOP(p) && p[0] != '\r' && p[0] != '\n') {
+        if (define && c_starts_ident(p[0])) {
+            PUSH(SHT_MACRO);
+            while (c_is_ident(p[0])) p++;
+            scan_lexeme(b, p, begin, type);
+            PUSH(SHT_DIRECTIVE);
+        } else if (include && p[0] == '"' || p[0] == '<') {
+            u32 end = p[0] == '<' ? '>' : '"';
+            PUSH(SHT_STRING_LITERAL);
+            p++;
+            while (!STOP(p) && p[0] != end && !c_is_eol(p)) p++;
+        }
+    }
+    while (!STOP(p) && !c_is_eol(p)) {
+        p++;
+        scan_lexeme(b, p, begin, type);
+    }
+}
+
+static void next_token(Buffer &b, u32 *&p, u32 *&begin, Syntax_Highlight_Type &type) {
+    scan_lexeme(b, p, begin, type);
+    if (p[0] == '#') parse_pp(b, p, begin, type);
+}
+
+static void cpp_parse_syntax(Buffer& b) {
+    if (b.allocated <= 0) return;
+    move_gap_to_end(b);
+    u32 *p = b.data;
+    u32 *end = b.gap;
+    u32 final_char = end[-1];
+    end[-1] = BUFFER_STOP_PARSING;
+
+    u32 *begin = p;
+    Syntax_Highlight_Type type = SHT_NONE;
+    for (;; next_token(b, p, begin, type)) switch (p[0]) {
+    case BUFFER_STOP_PARSING: goto done;
+
+    case ' ':
+    case '\t':
+        p++;
+        break;
+
+    default:
+        PUSH(SHT_NONE);
+        p++;
+        break;
+
+    case '#':
+        parse_pp(b, p, begin, type);
+        break;
+    }
+done:;
+    END();
+    end[-1] = final_char;
 }
 
 
@@ -565,12 +357,7 @@ void parse_syntax(Buffer* buffer) {
 
     auto begin = os_get_time();
 
-    size_t buffer_count = get_count(*buffer);
-    for (size_t i = 0; i < buffer_count;) {
-        Syntax_Highlight tok = c_next_token(&buffer->macros, &buffer->types, *buffer, i);
-        array_add(&buffer->syntax, tok);
-        i = tok.where + tok.size;
-    }
+    cpp_parse_syntax(*buffer);
     
     auto end = os_get_time();
 
