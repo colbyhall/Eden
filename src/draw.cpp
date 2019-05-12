@@ -421,13 +421,15 @@ static Color get_color(Syntax_Highlight_Type type) {
     }
 }
 
-void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float y1, const Font& font) {
-
+void draw_buffer_view(Editor_State* editor, const Buffer_View& buffer_view, float x0, float y0, float x1, float y1, const Font& font) {
 	float x = x0;
 	float y = y0;
 
 	const float starting_x = x;
 	const float starting_y = y;
+
+	Buffer* buffer = editor_find_buffer(editor, buffer_view.id);
+	assert(buffer);
 
     y += font.ascent;
 
@@ -440,10 +442,10 @@ void draw_buffer_view(const Buffer* buffer, float x0, float y0, float x1, float 
 	const size_t cursor_index = buffer_get_cursor_index(*buffer);
 	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
 
-	const size_t lines_scrolled = 0; // (size_t)(buffer_view.current_scroll_y / font_height);
-	const size_t starting_index = buffer->eol_table.count ? buffer_get_line_index(*buffer, lines_scrolled) : 0;
+	const size_t lines_scrolled = (size_t)(buffer_view.current_scroll_y / font_height);
+	const size_t starting_index = buffer_get_line_index(*buffer, lines_scrolled);
 
-	// if (buffer_count) y -= buffer_view.current_scroll_y;
+	if (buffer_count) y -= buffer_view.current_scroll_y;
 
 	y += lines_scrolled * font_height;
 

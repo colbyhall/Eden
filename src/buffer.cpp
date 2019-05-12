@@ -7,6 +7,7 @@
 #include "font.h"
 #include "keys.h"
 #include "editor.h"
+#include "input.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -422,4 +423,92 @@ size_t buffer_get_line_index(const Buffer& buffer, size_t index) {
 	}
 
 	return result;
+}
+
+static void buffer_view_char_entered(void* owner, Event* event) {
+	Buffer_View* view = (Buffer_View*)owner;
+	Buffer* buffer = editor_find_buffer(view->editor, view->id);
+	assert(buffer);
+
+	buffer_add_char(buffer, event->c);
+}
+
+static void buffer_view_key_pressed(void* owner, Event* event) {
+	Buffer_View* view = (Buffer_View*)owner;
+	Editor_State* editor = view->editor;
+	Input_State* input = &editor->input_state;
+
+	Buffer* buffer = editor_find_buffer(editor, view->id);
+	assert(buffer);
+
+	switch (event->key_code) {
+	case KEY_ENTER:
+		buffer_add_char(buffer, '\n');
+		break;
+	case KEY_LEFT:
+		if (input->ctrl_is_down) {
+			buffer_seek_horizontal(buffer, false);
+		}
+		else {
+			buffer_move_cursor_horizontal(buffer, -1);
+		}
+		break;
+	case KEY_RIGHT:
+		if (input->ctrl_is_down) {
+			buffer_seek_horizontal(buffer, true);
+		}
+		else {
+			buffer_move_cursor_horizontal(buffer, 1);
+		}
+		break;
+	case KEY_UP:
+		buffer_move_cursor_vertical(buffer, -1);
+		break;
+	case KEY_DOWN:
+		buffer_move_cursor_vertical(buffer, 1);
+		break;
+	case KEY_HOME:
+		buffer_seek_line_begin(buffer);
+		break;
+	case KEY_END:
+		buffer_seek_line_end(buffer);
+		break;
+	case KEY_BACKSPACE:
+		buffer_remove_before_cursor(buffer);
+		break;
+	case KEY_DELETE:
+		buffer_remove_at_cursor(buffer);
+		break;
+	}
+}
+
+static void buffer_view_mouse_scrolled(void* owner, Event* event) {
+	Buffer_View* view = (Buffer_View*)owner;
+	Buffer* buffer = editor_find_buffer(view->editor, view->id);
+	assert(buffer);
+
+	view->target_scroll_y -= event->delta;
+
+	if (view->target_scroll_y < 0.f) view->target_scroll_y = 0.f;
+
+	const float font_height = FONT_SIZE;
+	const float buffer_height = (buffer->eol_table.count * font_height) - font_height;
+	const float max_scroll = buffer_height - font_height;
+	if (view->target_scroll_y > max_scroll) view->target_scroll_y = max_scroll;
+}
+
+void buffer_view_lost_focus(Buffer_View* view) {
+	Editor_State* editor = view->editor;
+
+	unbind_event_listener(&editor->input_state, make_event_listener(view, buffer_view_char_entered, ET_Char_Entered));
+	unbind_event_listener(&editor->input_state, make_event_listener(view, buffer_view_key_pressed, ET_Key_Pressed));
+	unbind_event_listener(&editor->input_state, make_event_listener(view, buffer_view_mouse_scrolled, ET_Mouse_Wheel_Scrolled));
+}
+
+void buffer_view_gained_focus(Buffer_View* view) {
+	Editor_State* editor = view->editor;
+
+	bind_event_listener(&editor->input_state, make_event_listener(view, buffer_view_char_entered, ET_Char_Entered));
+	bind_event_listener(&editor->input_state, make_event_listener(view, buffer_view_key_pressed, ET_Key_Pressed));
+	bind_event_listener(&editor->input_state, make_event_listener(view, buffer_view_mouse_scrolled, ET_Mouse_Wheel_Scrolled));
 }

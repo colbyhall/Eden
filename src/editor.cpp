@@ -15,64 +15,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-static void editor_key_pressed(void* owner, Event* event) {
-	Editor_State* editor = (Editor_State*)owner;
-	Input_State* input = &editor->input_state;
-
-	Buffer* buffer = &editor->loaded_buffers[0];
-	if (!buffer) {
-		return;
-	}
-	switch (event->key_code) {
-	case KEY_ENTER:
-		buffer_add_char(buffer, '\n');
-		break;
-	case KEY_LEFT:
-		if (input->ctrl_is_down) {
-			buffer_seek_horizontal(buffer, false);
-		} else {
-			buffer_move_cursor_horizontal(buffer, -1);
-		}
-		break;
-	case KEY_RIGHT:
-		if (input->ctrl_is_down) {
-			buffer_seek_horizontal(buffer, true);
-		}
-		else {
-			buffer_move_cursor_horizontal(buffer, 1);
-		}
-		break;
-	case KEY_UP:
-		buffer_move_cursor_vertical(buffer, -1);
-		break;
-	case KEY_DOWN:
-		buffer_move_cursor_vertical(buffer, 1);
-		break;
-	case KEY_HOME:
-		buffer_seek_line_begin(buffer);
-		break;
-	case KEY_END:
-		buffer_seek_line_end(buffer);
-		break;
-	case KEY_BACKSPACE:
-		buffer_remove_before_cursor(buffer);
-		break;
-	case KEY_DELETE:
-		buffer_remove_at_cursor(buffer);
-		break;
-	}
-}
-
-static void editor_char_entered(void* owner, Event* event) {
-	Editor_State* editor = (Editor_State*)owner;
-
-	Buffer* buffer = &editor->loaded_buffers[0];
-	if (!buffer) {
-		return;
-	}
-
-	buffer_add_char(buffer, event->c);
-}
+const float scroll_speed = 10.f;
 
 static void editor_exit_requested(void* owner, Event* event) {
 	Editor_State* editor = (Editor_State*)owner;
@@ -84,22 +27,19 @@ void editor_init(Editor_State* editor) {
 	gl_init();
 	draw_init();
 
-	array_reserve(&editor->input_state.event_listeners, 1024);
-
-	Event_Listener key_pressed = make_event_listener(editor, editor_key_pressed, ET_Key_Pressed);
-	bind_event_listener(&editor->input_state, &key_pressed);
-
-	Event_Listener char_entered = make_event_listener(editor, editor_char_entered, ET_Char_Entered);
-	bind_event_listener(&editor->input_state, &char_entered);
-
-	Event_Listener exit_requested = make_event_listener(editor, editor_exit_requested, ET_Exit_Requested);
-	bind_event_listener(&editor->input_state, &exit_requested);
+	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_exit_requested, ET_Exit_Requested));
 
 	editor->loaded_font = font_load_from_os("consola.ttf");
+
+	for (int i = 0; i < views_allocated; i++) {
+		editor->views[i].editor = editor;
+	}
 	
 	Buffer* buffer = editor_create_buffer(editor);
 	buffer_load_from_file(buffer, "src\\editor.cpp");
 
+	editor_set_current_view(editor, 0);
+	editor->current_view->id = buffer->id;
 
 	editor->is_running = true;
 }
@@ -130,6 +70,10 @@ void editor_poll_input(Editor_State* editor) {
 }
 
 void editor_tick(Editor_State* editor, float dt) {
+	for (int i = 0; i < editor->views_count; i++) {
+		Buffer_View* view = &editor->views[i];
+		view->current_scroll_y = math_finterpto(view->current_scroll_y, view->target_scroll_y, dt, scroll_speed);
+	}
 }
 
 void editor_draw(Editor_State* editor) {
@@ -149,11 +93,20 @@ void editor_draw(Editor_State* editor) {
 	}
 
 	{
-		const float x0 = 0.f;
-		const float y0 = 0.f;
-		const float x1 = x0 + window_width;
-		const float y1 = y0 + window_height;
-		draw_buffer_view(&editor->loaded_buffers[0], x0, y0, x1, y1, editor->loaded_font);
+		const size_t views_count = editor->views_count;
+		float x = 0.f;
+		float y = 0.f;
+		for (size_t i = 0; i < views_count; i++) {
+			const float width = window_width / (float)views_count;
+			
+			const float x0 = x;
+			const float y0 = y;
+			const float x1 = x0 + width;
+			const float y1 = y0 + window_height;
+
+			x += width;
+			draw_buffer_view(editor, editor->views[i], x0, y0, x1, y1, editor->loaded_font);
+		}
 	}
 	render_frame_end();
 }
@@ -184,4 +137,16 @@ bool editor_destroy_buffer(Editor_State* editor, Buffer_ID id) {
 	}
 
 	return false;
+}
+
+void editor_set_current_view(Editor_State* editor, size_t view_index) {
+	assert(view_index < editor->views_count);
+
+	if (editor->current_view)
+	{
+		buffer_view_lost_focus(editor->current_view);
+	}
+
+	editor->current_view = &editor->views[view_index];
+	buffer_view_gained_focus(editor->current_view);
 }

@@ -82,3 +82,17 @@ void buffer_refresh_cursor_info(Buffer* buffer, bool update_desired = true);
 size_t buffer_get_count(const Buffer& buffer);
 size_t buffer_get_cursor_index(const Buffer& buffer);
 size_t buffer_get_line_index(const Buffer& buffer, size_t index);
+
+struct Buffer_View {
+	Buffer_ID id;
+	float current_scroll_y = 0.f;
+	float target_scroll_y = 0.f;
+
+	size_t cursor = 0;
+	size_t selection = 0;
+
+	struct Editor_State* editor;
+};
+
+void buffer_view_lost_focus(Buffer_View* view);
+void buffer_view_gained_focus(Buffer_View* view);

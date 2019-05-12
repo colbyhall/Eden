@@ -70,9 +70,11 @@ struct Input_State {
 	bool alt_is_down = false;
 
 	Array<Event_Listener> event_listeners;
+
+	Input_State();
 };
 
 void process_input_event(Input_State* input, Event* event);
 
-bool bind_event_listener(Input_State* input, const Event_Listener* event_listener);
-bool unbind_event_listener(Input_State* input, const Event_Listener* event_listener);
+bool bind_event_listener(Input_State* input, const Event_Listener& event_listener);
+bool unbind_event_listener(Input_State* input, const Event_Listener& event_listener);
