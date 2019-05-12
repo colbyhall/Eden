@@ -4,7 +4,7 @@
 
 #define SMALL_NUMBER		(1.e-8f)
 
-float math_finterpto(float current, float target, float delta_time, float speed) {
+float finterpto(float current, float target, float delta_time, float speed) {
 
 	if (speed <= 0.f) {
 		return target;

@@ -22,12 +22,59 @@ static void editor_exit_requested(void* owner, Event* event) {
 	editor->is_running = false;
 }
 
+static Buffer_View* get_hovered_view(Editor_State* editor) {
+	const float window_width = (float)os_window_width();
+	const float window_height = (float)os_window_height();
+	const Vector2 mouse_position = os_get_mouse_position();
+
+	float x = 0.f;
+	float y = 0.f;
+
+	const size_t views_count = editor->views_count;
+	for (size_t i = 0; i < views_count; i++) {
+		const float width = window_width / (float)views_count;
+
+		const float x0 = x;
+		const float y0 = y;
+		const float x1 = x0 + width;
+		const float y1 = y0 + window_height;
+
+		if (point_in_rect(mouse_position, x0, y0, x1, y1)) {
+			return &editor->views[i];
+		}
+
+		x += width;
+	}
+
+	return nullptr;
+}
+
+static void editor_mouse_wheel_scrolled(void* owner, Event* event) {
+	Editor_State* editor = (Editor_State*)owner;
+	Buffer_View* view = get_hovered_view(editor);
+
+	if (!view) return;
+
+	Buffer* buffer = get_buffer(view);
+	assert(buffer);
+
+	view->target_scroll_y -= event->delta;
+
+	if (view->target_scroll_y < 0.f) view->target_scroll_y = 0.f;
+
+	const float font_height = FONT_SIZE;
+	const float buffer_height = (buffer->eol_table.count * font_height) - font_height;
+	const float max_scroll = buffer_height - font_height;
+	if (view->target_scroll_y > max_scroll) view->target_scroll_y = max_scroll;
+}
+
 void editor_init(Editor_State* editor) {
 	// @NOTE(Colby): init systems here
 	gl_init();
 	draw_init();
 
 	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_exit_requested, ET_Exit_Requested));
+	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_mouse_wheel_scrolled, ET_Mouse_Wheel_Scrolled));
 
 	editor->loaded_font = font_load_from_os("consola.ttf");
 
@@ -72,7 +119,7 @@ void editor_poll_input(Editor_State* editor) {
 void editor_tick(Editor_State* editor, float dt) {
 	for (int i = 0; i < editor->views_count; i++) {
 		Buffer_View* view = &editor->views[i];
-		view->current_scroll_y = math_finterpto(view->current_scroll_y, view->target_scroll_y, dt, scroll_speed);
+		view->current_scroll_y = finterpto(view->current_scroll_y, view->target_scroll_y, dt, scroll_speed);
 	}
 }
 
@@ -105,7 +152,7 @@ void editor_draw(Editor_State* editor) {
 			const float y1 = y0 + window_height;
 
 			x += width;
-			draw_buffer_view(editor, editor->views[i], x0, y0, x1, y1, editor->loaded_font);
+			draw_buffer_view(&editor->views[i], x0, y0, x1, y1, editor->loaded_font);
 		}
 	}
 	render_frame_end();

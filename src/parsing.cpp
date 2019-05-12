@@ -84,7 +84,7 @@ struct Buffer_Iterator {
 // @Cleanup: make this do some utf8 parsing or something; currently we just template on char type.
 template <typename Char_Iterator>
 static bool buffer_match_string(const Buffer &b, size_t start, Char_Iterator compare_to, size_t size) {
-    size_t len = buffer_get_count(b);
+    size_t len = get_count(b);
     for (size_t i = 0; i < size; i++, ++compare_to) {
         const size_t j = start + i;
         if (j < 0 || j >= len) return false;
@@ -147,7 +147,7 @@ static Buf_String *find_buf_string(const Buffer &b, Array<Buf_String> *haystack,
 static Syntax_Highlight c_next_token(Array<Buf_String> *macros, Array<Buf_String> *types, const Buffer &b, size_t i) {
     Syntax_Highlight result = {};
     result.where = i;
-    size_t len = buffer_get_count(b);
+    size_t len = get_count(b);
     assert(i < len);
     if (b[i] == '/') {
         i++;
@@ -428,7 +428,7 @@ void parse_syntax(Buffer* buffer) {
     Array<Buf_String> macros = {};
     Array<Buf_String> types = {};
 
-    size_t buffer_count = buffer_get_count(*buffer);
+    size_t buffer_count = get_count(*buffer);
     for (size_t i = 0; i < buffer_count;) {
         Syntax_Highlight tok = c_next_token(&macros, &types, *buffer, i);
         array_add(&buffer->syntax, tok);

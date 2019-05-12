@@ -43,12 +43,6 @@ struct Buffer {
 	u32* gap;
 	size_t gap_size;
 
-	u64 current_line_number;
-	u64 current_column_number;
-	u64 desired_column_number;
-	
-	u32* cursor;
-
 	Array<size_t> eol_table;
 
     Array<Syntax_Highlight> syntax;
@@ -63,25 +57,11 @@ bool buffer_load_from_file(Buffer* buffer, const char* path);
 void buffer_init_from_size(Buffer* buffer, size_t size);
 void buffer_resize(Buffer* buffer, size_t new_gap_size);
 
-void buffer_add_char(Buffer* buffer, u32 c);
-void buffer_add_string(Buffer* buffer, const String& string);
-void buffer_remove_before_cursor(Buffer* buffer);
-void buffer_remove_at_cursor(Buffer* buffer);
+void add_char(Buffer* buffer, u32 c, size_t index);
+void remove_at_index(Buffer* buffer, size_t index);
 
-void buffer_move_cursor_horizontal(Buffer* buffer, s64 delta);
-void buffer_move_cursor_vertical(Buffer* buffer, s64 delta);
-
-void buffer_seek_horizontal(Buffer* buffer, bool right);
-
-void buffer_seek_line_begin(Buffer* buffer);
-void buffer_seek_line_end(Buffer* buffer);
-
-void buffer_set_cursor_from_index(Buffer* buffer, size_t index);
-void buffer_refresh_cursor_info(Buffer* buffer, bool update_desired = true);
-
-size_t buffer_get_count(const Buffer& buffer);
-size_t buffer_get_cursor_index(const Buffer& buffer);
-size_t buffer_get_line_index(const Buffer& buffer, size_t index);
+size_t get_count(const Buffer& buffer);
+size_t get_line_index(const Buffer& buffer, size_t index);
 
 struct Buffer_View {
 	Buffer_ID id;
@@ -91,8 +71,20 @@ struct Buffer_View {
 	size_t cursor = 0;
 	size_t selection = 0;
 
+	u64 current_line_number = 0;
+	u64 current_column_number = 0;
+	u64 desired_column_number = 0;
+
 	struct Editor_State* editor;
 };
+
+Buffer* get_buffer(Buffer_View* view);
+
+void refresh_cursor_info(Buffer_View* view, bool update_desired = true);
+void move_cursor_vertical(Buffer_View* view, s64 delta);
+void seek_line_start(Buffer_View* view);
+void seek_line_end(Buffer_View* view);
+void seek_horizontal(Buffer_View* view, bool right);
 
 void buffer_view_lost_focus(Buffer_View* view);
 void buffer_view_gained_focus(Buffer_View* view);

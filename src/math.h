@@ -36,10 +36,14 @@ Matrix4 m4_identity();
 Matrix4 m4_ortho(float size, float aspect_ratio, float far, float near);
 Matrix4 m4_translate(Vector2 position);
 
-float math_finterpto(float current, float target, float delta_time, float speed);
+float finterpto(float current, float target, float delta_time, float speed);
 
 inline float fclamp(float value, float min, float max) {
 	if (value < min) return min;
 	if (value > max) return max;
 	return value;
+}
+
+inline bool point_in_rect(Vector2 point, float x0, float y0, float x1, float y1) {
+	return point.x >= x0 && point.x <= x1 && point.y >= y0 && point.y <= y1;
 }
