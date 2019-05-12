@@ -52,6 +52,8 @@ struct Buffer {
 	Array<size_t> eol_table;
 
     Array<Syntax_Highlight> syntax;
+    Array<Buf_String> macros = {};
+    Array<Buf_String> types = {};
 
 	u32& operator[](size_t index);
 	u32 operator[](size_t index) const;
@@ -72,6 +74,10 @@ void buffer_move_cursor_vertical(Buffer* buffer, s64 delta);
 
 void buffer_seek_line_begin(Buffer* buffer);
 void buffer_seek_line_end(Buffer* buffer);
+
+// @Temporary: once buffer views have heights, that will be a parameter.
+void buffer_up_one_page(Buffer* buffer);
+void buffer_down_one_page(Buffer* buffer);
 
 void buffer_set_cursor_from_index(Buffer* buffer, size_t index);
 void buffer_refresh_cursor_info(Buffer* buffer, bool update_desired = true);

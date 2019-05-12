@@ -97,6 +97,31 @@
     X("xor_eq"          ) \
 
 #define CPP_TYPES(X)    \
+    X("auto"            ) \
+    X("bool"            ) \
+    X("char"            ) \
+    X("char8_t"         ) \
+    X("char16_t"        ) \
+    X("char32_t"        ) \
+    X("class"           ) \
+    X("const"           ) \
+    X("decltype"        ) \
+    X("double"          ) \
+    X("enum"            ) \
+    X("float"           ) \
+    X("int"             ) \
+    X("long"            ) \
+    X("register"        ) \
+    X("short"           ) \
+    X("signed"          ) \
+    X("struct"          ) \
+    X("typename"        ) \
+    X("union"           ) \
+    X("unsigned"        ) \
+    X("void"            ) \
+    X("volatile"        ) \
+    X("wchar_t"         ) \
+\
     X("int8_t"        ) \
     X("int16_t"       ) \
     X("int32_t"       ) \

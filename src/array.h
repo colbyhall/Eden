@@ -83,7 +83,11 @@ struct Array {
 
 template <typename T>
 size_t array_reserve(Array<T>* a, size_t amount) {
-	a->allocated += amount;
+    size_t new_size = a->allocated + amount;
+    while (a->allocated < new_size) {
+        a->allocated <<= 1;
+        a->allocated |= 1;
+    }
 
 	if (a->data) {
 		a->data = (T*)allocator_realloc(a->allocator, a->data, a->allocated * sizeof(T));

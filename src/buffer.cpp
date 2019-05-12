@@ -298,7 +298,7 @@ void buffer_move_cursor_vertical(Buffer* buffer, s64 delta) {
     buffer_assert_cursor_outside_gap(buffer);
 
 	size_t new_line = buffer->current_line_number + delta;
-	if (delta < 0 && buffer->current_line_number == 0) {
+	if (delta < 0 && buffer->current_line_number <= (u64)-delta) {
 		new_line = 0;
 	} else if (new_line >= buffer->eol_table.count) {
 		new_line = buffer->eol_table.count - 1;

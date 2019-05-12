@@ -44,3 +44,7 @@ struct Syntax_Highlight {
 };
 
 void parse_syntax(Buffer* buffer);
+struct Buf_String {
+    size_t i;
+    size_t size;
+};
