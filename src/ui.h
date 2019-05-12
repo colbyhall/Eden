@@ -14,10 +14,11 @@
 struct UI_ID {
 	size_t owner = 0;
 	size_t index = 0;
+
+	bool operator==(UI_ID right) { return owner == right.owner && index == right.index; }
+	bool operator!=(UI_ID right) { return !(*this == right); }
 };
 
-bool operator==(UI_ID left, UI_ID right) { return left.owner == right.owner && left.index == right.index; }
-bool operator!=(UI_ID left, UI_ID right) { return !(left == right); }
 
 UI_ID ui_id_from_pointer(void* pointer);
 UI_ID zero_id();

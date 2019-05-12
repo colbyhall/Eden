@@ -2,6 +2,9 @@
 
 #include "types.h"
 
+struct String;
+struct Buffer;
+
 bool is_eof(u8 c);
 bool is_eol(u8 c);
 bool is_whitespace(u8 c);
@@ -39,4 +42,5 @@ struct Syntax_Highlight {
     u64 size;
     Syntax_Highlight_Type type;
 };
-void parse_syntax(Array<Syntax_Highlight> *result, const struct Buffer *buffer, const char *language);
+
+void parse_syntax(Buffer* buffer);

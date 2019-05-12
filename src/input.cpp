@@ -79,6 +79,15 @@ void process_input_event(Input_State* input, Event* event) {
 		if (el.type == event->type || el.type == ET_None) {
 			el.process_func(el.owner, event);
 		}
+
+		switch (event->type) {
+		case ET_Mouse_Down:
+			input->mouse_went_down = true;
+			break;
+		case ET_Mouse_Up:
+			input->mouse_went_up = true;
+			break;
+		}
 	}
 }
 

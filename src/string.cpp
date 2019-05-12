@@ -17,6 +17,20 @@ u8 String::operator[](size_t index) const {
 	return data[index];
 }
 
+bool String::operator==(const String& right) const {
+	if (count != right.count) return false;
+
+	for (size_t i = 0; i < count; i++) {
+		if (data[i] != right[i]) return false;
+	}
+
+	return true;
+}
+
+bool String::operator==(const char* cstr) const {
+	return *this == String(cstr);
+}
+
 bool string_starts_with(const String& string, const String& compare, bool case_matters) {
 	if (string.count < compare.count) return false;
 

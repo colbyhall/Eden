@@ -10,6 +10,7 @@
 #include "parsing.h"
 #include "font.h"
 #include "keys.h"
+#include "ui.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -56,7 +57,7 @@ static void editor_key_pressed(void* owner, Event* event) {
 	}
 	// editor_bring_view_to_cursor(current_view, buffer);
 	if (edited) {
-        parse_syntax(&buffer->syntax, buffer, "c");
+        parse_syntax(buffer);
     }
 }
 
@@ -67,11 +68,8 @@ static void editor_char_entered(void* owner, Event* event) {
 	if (!buffer) {
 		return;
 	}
+
 	buffer_add_char(buffer, event->c);
-
-	// editor_bring_view_to_cursor(current_view, buffer);
-	parse_syntax(&buffer->syntax, buffer, "c");
-
 }
 
 static void editor_exit_requested(void* owner, Event* event) {
@@ -122,6 +120,8 @@ void editor_shutdown(Editor_State* editor) {
 
 void editor_poll_input(Editor_State* editor) {
 	Input_State* input = &editor->input_state;
+	input->mouse_went_down = false;
+	input->mouse_went_up = false;
 	input->last_mouse_position = input->current_mouse_position;
 	os_poll_window_events();
 	input->current_mouse_position = os_get_mouse_position();

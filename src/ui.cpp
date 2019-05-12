@@ -24,7 +24,7 @@ void set_active_item_in_ui_context(UI_ID id) {
 bool ui_button(UI_ID id, const Input_State& input, const char* text, const Font& font, float x0, float y0, float x1, float y1) {
 	bool result = false;
 	if (ui_context.active_item == id) {
-		if (input.mouse_went_down) {
+		if (input.mouse_went_up) {
 			if (ui_context.hot_item == id) {
 				result = true;
 			}
@@ -34,7 +34,7 @@ bool ui_button(UI_ID id, const Input_State& input, const char* text, const Font&
 		set_active_item_in_ui_context(id);
 	}
 
-	const Vector2 mouse_position = v2(0.f);
+	const Vector2 mouse_position = input.current_mouse_position;
 	if (mouse_position.x >= x0 && mouse_position.x <= x1 && mouse_position.y >= y0 && mouse_position.y <= y1) {
 		ui_context.hot_item = id;
 	} else if (ui_context.hot_item == id) {
@@ -45,8 +45,10 @@ bool ui_button(UI_ID id, const Input_State& input, const char* text, const Font&
 	if (ui_context.hot_item == id) {
 		button_background = 0xAAAAAA;
 	}
+	immediate_begin();
 	immediate_quad(x0, y0, x1, y1, button_background);
 	immediate_string(text, x0, y0, 0x000000, font);
+	immediate_flush();
 
 	return result;
 }
