@@ -317,6 +317,37 @@ void buffer_move_cursor_vertical(Buffer* buffer, s64 delta) {
 	buffer_refresh_cursor_info(buffer, false);
 }
 
+void buffer_seek_horizontal(Buffer* buffer, bool right) {
+	const size_t buffer_size = buffer_get_count(*buffer);
+	size_t cursor_index = buffer_get_cursor_index(*buffer);
+
+	if (right) {
+		if (cursor_index == buffer_size) {
+			return;
+		}
+		cursor_index += 1;
+	} else {
+		if (cursor_index == 0) {
+			return;
+		}
+		cursor_index -= 1;
+	}
+
+	while (cursor_index > 0 && cursor_index < buffer_size) {
+		const u32 c = (*buffer)[cursor_index];
+
+		if (is_whitespace(c) || is_symbol(c)) break;
+
+		if (right) {
+			cursor_index += 1;
+		} else {
+			cursor_index -= 1;
+		}
+	}
+	buffer_set_cursor_from_index(buffer, cursor_index);
+	buffer_refresh_cursor_info(buffer, true);
+}
+
 void buffer_seek_line_begin(Buffer *buffer) {
     // @Todo: indent-sensitive home seeking
     size_t cursor_index = buffer_get_cursor_index(*buffer);

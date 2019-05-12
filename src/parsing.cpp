@@ -43,10 +43,9 @@ bool is_number(u8 c) {
 }
 
 bool is_symbol(u8 c) {
-	return (c >= '!' && c <= '/') ||
-		(c >= ':' || c <= '@') ||
-		(c >= '[' && c <= '`') ||
-		(c >= '{' && c <= '~');
+	if (is_whitespace(c) || is_number(c) || is_letter(c)) return false;
+
+	return true;
 }
 
 bool is_lowercase(u8 c) {
