@@ -239,6 +239,13 @@ void remove_at_index(Buffer* buffer, size_t index) {
 	parse_syntax(buffer);
 }
 
+void remove_between(Buffer* buffer, size_t first, size_t last) {
+    // @SLOW(Colby): This is slow as shit
+    for (size_t i = first; i < last; i++) {
+        remove_at_index(buffer, i);
+    }
+}
+
 size_t get_count(const Buffer& buffer) {
 	return buffer.allocated - buffer.gap_size;
 }
@@ -386,6 +393,7 @@ static void char_entered(void* owner, Event* event) {
 
 	add_char(buffer, event->c, view->cursor);
 	view->cursor += 1;
+    view->selection += 1;
     refresh_cursor_info(view);
 }
 
@@ -404,6 +412,9 @@ static void key_pressed(void* owner, Event* event) {
 				break;
 			}
 			view->cursor -= 1;
+            if (!input->shift_is_down) {
+                view->selection = view->cursor;
+            }
 			refresh_cursor_info(view);
 		}
 		break;
@@ -414,30 +425,47 @@ static void key_pressed(void* owner, Event* event) {
 				break;
 			}
 			view->cursor += 1;
+            if (!input->shift_is_down) {
+                view->selection = view->cursor;
+            }
 			refresh_cursor_info(view);
 		}
 		break;
 	case KEY_ENTER:
 		add_char(buffer, '\n', view->cursor);
 		view->cursor += 1;
+        view->selection = view->cursor;
 		refresh_cursor_info(view);
 		break;
 	case KEY_UP:
 		move_cursor_vertical(view, -1);
+        if (!input->shift_is_down) {
+            view->selection = view->cursor;
+        }
 		break;
 	case KEY_DOWN:
 		move_cursor_vertical(view, 1);
+        if (!input->shift_is_down) {
+            view->selection = view->cursor;
+        }
 		break;
 	case KEY_HOME:
 		seek_line_start(view);
+        if (!input->shift_is_down) {
+            view->selection = view->cursor;
+        }
 		break;
 	case KEY_END:
 		seek_line_end(view);
+        if (!input->shift_is_down) {
+            view->selection = view->cursor;
+        }
 		break;
 	case KEY_BACKSPACE:
 		if (view->cursor > 0) {
-			remove_at_index(buffer, view->cursor);
+            remove_at_index(buffer, view->cursor);
 			view->cursor -= 1;
+            view->selection = view->cursor;
 			refresh_cursor_info(view);
 		}
 		break;

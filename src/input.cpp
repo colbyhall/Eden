@@ -95,7 +95,9 @@ void process_input_event(Input_State* input, Event* event) {
 				input->ctrl_is_down = event->type == ET_Key_Pressed;
 			} else if (key_code == KEY_ALT) {
 				input->alt_is_down = event->type == ET_Key_Pressed;
-			}
+			} else if (key_code == KEY_SHIFT) {
+                input->shift_is_down = event->type == ET_Key_Pressed;
+            }
 			break;
 		}
 	}

@@ -516,6 +516,26 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			color = 0x052329;
 		}
 
+        if ((view->cursor > view->selection && i >= view->selection && i < view->cursor) || 
+            (view->cursor < view->selection && i <= view->selection && i > view->cursor)) {
+            Font_Glyph glyph = font_find_glyph(&font, c);
+
+            if (is_whitespace(c)) {
+                glyph = space_glyph;
+            }
+
+            float width = glyph.advance;
+            if (c == '\t') {
+                width *= 4.f;
+            }
+
+            const float selection_x0 = x;
+            const float selection_y0 = y - font.ascent;
+            const float selection_x1 = selection_x0 + width;
+            const float selection_y1 = y - font.descent;
+            immediate_quad(selection_x0, selection_y0, selection_x1, selection_y1, 0x000EFF);
+        }
+
 		switch (c) {
 		case ' ':
 			x += space_glyph.advance;

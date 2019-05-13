@@ -61,6 +61,7 @@ void buffer_resize(Buffer* buffer, size_t new_gap_size);
 
 void add_char(Buffer* buffer, u32 c, size_t index);
 void remove_at_index(Buffer* buffer, size_t index);
+void remove_between(Buffer* buffer, size_t first, size_t last);
 
 u32* get_index_as_cursor(Buffer* buffer, size_t index);
 size_t get_count(const Buffer& buffer);

@@ -68,6 +68,7 @@ struct Input_State {
 
 	bool ctrl_is_down = false;
 	bool alt_is_down = false;
+    bool shift_is_down = false;
 
 	Array<Event_Listener> event_listeners;
 
