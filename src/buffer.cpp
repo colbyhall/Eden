@@ -225,13 +225,13 @@ void remove_at_index(Buffer* buffer, size_t index) {
 	}
 
 	buffer->eol_table[index_line] -= 1;
-
-	const u32 c = (*buffer)[index];
+	
+    const u32 c = (*buffer)[index - 1];
 	if (is_eol(c)) {
 		const size_t amount_on_line = buffer->eol_table[index_line];
 		array_remove_index(&buffer->eol_table, index_line);
-		buffer->eol_table[index_line] += amount_on_line;
-	}
+		buffer->eol_table[index_line - 1] += amount_on_line;
+    }
 
 	buffer->gap -= 1;
 	buffer->gap_size += 1;
