@@ -96,7 +96,7 @@
     X("xor"             ) \
     X("xor_eq"          ) \
 
-#define CPP_TYPES(X)    \
+#define CPP_TYPE_KEYWORDS(X)    \
     X("auto"            ) \
     X("bool"            ) \
     X("char"            ) \
@@ -121,7 +121,8 @@
     X("void"            ) \
     X("volatile"        ) \
     X("wchar_t"         ) \
-\
+
+#define CPP_TYPES(X) \
     X("int8_t"        ) \
     X("int16_t"       ) \
     X("int32_t"       ) \

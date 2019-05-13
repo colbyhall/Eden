@@ -22,9 +22,8 @@ u32 to_uppercase(u32 c);
 #include "array.h"
 
 enum Syntax_Highlight_Type {
-    SHT_NONE,
-    SHT_COMMENT,
     SHT_IDENT,
+    SHT_COMMENT,
     SHT_KEYWORD, 
     SHT_OPERATOR,
     SHT_TYPE,
@@ -36,13 +35,11 @@ enum Syntax_Highlight_Type {
     SHT_STRING_LITERAL,
     SHT_DIRECTIVE,
     SHT_ANNOTATION,
-    
-    SHT__WAITING,
 };
 struct Syntax_Highlight {
     //size_t type : 4;
     //size_t where : (sizeof(size_t) * 8 - 4);
-    Syntax_Highlight_Type type = SHT_NONE;
+    Syntax_Highlight_Type type = {};
     size_t where = 0;
 };
 

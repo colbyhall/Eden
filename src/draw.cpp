@@ -402,9 +402,8 @@ void render_frame_end() {
 
 static Color get_color(Syntax_Highlight_Type type) {
     switch (type) {
-	case SHT_NONE: return 0xd6b58d; // @Temporary: NONE should never happen.
-    case SHT_COMMENT: return 0x40c040;
-    case SHT_IDENT: return 0xd6b58d;//0xf07040;//255<<16 |72<<8 |48;// @Temporary
+	case SHT_COMMENT: return 0x40c040;
+    case SHT_IDENT: return 0xd6b58d;
     case SHT_KEYWORD: return 0xffffff;
     case SHT_OPERATOR: return 0xcccccc; // @Temporary
     case SHT_TYPE: return 0x66d9ef; // @Temporary

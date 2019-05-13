@@ -74,25 +74,6 @@ u32 to_uppercase(u32 c) {
 
 #include "buffer.h"
 
-struct Buffer_Iterator {
-    const Buffer &b;
-    size_t i;
-    u32 operator*() { return b[i]; }
-    void operator++() { ++i; }
-};
-
-// @Cleanup: make this do some utf8 parsing or something; currently we just template on char type.
-template <typename Char_Iterator>
-static bool buffer_match_string(const Buffer &b, size_t start, Char_Iterator compare_to, size_t size) {
-    size_t len = get_count(b);
-    for (size_t i = 0; i < size; i++, ++compare_to) {
-        const size_t j = start + i;
-        if (j < 0 || j >= len) return false;
-        if (b[j] != *compare_to) return false;
-    }
-    return true;
-}
-
 static bool buffer_match_string(u32 *start, size_t len_in_buf, const char *str, size_t len_in_lit) {
     if (len_in_buf != len_in_lit) return false;
     for (size_t i = 0; i < len_in_buf; i++) {
@@ -100,17 +81,21 @@ static bool buffer_match_string(u32 *start, size_t len_in_buf, const char *str, 
     }
     return true;
 }
+#define BUFMATCH_LIT(start, len, str) buffer_match_string(start, len, str, sizeof(str) - 1)
 
-static bool c_starts_ident(u32 c) {
+// Caution: this takes signed 32, because REASONS.
+// (It's so that the function performs a signed compare
+// in order to make sure that it doesn't match against
+// the buffer end character, which has the high bit
+// [and every other bit] set.) phil 2019-05-12
+static bool c_starts_ident(s32 c) {
     if (c >= 128) return true;
     if (is_letter(c)) return true;
     if (c == '_') return true;
     if (c == '$') return true;
     return false;
 }
-static bool c_is_ident(u32 c) {
-    return c_starts_ident(c) || is_number(c);
-}
+static bool c_is_ident(u32 c) { return c_starts_ident(c) || is_number(c); }
 
 static bool c_is_op(u32 c) {
     switch (c) {
@@ -121,76 +106,9 @@ static bool c_is_op(u32 c) {
     }
     return false;
 }
-static bool c_is_op_except_comment(u32 c) {
-    switch (c) {
-    case '~': case '!': case '%': case '^': case '&': case '*': case '(':
-    case ')': case '-': case '=': case '+': case '[': case '{': case ']':
-    case '}': case '\\': case '|': case ';': case ':': case '\'': case '"':
-    case ',': case '<': case '.': case '>': case '?': return true;
-    }
-    return false;
-}
-
-#define MATCHES(tok,N) (toklen == N && buffer_match_string(b, where, tok, N))
-#define CPP_MATCH_ASCII(tok) || MATCHES(tok, sizeof(tok) - 1)
-#include "cpp_syntax.h"
-static bool c_is_keyword(const Buffer &b, size_t where, size_t toklen) {
-    if (false CPP_KEYWORDS(CPP_MATCH_ASCII)) {
-        return true;
-    }
-    return false;
-}
-
-static bool c_is_type(const Buffer& b, size_t where, size_t toklen) {
-    if (false CPP_TYPES(CPP_MATCH_ASCII)) {
-        return true;
-    }
-    return false;
-}
 
 static bool c_is_eol(u32 *p) {
     return is_eol(p[0]) && p[-1] != '\\';
-}
-
-//static size_t c_scan_line(const Buffer &b, size_t len, size_t i) {
-//    while (i < len && !c_is_eol(b, i)) i++;
-//    return i;
-//}
-
-#define WHITESPACE() do { while (i < len && is_whitespace(b[i])) i++; } while(0)
-
-static Buf_String *find_buf_string(const Buffer &b, Array<Buf_String> *haystack, Buf_String needle) {
-    for (auto &&it : *haystack) {
-        if (it.size != needle.size) continue;
-        if (buffer_match_string(b, it.i, Buffer_Iterator{b, needle.i}, needle.size)) return &it;
-    }
-    return nullptr;
-}
-
-static bool is_type(const Buffer& b, Array<Buf_String> *types, Buf_String tok) {
-    if (c_is_type(b, tok.i, tok.size)) return true;
-    if (find_buf_string(b, types, tok)) return true;
-
-    return false;
-}
-
-static bool is_macro(const Buffer& b, Array<Buf_String> *macros, Buf_String tok) {
-    if (find_buf_string(b, macros, tok)) return true;
-
-    return false;
-}
-
-//static void add_type(const Buffer& b, Array<Buf_String> *types, Buf_String tok) {
-//
-//}
-
-// @Todo: static void c_advance(const Buffer &b, size_t i) {}
-
-static bool macro_has_params(const Buffer &b, Buf_String macro) {
-    size_t check = macro.i + macro.size;
-    if (check < get_count(b) && b[check] == '(') return true;
-
-    return false;
 }
 
 static void move_gap_to_end(Buffer& b) {
@@ -207,16 +125,42 @@ static void move_gap_to_end(Buffer& b) {
 #define BUFFER_STOP_PARSING 0xffffffff
 
 struct Cpp_Lexer {
-    u32 *buffer_start;
-    u32 *p;
-    Syntax_Highlight *sh;
+    u32 *buffer_start = nullptr;
+    u32 *p = nullptr;
+    Syntax_Highlight *sh = nullptr;
 
     bool more() { return p[0] != BUFFER_STOP_PARSING; }
+    bool eol() { return c_is_eol(p); }
 
-    void push(Syntax_Highlight_Type new_type) {
+#define CPP_MATCH_ASCII(tok) || BUFMATCH_LIT(start, n, tok)
+#include "cpp_syntax.h"
+    static bool is_keyword(u32 *start, size_t n) {
+        if (n < 2 || n > 16) return false;
+        // @Todo: switch on length instead of linear search.
+        if (false CPP_KEYWORDS(CPP_MATCH_ASCII)) return true;
+
+        return false;
+    }
+
+    static bool is_type_keyword(u32 *start, size_t n) {
+        if (n < 3 || n > 8) return false;
+        if (false CPP_TYPE_KEYWORDS(CPP_MATCH_ASCII)) return true;
+
+        return false;
+    }
+
+    static bool is_type(u32 *start, size_t n) {
+        if (n < 6 || n > 14) return false; // @Temporary: only for builtins.
+        if (false CPP_TYPES(CPP_MATCH_ASCII)) return true;
+        
+        return false;
+    }
+
+    Syntax_Highlight* push(Syntax_Highlight_Type new_type) {
         sh->type = new_type;
         sh->where = (size_t)(p - buffer_start);
         sh++;
+        return sh - 1;
     }
 
     // advance in the buffer, skipping whitespace & escaped newlines, and pushing comments.
@@ -236,27 +180,27 @@ struct Cpp_Lexer {
         case '/': {
             // slash: divide, block comment, or line comment
             bool line = false;
-            switch (p[1]) {
+            auto s = push(SHT_OPERATOR);
+            p++;
+            switch (p[0]) {
             case '/': // line comment
                 line = true;
             case '*':
-                push(SHT_COMMENT);
-                p++;
+                s->type = SHT_COMMENT;
                 p++;
                 for (;;) switch (p[0]) {
                 case BUFFER_STOP_PARSING: goto done;
                 case '\r':
                 case '\n':
-                    if (line) {
-                        if (p[-1] != '\\') goto comment_done;
-                    } else {
-                        if (p[-1] == '*') goto comment_done;
-                    }
+                    if (line && p[-1] != '\\') goto comment_done;
+                case '/':
+                    if (!line && p[-1] == '*') goto comment_done;
                 default:
                     p++;
                     break;
                 }
             comment_done:;
+                p++;
                 break;
             default:
                 // it was just a divide.
@@ -290,19 +234,20 @@ struct Cpp_Lexer {
                 while (c_is_ident(p[0])) p++;
                 scan_lexeme();
             } else if (include && p[0] == '"' || p[0] == '<') {
-                u32 end = p[0] == '<' ? '>' : '"';
+                u32 end;
+                if (p[0] == '<') end = '>'; else end = '"';
                 push(SHT_STRING_LITERAL);
                 p++;
-                while (more() && p[0] != end && !c_is_eol(p)) p++;
+                while (more() && !eol() && p[0] != end) p++;
                 p++;
+                scan_lexeme();
             }
-            if (more() && !c_is_eol(p)) {
+            if (more() && !eol()) {
                 push(SHT_DIRECTIVE);
                 p++;
-                while (more() && !c_is_eol(p)) p++;
             }
         }
-        while (more() && !c_is_eol(p)) {
+        while (more() && !eol()) {
             p++;
             scan_lexeme();
         }
@@ -310,54 +255,385 @@ struct Cpp_Lexer {
 
     void next_token() {
         scan_lexeme();
-        if (is_eol(p[0])) {
+        while (is_eol(p[0])) {
             p++;
             scan_lexeme();
             if (p[0] == '#') {
                 parse_pp();
-                scan_lexeme();
+                push(SHT_IDENT); // @Hack.
             }
         }
     }
-};
 
-
-#define STOP(p) (p[0] == BUFFER_STOP_PARSING)
-
-
-static void cpp_parse_syntax(Buffer& b) {
-    if (b.allocated <= 0) return;
-    move_gap_to_end(b);
-    u32 *end = b.gap;
-    u32 final_char = end[-1];
-    end[-1] = BUFFER_STOP_PARSING;
-
-    assert(b.syntax.count >= get_count(b));
-    Cpp_Lexer l = {};
-    l.buffer_start = b.data;
-    l.p = b.data;
-    l.sh = b.syntax.data;
-    for (;; l.next_token()) switch (l.p[0]) {
-    case BUFFER_STOP_PARSING: goto done;
-
-    case ' ':
-    case '\t':
-        l.p++;
-        break;
-
-    default:
-        l.push(SHT_NONE);
-        l.p++;
-        break;
-
-    case '#':
-        l.parse_pp();
-        break;
+    struct Ident {
+        u32 *p = nullptr;
+        size_t n = 0;
+    };
+    Ident read_ident() {
+        Ident result;
+        result.p = p;
+        while (c_is_ident(p[0])) p++;
+        result.n = p - result.p;
+        return result;
     }
-done:;
-    end[-1] = final_char;
-    l.push(SHT_NONE);
-}
+
+    void parse_braces() { // @Stub.
+        assert(p[0] == '{');
+        push(SHT_OPERATOR);
+        p++; // Eat operator
+        while (more() && p[0] != '}') {
+            next_token();
+            if (should_bail()) return;
+            parse_stmt();
+            if (p[0] == ';') { push(SHT_OPERATOR); p++; }
+        }
+    }
+
+    void parse_params() { // @Stub.
+        assert(p[0] == '(');
+        push(SHT_OPERATOR);
+        p++; // Eat operator
+        while (more() && p[0] != ')') {
+            next_token();
+            if (should_bail()) return;
+            parse_stmt(true);
+            //if (p[0] == ';') { push(SHT_OPERATOR); p++; }
+        }
+    }
+    bool should_bail() {
+        if (p[0] == ']' || p[0] == '}' || p[0] == ';') return true;
+        return false;
+    }
+    void parse_expr() { // @Temporary @Stub
+        if (p[0] == '(') {
+            push(SHT_OPERATOR);
+            p++; // Eat operator
+            while (more() && p[0] != ')') {
+                next_token();
+                if (should_bail()) return;
+                parse_expr();
+            }
+        } else if (p[0] == '{') {
+            parse_braces();
+        } else if (p[0] == '[') {
+            push(SHT_OPERATOR);
+            p++;
+            while (more() && p[0] != ']') {
+                next_token();
+                if (should_bail()) return;
+                parse_expr();
+            }
+            if (p[0] == ']') { push(SHT_OPERATOR); p++; }
+        } else if (p[0] == ')') {
+            push(SHT_OPERATOR);
+            p++;
+            // We have been passed a closing paren as the expr.
+            // This is weird and shouldn't happen in valid c++.
+            return;
+        } else if (should_bail()) {
+            return;
+        } else if (c_starts_ident(p[0])) {
+            auto w = push(SHT_IDENT);
+            Ident i = read_ident();
+            if (is_keyword(i.p, i.n)) {
+                w->type = SHT_KEYWORD;
+            }
+            next_token();
+            if (p[0] == '(') w->type = SHT_FUNCTION;
+        } else if (p[0] == '"' || p[0] == '\'') {
+            u32 end = p[0];
+            push(SHT_STRING_LITERAL);
+            p++;
+            while (more() && p[0] != end && !c_is_eol(p)) {
+                p++;
+                if (p[0] == '\\') p++;
+            }
+            if (p[0] == end) p++;
+        } else if (c_is_op(p[0])) {
+            push(SHT_OPERATOR);
+            p++; // Eat operator
+        } else if (is_number(p[0])) { // @Todo: real C++ number parsing
+            push(SHT_NUMERIC_LITERAL);
+            p++;
+            while (more() && is_number(p[0])) p++;
+        }
+    }
+
+    //void parse_expr() {
+    //    assert(p[0] == '(');
+    //}
+
+    void parse_stmt(bool is_params = false) {
+        if (c_starts_ident(p[0])) {
+            auto prev = push(SHT_IDENT);
+            Ident ident = read_ident();
+            assert(ident.n);
+            // @Todo: if (is_macro(ident)) {
+            // } else
+            if (BUFMATCH_LIT(ident.p, ident.n, "break") ||
+                BUFMATCH_LIT(ident.p, ident.n, "continue")) {
+                prev->type = SHT_KEYWORD;
+                next_token();
+                parse_stmt();
+                return;
+            } else if (BUFMATCH_LIT(ident.p, ident.n, "return")) {
+                prev->type = SHT_KEYWORD;
+                while (more() && p[0] != ';') {
+                    next_token();
+                    if (should_bail()) return;
+                    parse_expr();
+                }
+                return;
+            } else {
+                if (is_keyword(ident.p, ident.n)) {
+                    prev->type = SHT_KEYWORD;
+                //} else if (is_type(ident.p, ident.n)) {
+                //    prev->type = SHT_TYPE;
+                }
+                if (BUFMATCH_LIT(ident.p, ident.n, "if") ||
+                    BUFMATCH_LIT(ident.p, ident.n, "while") ||
+                    BUFMATCH_LIT(ident.p, ident.n, "switch")) {
+                    next_token();
+                    if (p[0] == '(') {
+                        push(SHT_OPERATOR);
+                        p++;
+                        next_token();
+                        parse_stmt(true);
+                        if (p[0] == ')') { push(SHT_OPERATOR); p++; }
+                    }
+                    next_token();
+                    parse_stmt();
+                    return;
+                }
+                if (BUFMATCH_LIT(ident.p, ident.n, "for")) {
+                    next_token();
+                    if (p[0] == '(') {
+                        push(SHT_OPERATOR);
+                        p++;
+                        next_token();
+                        parse_stmt(true);
+                        if (p[0] == ';') { push(SHT_OPERATOR); p++; }
+                        next_token();
+                        while (more() && p[0] != ';') {
+                            next_token();
+                            if (should_bail()) return;
+                            parse_expr();
+                        }
+                        if (p[0] == ';') { push(SHT_OPERATOR); p++; }
+                        next_token();
+                        while (more() && p[0] != ')') {
+                            next_token();
+                            if (should_bail()) return;
+                            parse_expr();
+                        }
+                        if (p[0] == ')') { push(SHT_OPERATOR); p++; }
+                    }
+                    next_token();
+                    parse_stmt();
+                    return;
+                }
+                bool is_declaration = false;
+                if (is_params) is_declaration = true;
+
+                Syntax_Highlight *maybe_type = nullptr;
+                bool cant_move_type_forward = false;
+
+                int paren_nesting = 0;
+
+                while (more()) {
+                    next_token();
+                    auto next = push(SHT_IDENT);
+                    if (c_starts_ident(p[0])) {
+                        ident = read_ident();
+                    } else {
+                        ident.n = 0;
+                    }
+                    if (ident.n) {
+                        if (!paren_nesting) {
+                            // Type lags behind by 1 ident, and only outside parens
+                            maybe_type = prev;
+                        }
+                        if (is_keyword(ident.p, ident.n)) {//if (is_type_keyword(ident.p, ident.n)) {
+                            next->type = SHT_KEYWORD;
+                            
+                        } else {
+                            //if (is_type(ident.p, ident.n)) {
+                            //    next->type = SHT_TYPE;
+                            //}
+                        }
+                        prev = next;
+                    } else if (p[0] == '*' || p[0] == '&') {
+                        next->type = SHT_OPERATOR;
+                        p++; // Eat operator
+                        while (p[0] == '*' || p[0] == '&') {
+                            p++; // Eat operator
+                            next_token();
+                        }
+                        cant_move_type_forward = true;
+                    } else if (p[0] == '(') {
+                        next->type = SHT_OPERATOR;
+                        if (maybe_type && !paren_nesting) {
+                            is_declaration = true;
+                            if (prev->type != SHT_KEYWORD) prev->type = SHT_FUNCTION;
+                            parse_params();
+                            if (p[0] == ')') { push(SHT_OPERATOR); p++; } // @Hack?
+                        } else {
+                            p++; // Eat paren.
+                            paren_nesting++;
+                        }
+                    } else if (p[0] == ')') {
+                        next->type = SHT_OPERATOR;
+                        if (paren_nesting) {
+                            p++; // Eat paren.
+                            paren_nesting--;
+                        } else {
+                            if (is_params) {
+                                // We're the last parameter.
+                                is_declaration = true;
+                                break;
+                            } else {
+                                // Something's weird, eat paren and bail.
+                                p++;
+                                break;
+                            }
+                        }
+                    } else if (p[0] == ';' || p[0] == '}' ||
+                               (is_params && p[0] == ',' && !paren_nesting)) {
+                        push(SHT_OPERATOR);
+                        // Done.
+                        if (!paren_nesting) {
+                            if (maybe_type) is_declaration = true;
+                        }
+                        break;
+                    } else if (p[0] == ',') {
+                        push(SHT_OPERATOR);
+                        p++; // Eat the comma
+                        if (!paren_nesting) {
+                            // Either a multiple declaration or a comma expression.
+                            // We reassign prev back to whatever might be the type.
+                            if (maybe_type) {
+                                prev = maybe_type;
+                            } else {
+                                //prev = first;
+                            }
+                        }
+                    } else if (p[0] == '{') { // This is a variable or function, hard to tell
+                        push(SHT_OPERATOR);
+                        parse_braces();
+                        if (p[0] == '}') {
+                            p++;
+                            if (prev->type == SHT_FUNCTION) { // Don't expect a semicolon, just leave.
+                                // (Only possible when is_declaration == true.)
+                                break;
+                            }
+                            next_token();
+                        }
+                    } else if (p[0] == '[') {
+                        push(SHT_OPERATOR);
+                        p++; // Eat bracket
+                        while (more() && p[0] != ';' && p[0] != '}'
+                               && p[0] != ']') {
+                            next_token();
+                            parse_expr();
+                        }
+                        if (!paren_nesting) {
+                            if (maybe_type) is_declaration = true;
+                        }
+                    } else if (p[0] == ']') {
+                        push(SHT_OPERATOR);
+                        p++; // Eat bracket
+                    } else if (p[0] == '=') { // This is a variable for sure(?)
+                        push(SHT_OPERATOR);
+                        p++; // Eat operator
+                        while (more()) {
+                            next_token();
+                            if (should_bail()) break;
+                            parse_expr();
+                        }
+                        if (!paren_nesting) {
+                            if (maybe_type) is_declaration = true;
+                        }
+                    } else if (p[0] == '#') {
+                        // '#' inside decl/expr
+                        while (p[0] == '#') {
+                            p++;
+                            scan_lexeme();
+                        }
+                    } else if (c_is_op(p[0])) {
+                        push(SHT_OPERATOR);
+                        p++;
+                        while (more()) {
+                            next_token();
+                            if (should_bail()) break;
+                            parse_expr();
+                        }
+                        is_declaration = false;
+                    } else {
+                        push(SHT_COMMENT);
+                        while (more()) {
+                            next_token();
+                            if (should_bail()) break;
+                            parse_stmt();
+                        }
+                        if (!paren_nesting) {
+                            if (maybe_type) is_declaration = true;
+                        }
+                        break;
+                    }
+                }
+                if (is_declaration) {
+                    if (maybe_type) {
+                        if (maybe_type->type != SHT_KEYWORD) {
+                            maybe_type->type = SHT_TYPE;
+                        }
+                    } else {
+                        // We only found a single ident. We'll treat it
+                        // as the type name then, especially in params.
+                        prev->type = SHT_TYPE;
+                    }
+                }
+            }
+        } else if (p[0] == ';' || p[0] == '}') {
+            return;
+        } else {
+            parse_expr();
+        }
+    }
+    void parse_buffer(Buffer& b) {
+        if (b.allocated <= 0) return;
+        move_gap_to_end(b); // @Temporary @Remove
+        u32 *end = b.gap;
+        u32 final_char = end[-1];
+        end[-1] = BUFFER_STOP_PARSING;
+    
+        assert(b.syntax.count >= get_count(b));
+        buffer_start = b.data;
+        p = b.data;
+        sh = b.syntax.data;
+
+        next_token();
+        for (;; next_token()) switch (p[0]) {
+        case BUFFER_STOP_PARSING: goto done;
+    
+        default:
+            assert(!is_whitespace(p[0]));
+            //if (is_whitespace(p[0])) next_token();
+            parse_stmt();
+            // If we hit a semicolon/weirdness, skip it.
+            if (should_bail()) { push(SHT_OPERATOR); p++; }
+            break;
+    
+        case '#':
+            parse_pp();
+            break;
+        }
+    done:;
+        end[-1] = final_char;
+        p++;
+        push(SHT_IDENT);
+        b.syntax.count = sh - b.syntax.data;
+    }
+};
 
 
 #define WIN32_LEAN_AND_MEAN
@@ -381,7 +657,8 @@ void parse_syntax(Buffer* buffer) {
 
     auto begin = os_get_time();
 
-    cpp_parse_syntax(*buffer);
+    Cpp_Lexer l;
+    l.parse_buffer(*buffer);
     
     auto end = os_get_time();
 
