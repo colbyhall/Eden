@@ -416,8 +416,9 @@ static Color get_color(Syntax_Highlight_Type type) {
     case SHT_STRING_LITERAL: return 0x40b0a0;
     case SHT_DIRECTIVE: return 0xb0ffb0;
     case SHT_ANNOTATION: return 0xb0ffb0;
-    default: assert(0); 
+    default: assert(0);
     }
+    return 0; // shut up compiler
 }
 
 void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font) {
