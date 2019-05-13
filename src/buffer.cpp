@@ -74,7 +74,7 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 		}
 	}
     // @Cleanup: why does + 1 make things work here?
-    array_add(&buffer->eol_table, line_size - extra + 1);
+   // array_add(&buffer->eol_table, line_size - extra);
 	fclose(file);
 
 	buffer->gap = buffer->data + file_size - extra;
@@ -154,7 +154,7 @@ static void move_gap_to_index(Buffer* buffer, size_t index) {
 	}
 }
 
-static u32* get_index_as_cursor(Buffer* buffer, size_t index) {
+u32* get_index_as_cursor(Buffer* buffer, size_t index) {
 	if (buffer->data + index <= buffer->gap) {
 		return buffer->data + index;
 	} 
@@ -254,13 +254,139 @@ size_t get_line_index(const Buffer& buffer, size_t index) {
 	return result;
 }
 
+
+Buffer* get_buffer(Buffer_View* view) {
+	Buffer* result = editor_find_buffer(view->editor, view->id);
+	assert(result);
+	return result;
+}
+
+void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
+	Buffer* buffer = get_buffer(view);
+	view->current_line_number = 0;
+	view->current_column_number = 0;
+	for (size_t i = 0; i < view->cursor; i++) {
+		const u32 c = (*buffer)[i];
+
+		view->current_column_number += 1;
+
+		if (is_eol(c)) {
+			view->current_line_number += 1;
+			view->current_column_number = 0;
+		}
+	}
+
+	if (update_desired) {
+		view->desired_column_number = view->current_column_number;
+	}
+
+	const float font_height = FONT_SIZE;
+	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+	const size_t lines_in_window = (size_t)(os_window_height() / font_height) - 2;
+
+	if (view->current_line_number < lines_scrolled) {
+		view->target_scroll_y = view->current_line_number * font_height;
+		view->current_scroll_y = view->target_scroll_y;
+	}
+
+	if (view->current_line_number > lines_scrolled + lines_in_window) {
+		view->target_scroll_y += (view->current_line_number - (lines_scrolled + lines_in_window)) * font_height;
+		view->current_scroll_y = view->target_scroll_y;
+	}
+}
+
+void move_cursor_vertical(Buffer_View* view, s64 delta) {
+	Buffer* buffer = get_buffer(view);
+
+	assert(delta != 0);
+
+	const size_t buffer_count = get_count(*buffer);
+	if (buffer_count == 0) {
+		return;
+	}
+
+	size_t new_line = view->current_line_number + delta;
+	if (delta < 0 && view->current_line_number <= (u64)-delta) {
+		new_line = 0;
+	}
+	else if (new_line >= buffer->eol_table.count) {
+		new_line = buffer->eol_table.count - 1;
+	}
+
+	const size_t line_index = get_line_index(*buffer, new_line);
+
+	size_t new_cursor_index = line_index;
+	if (buffer->eol_table[new_line] <= view->desired_column_number) {
+		new_cursor_index += buffer->eol_table[new_line] - 1;
+	}
+	else {
+		new_cursor_index += view->desired_column_number;
+	}
+
+	view->cursor = new_cursor_index;
+	refresh_cursor_info(view, false);
+}
+
+void seek_line_start(Buffer_View* view) {
+	// @Todo: indent-sensitive home seeking
+	view->cursor -= view->current_column_number;
+	refresh_cursor_info(view);
+}
+
+void seek_line_end(Buffer_View* view) {
+	Buffer* buffer = get_buffer(view);
+	if (buffer->eol_table.count) {
+		const size_t line_length = buffer->eol_table[view->current_line_number];
+		if (!line_length) {
+			assert(view->current_column_number == 0);
+		}
+		else {
+			view->cursor += line_length - view->current_column_number - 1;
+		}
+	}
+	refresh_cursor_info(view);
+}
+
+void seek_horizontal(Buffer_View* view, bool right) {
+	Buffer* buffer = get_buffer(view);
+	const size_t buffer_count = get_count(*buffer);
+
+	if (right) {
+		if (view->cursor == buffer_count) {
+			return;
+		}
+		view->cursor += 1;
+	}
+	else {
+		if (view->cursor == 0) {
+			return;
+		}
+		view->cursor -= 1;
+	}
+
+	while (view->cursor > 0 && view->cursor < buffer_count) {
+		const u32 c = (*buffer)[view->cursor];
+
+		if (is_whitespace(c) || is_symbol(c)) break;
+
+		if (right) {
+			view->cursor += 1;
+		}
+		else {
+			view->cursor -= 1;
+		}
+	}
+
+	refresh_cursor_info(view);
+}
+
 static void char_entered(void* owner, Event* event) {
 	Buffer_View* view = (Buffer_View*)owner;
 	Buffer* buffer = get_buffer(view);
 
 	add_char(buffer, event->c, view->cursor);
-    refresh_cursor_info(view);
 	view->cursor += 1;
+    refresh_cursor_info(view);
 }
 
 static void key_pressed(void* owner, Event* event) {
@@ -323,130 +449,6 @@ static void key_pressed(void* owner, Event* event) {
 		}
 		break;
 	}
-}
-
-Buffer* get_buffer(Buffer_View* view) {
-	Buffer* result = editor_find_buffer(view->editor, view->id);
-	assert(result);
-	return result;
-}
-
-void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
-	Buffer* buffer = get_buffer(view);
-	view->current_line_number = 0;
-	view->current_column_number = 0;
-	for (size_t i = 0; i < view->cursor; i++) {
-		const u32 c = (*buffer)[i];
-
-		view->current_column_number += 1;
-
-		if (is_eol(c)) {
-			view->current_line_number += 1;
-			view->current_column_number = 0;
-		}
-	}
-
-	if (update_desired) {
-		view->desired_column_number = view->current_column_number;
-	}
-
-	const float font_height = FONT_SIZE;
-	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
-	const size_t lines_in_window = (size_t)(os_window_height() / font_height) - 2;
-
-	if (view->current_line_number < lines_scrolled) {
-		view->target_scroll_y = view->current_line_number * font_height;
-		view->current_scroll_y = view->target_scroll_y;
-	} 
-	
-	if (view->current_line_number > lines_scrolled + lines_in_window) {
-		view->target_scroll_y += (view->current_line_number - (lines_scrolled + lines_in_window)) * font_height;
-		view->current_scroll_y = view->target_scroll_y;
-	}
-}
-
-void move_cursor_vertical(Buffer_View* view, s64 delta) {
-	Buffer* buffer = get_buffer(view);
-
-	assert(delta != 0);
-
-	const size_t buffer_count = get_count(*buffer);
-	if (buffer_count == 0) {
-		return;
-	}
-
-	size_t new_line = view->current_line_number + delta;
-	if (delta < 0 && view->current_line_number <= (u64)-delta) {
-		new_line = 0;
-	}
-	else if (new_line >= buffer->eol_table.count) {
-		new_line = buffer->eol_table.count - 1;
-	}
-
-	const size_t line_index = get_line_index(*buffer, new_line);
-
-	size_t new_cursor_index = line_index;
-	if (buffer->eol_table[new_line] <= view->desired_column_number) {
-		new_cursor_index += buffer->eol_table[new_line] - 1;
-	}
-	else {
-		new_cursor_index += view->desired_column_number;
-	}
-
-	view->cursor = new_cursor_index;
-	refresh_cursor_info(view, false);
-}
-
-void seek_line_start(Buffer_View* view) {
-	// @Todo: indent-sensitive home seeking
-	view->cursor -= view->current_column_number;
-	refresh_cursor_info(view);
-}
-
-void seek_line_end(Buffer_View* view) {
-	Buffer* buffer = get_buffer(view);
-	if (buffer->eol_table.count) {
-		const size_t line_length = buffer->eol_table[view->current_line_number];
-		if (!line_length) {
-			assert(view->current_column_number == 0);
-		} else {
-			view->cursor += line_length - view->current_column_number - 1;
-		}
-	}
-	refresh_cursor_info(view);
-}
-
-void seek_horizontal(Buffer_View* view, bool right) {
-	Buffer* buffer = get_buffer(view);
-	const size_t buffer_count = get_count(*buffer);
-
-	if (right) {
-		if (view->cursor == buffer_count) {
-			return;
-		}
-		view->cursor += 1;
-	}
-	else {
-		if (view->cursor == 0) {
-			return;
-		}
-		view->cursor -= 1;
-	}
-
-	while (view->cursor > 0 && view->cursor < buffer_count) {
-		const u32 c = (*buffer)[view->cursor];
-
-		if (is_whitespace(c) || is_symbol(c)) break;
-
-		if (right) {
-			view->cursor += 1;
-		}
-		else {
-			view->cursor -= 1;
-		}
-	}
-	
-	refresh_cursor_info(view);
 }
 
 void buffer_view_lost_focus(Buffer_View* view) {

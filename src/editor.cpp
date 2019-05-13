@@ -95,7 +95,7 @@ void editor_loop(Editor_State* editor) {
 	double last_frame_time = os_get_time();
 	while (editor->is_running) {
 		double current_time = os_get_time();
-		editor->dt = (float)((current_time - last_frame_time) / 1000.f);
+		editor->dt = (float)(current_time - last_frame_time);
 		last_frame_time = current_time;
 
 		editor_poll_input(editor);
@@ -105,6 +105,7 @@ void editor_loop(Editor_State* editor) {
 }
 
 void editor_shutdown(Editor_State* editor) {
+
 }
 
 void editor_poll_input(Editor_State* editor) {
