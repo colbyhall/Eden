@@ -5,19 +5,19 @@
 struct String;
 struct Buffer;
 
-bool is_eof(u8 c);
-bool is_eol(u8 c);
-bool is_whitespace(u8 c);
-bool is_whitespace_not_eol(u8 c);
-bool is_letter(u8 c);   
-bool is_oct_digit(u8 c);
-bool is_hex_digit(u8 c);
-bool is_number(u8 c);
-bool is_symbol(u8 c);
-bool is_lowercase(u8 c);
-bool is_uppercase(u8 c);
-u8 to_lowercase(u8 c);
-u8 to_uppercase(u8 c);
+bool is_eof(u32 c);
+bool is_eol(u32 c);
+bool is_whitespace(u32 c);
+bool is_whitespace_not_eol(u32 c);
+bool is_letter(u32 c);   
+bool is_oct_digit(u32 c);
+bool is_hex_digit(u32 c);
+bool is_number(u32 c);
+bool is_symbol(u32 c);
+bool is_lowercase(u32 c);
+bool is_uppercase(u32 c);
+u32 to_lowercase(u32 c);
+u32 to_uppercase(u32 c);
 
 #include "array.h"
 
@@ -40,8 +40,10 @@ enum Syntax_Highlight_Type {
     SHT__WAITING,
 };
 struct Syntax_Highlight {
-    u64 type : 4;
-    u64 length : 60;
+    //size_t type : 4;
+    //size_t where : (sizeof(size_t) * 8 - 4);
+    Syntax_Highlight_Type type = SHT_NONE;
+    size_t where = 0;
 };
 
 void parse_syntax(Buffer* buffer);

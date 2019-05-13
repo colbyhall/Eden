@@ -444,23 +444,17 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
 	y += lines_scrolled * font_height;
 
-    const Syntax_Highlight *current_highlight = nullptr;
-    if (buffer->syntax.count) current_highlight = &buffer->syntax[0];
-    size_t current_highlight_index = 0;
-
+    const Syntax_Highlight *current_highlight = buffer->syntax.data;
+    
 	immediate_begin();
 	for (size_t i = starting_index; i < buffer_count; i++) {
 
-        while (i >= current_highlight_index + current_highlight->length) {
-            current_highlight_index += current_highlight->length;
+        while (i >= current_highlight[1].where) {
             current_highlight += 1;
-            assert(current_highlight < buffer->syntax.cend());
+            assert(current_highlight + 1 < buffer->syntax.cend());
         }
 
-        assert(i >= current_highlight_index);
-        assert(i < current_highlight_index + current_highlight->length);
-
-		Color color = get_color((Syntax_Highlight_Type)current_highlight->type);
+        Color color = get_color((Syntax_Highlight_Type)current_highlight->type);
 
 		const u32 c = (*buffer)[i];
 

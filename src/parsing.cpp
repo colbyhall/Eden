@@ -1,34 +1,34 @@
 #include "parsing.h"
 #include "string.h"
 
-bool is_eof(u8 c) {
+bool is_eof(u32 c) {
 	return c == EOF;
 }
 
-bool is_eol(u8 c) {
+bool is_eol(u32 c) {
 	return c == '\n' || c == '\r';
 }
 
-bool is_whitespace(u8 c) {
+bool is_whitespace(u32 c) {
 	return is_eol(c) || c == ' ' || c == '\t';
 }
 
-bool is_whitespace_not_eol(u8 c) {
+bool is_whitespace_not_eol(u32 c) {
     return is_whitespace(c) && !is_eol(c);
 }
 
-bool is_letter(u8 c) {
+bool is_letter(u32 c) {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-bool is_oct_digit(u8 c) {
+bool is_oct_digit(u32 c) {
     if (c < '0') return false;
     if (c > '7') return false;
 
     return true;
 }
 
-bool is_hex_digit(u8 c) {
+bool is_hex_digit(u32 c) {
     if (is_number(c)) return true;
     if (!is_letter(c)) return false;
 
@@ -38,35 +38,35 @@ bool is_hex_digit(u8 c) {
     return false;
 }
 
-bool is_number(u8 c) {
+bool is_number(u32 c) {
 	return (c >= '0' && c <= '9');
 }
 
-bool is_symbol(u8 c) {
+bool is_symbol(u32 c) {
 	if (is_whitespace(c) || is_number(c) || is_letter(c)) return false;
 
 	return true;
 }
 
-bool is_lowercase(u8 c) {
+bool is_lowercase(u32 c) {
 	if (!is_letter(c)) return false;
 
 	return c >= 'a' && c <= 'z';
 }
 
-bool is_uppercase(u8 c) {
+bool is_uppercase(u32 c) {
 	if (!is_letter(c)) return false;
 
 	return c >= 'A' && c <= 'Z';
 }
 
-u8 to_lowercase(u8 c) {
+u32 to_lowercase(u32 c) {
 	if (is_uppercase(c)) return c + ('a' - 'A');
 
 	return c;
 }
 
-u8 to_uppercase(u8 c) {
+u32 to_uppercase(u32 c) {
 	if (is_lowercase(c)) return c - ('a' - 'A');
 
 	return c;
@@ -206,135 +206,157 @@ static void move_gap_to_end(Buffer& b) {
 
 #define BUFFER_STOP_PARSING 0xffffffff
 
-#define PUSH(new_type)                                                         \
-    do {                                                                       \
-        if (type != new_type && p > begin) {                                   \
-            array_add(&b.syntax,                                               \
-                      Syntax_Highlight{(u64)type, (u64)(p - begin)});          \
-            begin = p;                                                         \
-        }                                                                      \
-        type = new_type;                                                       \
-    } while (0)
-#define END() PUSH(SHT_NONE)
+struct Cpp_Lexer {
+    u32 *buffer_start;
+    u32 *p;
+    Syntax_Highlight *sh;
 
-// advance in the buffer, skipping whitespace & escaped newlines, and pushing comments.
-static void scan_lexeme(Buffer &b, u32 *&p, u32 *&begin, Syntax_Highlight_Type &type) {
-    Syntax_Highlight_Type old_type = type;
-    for (;;) switch (p[0]) {
-    case BUFFER_STOP_PARSING: default: goto done; // symbols or newlines, we're done!!
+    bool more() { return p[0] != BUFFER_STOP_PARSING; }
 
-    case '\\':
-        // escape: if it's a newline, skip it, otherwise ignore the backslash.
-        p++;
-        if (p[0] == '\r' || p[0] == '\n') p++;
-        break;
+    void push(Syntax_Highlight_Type new_type) {
+        sh->type = new_type;
+        sh->where = (size_t)(p - buffer_start);
+        sh++;
+    }
 
-    case '/': {
-        // slash: divide, block comment, or line comment
-        bool line = false;
-        switch (p[1]) {
-        case '/': // line comment
-            line = true;
-        case '*':
-            PUSH(SHT_COMMENT);
-            p++;
-            p++;
-            for (;;) switch (p[0]) {
-            case BUFFER_STOP_PARSING: goto done;
-            case '\r':
-            case '\n':
-                if (line) {
-                    if (p[-1] != '\\') goto comment_done;
-                } else {
-                    if (p[-1] == '*') goto comment_done;
-                }
-            default:
-                p++;
-                break;
+    // advance in the buffer, skipping whitespace & escaped newlines, and pushing comments.
+    void scan_lexeme() {
+        Syntax_Highlight_Type old_type = (Syntax_Highlight_Type)sh->type;
+        for (;;) switch (p[0]) {
+        case BUFFER_STOP_PARSING: default: goto done; // symbols or newlines, we're done!!
+    
+        case '\\':
+            // escape: if it's a newline, skip it, otherwise it's over.
+            switch (p[1]) {
+            default: goto done;
+            case '\r': case '\n': p++; p++;
             }
-        comment_done:;
             break;
-        default:
-            // it was just a divide.
-            goto done;
+    
+        case '/': {
+            // slash: divide, block comment, or line comment
+            bool line = false;
+            switch (p[1]) {
+            case '/': // line comment
+                line = true;
+            case '*':
+                push(SHT_COMMENT);
+                p++;
+                p++;
+                for (;;) switch (p[0]) {
+                case BUFFER_STOP_PARSING: goto done;
+                case '\r':
+                case '\n':
+                    if (line) {
+                        if (p[-1] != '\\') goto comment_done;
+                    } else {
+                        if (p[-1] == '*') goto comment_done;
+                    }
+                default:
+                    p++;
+                    break;
+                }
+            comment_done:;
+                break;
+            default:
+                // it was just a divide.
+                goto done;
+            }
+            break;
         }
-        break;
+        case ' ':
+        case '\t':
+            // whitespace, scan ahead.
+            p++;
+            break;
+        }
+    done:;
+        if ((Syntax_Highlight_Type)sh->type != old_type) push(old_type);
     }
-    case ' ':
-    case '\t':
-        // whitespace, scan ahead.
+
+    void parse_pp() {
+        assert(p[0] == '#');
+        push(SHT_DIRECTIVE);
         p++;
-        break;
+        scan_lexeme();
+        u32 *directive = p;
+        while (is_letter(p[0])) p++;
+        bool define = buffer_match_string(directive, p - directive, "define", 6);
+        bool include = buffer_match_string(directive, p - directive, "include", 7);
+        scan_lexeme();
+        if (more() && !is_eol(p[0])) {
+            if (define && c_starts_ident(p[0])) {
+                push(SHT_MACRO);
+                while (c_is_ident(p[0])) p++;
+                scan_lexeme();
+            } else if (include && p[0] == '"' || p[0] == '<') {
+                u32 end = p[0] == '<' ? '>' : '"';
+                push(SHT_STRING_LITERAL);
+                p++;
+                while (more() && p[0] != end && !c_is_eol(p)) p++;
+                p++;
+            }
+            if (more() && !c_is_eol(p)) {
+                push(SHT_DIRECTIVE);
+                p++;
+                while (more() && !c_is_eol(p)) p++;
+            }
+        }
+        while (more() && !c_is_eol(p)) {
+            p++;
+            scan_lexeme();
+        }
     }
-done:;
-    PUSH(old_type);
-}
+
+    void next_token() {
+        scan_lexeme();
+        if (is_eol(p[0])) {
+            p++;
+            scan_lexeme();
+            if (p[0] == '#') {
+                parse_pp();
+                scan_lexeme();
+            }
+        }
+    }
+};
+
 
 #define STOP(p) (p[0] == BUFFER_STOP_PARSING)
-static void parse_pp(Buffer &b, u32 *&p, u32 *&begin, Syntax_Highlight_Type &type) {
-    assert(p[0] == '#');
-    PUSH(SHT_DIRECTIVE);
-    p++;
-    scan_lexeme(b, p, begin, type);
-    u32 *directive = p;
-    while (is_letter(p[0])) p++;
-    bool define = buffer_match_string(directive, p - directive, "define", 6);
-    bool include = buffer_match_string(directive, p - directive, "include", 7);
-    scan_lexeme(b, p, begin, type);
-    if (!STOP(p) && p[0] != '\r' && p[0] != '\n') {
-        if (define && c_starts_ident(p[0])) {
-            PUSH(SHT_MACRO);
-            while (c_is_ident(p[0])) p++;
-            scan_lexeme(b, p, begin, type);
-            PUSH(SHT_DIRECTIVE);
-        } else if (include && p[0] == '"' || p[0] == '<') {
-            u32 end = p[0] == '<' ? '>' : '"';
-            PUSH(SHT_STRING_LITERAL);
-            p++;
-            while (!STOP(p) && p[0] != end && !c_is_eol(p)) p++;
-        }
-    }
-    while (!STOP(p) && !c_is_eol(p)) {
-        p++;
-        scan_lexeme(b, p, begin, type);
-    }
-}
 
-static void next_token(Buffer &b, u32 *&p, u32 *&begin, Syntax_Highlight_Type &type) {
-    scan_lexeme(b, p, begin, type);
-    if (p[0] == '#') parse_pp(b, p, begin, type);
-}
 
 static void cpp_parse_syntax(Buffer& b) {
     if (b.allocated <= 0) return;
     move_gap_to_end(b);
-    u32 *p = b.data;
     u32 *end = b.gap;
     u32 final_char = end[-1];
     end[-1] = BUFFER_STOP_PARSING;
 
-    u32 *begin = p;
-    Syntax_Highlight_Type type = SHT_NONE;
-    for (;; next_token(b, p, begin, type)) switch (p[0]) {
+    assert(b.syntax.count >= get_count(b));
+    Cpp_Lexer l = {};
+    l.buffer_start = b.data;
+    l.p = b.data;
+    l.sh = b.syntax.data;
+    for (;; l.next_token()) switch (l.p[0]) {
     case BUFFER_STOP_PARSING: goto done;
 
     case ' ':
     case '\t':
-        p++;
+        l.p++;
         break;
 
     default:
-        PUSH(SHT_NONE);
-        p++;
+        l.push(SHT_NONE);
+        l.p++;
         break;
 
     case '#':
-        parse_pp(b, p, begin, type);
+        l.parse_pp();
         break;
     }
 done:;
-    END();
     end[-1] = final_char;
+    l.push(SHT_NONE);
 }
 
 
@@ -345,14 +367,16 @@ done:;
 void parse_syntax(Buffer* buffer) {
 	if (!buffer->language) return;
 
-    array_empty(&buffer->syntax);
+    //array_empty(&buffer->syntax);
     array_empty(&buffer->macros);
     array_empty(&buffer->types);
     assert(buffer->language == "c" || buffer->language == "cpp");
 
-    if (buffer->syntax.allocated < buffer->allocated) {
-        array_reserve(&buffer->syntax, (size_t)(buffer->allocated - buffer->syntax.allocated));
-        OutputDebugStringA("Reserving!!\n");
+    if (buffer->syntax.count < get_count(*buffer)) {
+        auto old_cap = buffer->syntax.allocated;
+        array_resize(&buffer->syntax, get_count(*buffer));
+        if (buffer->syntax.allocated != old_cap)
+            OutputDebugStringA("Reserving!!\n");
     }
 
     auto begin = os_get_time();

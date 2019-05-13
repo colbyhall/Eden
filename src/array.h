@@ -153,6 +153,12 @@ bool array_remove(Array<T>* a, const T& element) {
 }
 
 template <typename T>
+void array_resize(Array<T>* a, size_t new_size) {
+    if (new_size > a->allocated) array_reserve(a, new_size - a->allocated);
+    a->count = new_size;
+}
+
+template <typename T>
 void array_destroy(Array<T>* a) {
 	a->allocated = 0;
 	a->count = 0;
