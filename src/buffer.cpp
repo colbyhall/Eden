@@ -95,8 +95,7 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 		}
 	}
 
-    // @Temporary
-    parse_syntax(buffer);
+    buffer->syntax_is_dirty = true;
 	return true;
 }
 
@@ -197,7 +196,7 @@ void add_char(Buffer* buffer, u32 c, size_t index) {
         buffer->eol_table[index_line] += 1;
     }
 
-	parse_syntax(buffer);
+    buffer->syntax_is_dirty = true;
 }
 
 void remove_at_index(Buffer* buffer, size_t index) {
@@ -236,7 +235,7 @@ void remove_at_index(Buffer* buffer, size_t index) {
 	buffer->gap -= 1;
 	buffer->gap_size += 1;
 
-	parse_syntax(buffer);
+    buffer->syntax_is_dirty = true;
 }
 
 void remove_between(Buffer* buffer, size_t first, size_t last) {

@@ -430,6 +430,10 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 	Buffer* buffer = editor_find_buffer(view->editor, view->id);
 	assert(buffer);
 
+    if (buffer->syntax_is_dirty) {
+        parse_syntax(buffer);
+    }
+
     y += font.ascent;
 
 	const float font_height = FONT_SIZE;

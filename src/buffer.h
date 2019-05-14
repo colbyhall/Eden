@@ -46,8 +46,7 @@ struct Buffer {
 	Array<size_t> eol_table;
 
     Array<Syntax_Highlight> syntax;
-    Array<Buf_String> macros = {};
-    Array<Buf_String> types = {};
+    bool syntax_is_dirty;
 
 	u32& operator[](size_t index);
 	u32 operator[](size_t index) const;
