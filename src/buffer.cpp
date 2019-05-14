@@ -408,6 +408,9 @@ static void key_pressed(void* owner, Event* event) {
 		if (view->cursor > 0) {
 			if (input->ctrl_is_down) {
 				seek_horizontal(view, false);
+				if (!input->shift_is_down) {
+					view->selection = view->cursor;
+				}
 				break;
 			}
 			view->cursor -= 1;
@@ -421,6 +424,9 @@ static void key_pressed(void* owner, Event* event) {
 		if (view->cursor < buffer_count - 1) {
 			if (input->ctrl_is_down) {
 				seek_horizontal(view, true);
+				if (!input->shift_is_down) {
+					view->selection = view->cursor;
+				}
 				break;
 			}
 			view->cursor += 1;

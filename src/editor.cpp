@@ -63,7 +63,7 @@ static void editor_mouse_wheel_scrolled(void* owner, Event* event) {
 	if (view->target_scroll_y < 0.f) view->target_scroll_y = 0.f;
 
 	const float font_height = FONT_SIZE;
-	const float buffer_height = (buffer->eol_table.count * font_height) - font_height;
+	const float buffer_height = (buffer->eol_table.count * font_height);
 	const float max_scroll = buffer_height - font_height;
 	if (view->target_scroll_y > max_scroll) view->target_scroll_y = max_scroll;
 }
