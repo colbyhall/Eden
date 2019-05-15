@@ -49,6 +49,7 @@ struct Buffer {
     bool syntax_is_dirty;
 
     double loc_s;
+    double chars_s;
 
 	u32& operator[](size_t index);
 	u32 operator[](size_t index) const;

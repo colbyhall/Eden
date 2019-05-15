@@ -80,14 +80,13 @@ u32 to_uppercase(u32 c) {
 // the buffer end character, which has the high bit
 // [and every other bit] set.) phil 2019-05-12
 static bool c_starts_ident(s32 c) {
-    if (c >= 128) return true;
-    if (is_letter(c)) return true;
-    if (c == '_') return true;
+    if (c == '#') return true; // @Remove.
     if (c == '$') return true;
-    if (c == '`') return true;
-    if (c == '@') return true;
+    if (c < '@') return false;
+    if (c > 'Z' && c < '_') return false;
+    if (c > 'z' && c < 256) return false;
 
-    return false;
+    return true;
 }
 static bool c_is_ident(u32 c) { return c_starts_ident(c) || is_number(c); }
 
@@ -111,63 +110,83 @@ static bool c_ends_statement(u32 c) {
 #define BUF_END 0xffffffff
 #define BUF_GAP 0xfffffffe
 
-static bool c_buffer_match_string(size_t gap_size,
-                                  const u32 *tok,
-                                  size_t tok_len,
-                                  const char *match,
-                                  size_t match_len) {
-    if (tok_len != match_len) return false;
-    for (size_t i = 0; i < tok_len; i++) {
-        if (tok[0] == BUF_GAP) tok += gap_size;
-        if (tok[0] == '\\') {
-            tok++;
-            if (tok[0] == BUF_GAP) tok += gap_size;
-            if (is_eol(tok[0])) {
-                tok++;
-                continue;
-            } else {
-                return false; // You better not try matching against '\\'.
-            }
-        }
-        if (tok[0] != match[0]) return false;
-        tok++;
-        match++;
-    }
-    return true;
-}
-#define BUFMATCH_LIT(start, len, str) c_buffer_match_string(gap_size, start, len, str, sizeof(str) - 1)
+#include "cpp_syntax.h"
 
-struct Cpp_Lexer {
+#define C_KW_DECL(name) C##name,
+enum C_Keyword {
+    NOT_KEYWORD,
+
+    Catomic_cancel,
+    Catomic_commit,
+
+    CPP_KEYWORDS(C_KW_DECL)
+};
+
+struct C_Ident {
+    const u32* p = nullptr;
+    size_t n = 0;
+    union {
+        char check_keyword[16];
+        u64 chunk[2];
+    };
+};
+
+// This is THE FASTEST WAY to check if a token is a keyword.
+// I wrote and profiled 2 other routines (200 lines). One was identical, the
+// other slower.
+C_Keyword keyword_check(const C_Ident& i) {
+    if (i.n < 2 || i.n > 16) return NOT_KEYWORD;
+
+    switch (i.chunk[0]) {
+
+#define KW_CHUNK_(s, offset, I)                                                \
+    ((I) + offset < (sizeof(s) - 1)                                            \
+         ? (u64)(s)[(I) + offset] << (u64)((I)*8ull)                           \
+         : 0ull)
+
+#define KW_CHUNK(s, offset)                                                    \
+    (KW_CHUNK_(s, offset, 0) | KW_CHUNK_(s, offset, 1) |                       \
+     KW_CHUNK_(s, offset, 2) | KW_CHUNK_(s, offset, 3) |                       \
+     KW_CHUNK_(s, offset, 4) | KW_CHUNK_(s, offset, 5) |                       \
+     KW_CHUNK_(s, offset, 6) | KW_CHUNK_(s, offset, 7))
+
+#define KW_CHUNK1(s) KW_CHUNK(s, 0)
+#define KW_CHUNK2(s) KW_CHUNK(s, 8)
+
+#define KW_CASE(x)                                                             \
+    case KW_CHUNK1(#x):                                                        \
+        if ((sizeof(#x) - 1) > 8)                                              \
+            switch (i.chunk[1]) {                                              \
+            case KW_CHUNK2(#x):                                                \
+                return C##x;                                                   \
+            default:                                                           \
+                return NOT_KEYWORD;                                            \
+            }                                                                  \
+        else                                                                   \
+            return C##x;
+
+        CPP_KEYWORDS(KW_CASE);
+
+    case KW_CHUNK1("atomic_commit"):
+        switch (i.chunk[1]) {
+        case KW_CHUNK2("atomic_commit"):
+            return Catomic_commit;
+        case KW_CHUNK2("atomic_cancel"):
+            return Catomic_cancel;
+        }
+
+    default:
+        return NOT_KEYWORD;
+    }
+}
+
+struct C_Lexer {
     const u32 *index_offset = nullptr;
     const u32 *p = nullptr;
     Syntax_Highlight *sh = nullptr;
     size_t gap_size = 0;
 
     bool more() { return p[0] != BUF_END; }
-
-#define CPP_MATCH_ASCII(tok) || BUFMATCH_LIT(start, n, tok)
-#include "cpp_syntax.h"
-    static bool is_keyword(size_t gap_size, const u32 *start, size_t n) {
-        if (n < 2 || n > 16) return false;
-        // @Todo: switch on length instead of linear search.
-        if (false CPP_KEYWORDS(CPP_MATCH_ASCII)) return true;
-
-        return false;
-    }
-
-    static bool is_type_keyword(size_t gap_size, const u32 *start, size_t n) {
-        if (n < 3 || n > 8) return false;
-        if (false CPP_TYPE_KEYWORDS(CPP_MATCH_ASCII)) return true;
-
-        return false;
-    }
-
-    static bool is_type(size_t gap_size, const u32 *start, size_t n) {
-        if (n < 6 || n > 14) return false; // @Temporary: only for builtins.
-        if (false CPP_TYPES(CPP_MATCH_ASCII)) return true;
-        
-        return false;
-    }
 
     Syntax_Highlight* push(Syntax_Highlight_Type new_type) {
         sh->type = new_type;
@@ -301,16 +320,16 @@ struct Cpp_Lexer {
 
         push(SHT_DIRECTIVE);
 
-        Ident i = read_ident();
+        C_Ident i = read_ident();
 
-        bool define = c_buffer_match_string(gap_size, i.p, i.n, "define", 6);
-        bool include = c_buffer_match_string(gap_size, i.p, i.n, "include", 7);
+        bool define = (i.chunk[0] == KW_CHUNK1("define"));
+        bool include = (i.chunk[0] == KW_CHUNK1("include"));
 
         scan_lexeme();
         if (define) {
             if (c_starts_ident(p[0])) {
                 push(SHT_MACRO);
-                Ident macro = read_ident();
+                C_Ident macro = read_ident();
                 scan_lexeme();
             }
         } else if (include) {
@@ -385,19 +404,29 @@ struct Cpp_Lexer {
         return true;
     }
 
-    struct Ident {
-        const u32 *p = nullptr;
-        size_t n = 0;
-    };
-    Ident read_ident() {
-        Ident result;
+    C_Ident read_ident() {
+        C_Ident result = {0}; // zero the check_keyword array
         result.p = p;
         for (;;) {
             if (p[0] == BUF_GAP) {
                 skip_gap();
                 continue;
 
+            } else if (p[0] == BUF_END) {
+                break;
+
+            } else if (p[0] >= 128) { // Unicode: we're good, but it's not a keyword.
+                result.check_keyword[0] = 0;
+
+                p++;
+                result.n++;
+                continue;
+
             } else if (c_is_ident(p[0])) {
+                if (result.n < sizeof(result.check_keyword)) {
+                    result.check_keyword[result.n] = p[0];
+                }
+                
                 p++;
                 result.n++;
                 continue;
@@ -562,7 +591,7 @@ struct Cpp_Lexer {
                     skip_gap();
                     continue;
 
-                } else if (is_number(p[0])) {
+                } else if (c_is_ident(p[0])) {
                     p++;
                     continue;
 
@@ -576,10 +605,10 @@ struct Cpp_Lexer {
 
         } else if (c_starts_ident(p[0])) {
             auto w = push(SHT_IDENT);
-            Ident i = read_ident();
+            C_Ident i = read_ident();
 
             next_token();
-            if (is_keyword(gap_size, i.p, i.n)) {
+            if (keyword_check(i) != NOT_KEYWORD) {
                 w->type = SHT_KEYWORD;
             } else if (p[0] == '(') {
                 w->type = SHT_FUNCTION;
@@ -617,11 +646,12 @@ struct Cpp_Lexer {
 
         auto first = push(SHT_IDENT);
         auto prev = first;
-        Ident ident = read_ident();
+        C_Ident ident = read_ident();
             
-        if (BUFMATCH_LIT(ident.p, ident.n, "return") ||
-            BUFMATCH_LIT(ident.p, ident.n, "break") ||
-            BUFMATCH_LIT(ident.p, ident.n, "continue")) {
+        switch (keyword_check(ident)) {
+        case Creturn:
+        case Cbreak:
+        case Ccontinue: {
             if (is_valid_decl) *is_valid_decl = false;
             prev->type = SHT_KEYWORD;
             next_token();
@@ -634,9 +664,10 @@ struct Cpp_Lexer {
             }
             return;
 
-        } else if (BUFMATCH_LIT(ident.p, ident.n, "if") ||
-                   BUFMATCH_LIT(ident.p, ident.n, "while") ||
-                   BUFMATCH_LIT(ident.p, ident.n, "switch")) {
+        }
+        case Cif:
+        case Cwhile:
+        case Cswitch: {
             if (is_valid_decl) *is_valid_decl = false;
             prev->type = SHT_KEYWORD;
             next_token();
@@ -658,7 +689,8 @@ struct Cpp_Lexer {
             }
             return;
 
-        } else if (BUFMATCH_LIT(ident.p, ident.n, "for")) {
+        }
+        case Cfor: {
             if (is_valid_decl) *is_valid_decl = false;
             prev->type = SHT_KEYWORD;
             next_token();
@@ -703,7 +735,8 @@ struct Cpp_Lexer {
             }
             return;
 
-        } else if (BUFMATCH_LIT(ident.p, ident.n, "case")) {
+        }
+        case Ccase: {
             prev->type = SHT_KEYWORD;
             next_token();
 
@@ -717,7 +750,8 @@ struct Cpp_Lexer {
             }
             return;
 
-        } else if (BUFMATCH_LIT(ident.p, ident.n, "default")) {
+        }
+        case Cdefault: {
             prev->type = SHT_KEYWORD;
             next_token();
 
@@ -730,10 +764,9 @@ struct Cpp_Lexer {
             return;
 
         }
-        
-        if (is_keyword(gap_size, ident.p, ident.n)) {
+        default:
             prev->type = SHT_KEYWORD;
-        }
+        case NOT_KEYWORD:
         // If both of these are false, the answer is "maybe".
         bool is_declaration = false;
         bool not_declaration = false;
@@ -770,7 +803,7 @@ struct Cpp_Lexer {
                     // Type lags behind by 1 ident, and only outside parens
                     maybe_type = prev;
                 }
-                if (is_keyword(gap_size, ident.p, ident.n)) {//if (is_type_keyword(ident.p, ident.n)) {
+                if (keyword_check(ident) != NOT_KEYWORD) {//if (is_type_keyword(ident.p, ident.n)) {
                     next->type = SHT_KEYWORD;
                             
                 } else {
@@ -936,11 +969,12 @@ struct Cpp_Lexer {
                 first->type = SHT_FUNCTION;
             }
         }
+        }
     }
     void parse_buffer(Buffer& b) {
         if (b.allocated <= 0) return;
         //move_gap_to_end(b); // @Temporary @Remove
-        u32 *const end = &b[get_count(b) - 1]; // will skip gap
+        u32 *const end = &b[get_count(b) - 1] + 1; // will skip gap
         const u32 final_char = end[-1];
         end[-1] = BUF_END;
     
@@ -996,12 +1030,13 @@ void parse_syntax(Buffer* buffer) {
 
     double begin = os_get_time();
 
-    Cpp_Lexer l;
+    C_Lexer l;
     l.parse_buffer(*buffer);
     
     double end = os_get_time();
 
     buffer->loc_s = buffer->eol_table.count / (end - begin);
+    buffer->chars_s = get_count(*buffer) / (end - begin);
     buffer->syntax_is_dirty = false;
     //double microseconds = (end - begin);
     //microseconds *= 1000000;
