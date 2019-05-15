@@ -56,11 +56,18 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	buffer->allocated = file_size + DEFAULT_GAP_SIZE;
 	buffer->data = (u32*)c_alloc(buffer->allocated * sizeof(u32));
 
+    size_t chars_read = 0;
+
 	size_t extra = 0;
 	u32* current_char = buffer->data;
 	size_t line_size = 0;
 	while (current_char != buffer->data + file_size) {
-		const u8 c = fgetc(file);
+		const int c_ = fgetc(file);
+        if (c_ == EOF) break; // Failure.
+
+        chars_read += 1;
+        const u32 c = c_;
+
 		if (c == '\r') {
 			extra += 1;
 			continue;

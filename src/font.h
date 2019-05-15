@@ -28,4 +28,4 @@ struct Font {
 };
 
 Font font_load_from_os(const char* file_name);
-Font_Glyph font_find_glyph(const Font* font, u8 c);
+Font_Glyph font_find_glyph(const Font* font, u32 c);

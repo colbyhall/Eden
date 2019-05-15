@@ -27,7 +27,7 @@ struct Event {
 		};
 		Vector2 mouse_position;
 		float delta;
-		u8 key_code;
+		u32 key_code;
 		u8 c;
 	};
 
@@ -42,7 +42,7 @@ Event make_mouse_moved_event(Vector2 mouse_position);
 Event make_mouse_wheel_scrolled_event(float delta);
 Event make_key_pressed_event(u8 key_code);
 Event make_key_released_event(u8 key_code);
-Event make_char_entered_event(u8 c);
+Event make_char_entered_event(u32 c);
 
 using Process_Event = void(*)(void* owner, Event* event);
 

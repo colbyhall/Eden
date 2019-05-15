@@ -47,6 +47,7 @@ typedef enum PROCESS_DPI_AWARENESS {
 
 typedef HRESULT(*Set_Process_DPI_Awareness)(PROCESS_DPI_AWARENESS value);
 
+u16 surrogate_pair_first; // @Refactor: get some persistent state instead of global :)
 static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_param) {
 
 	Editor_State* editor = (Editor_State*)GetWindowLongPtr(window_handle, GWLP_USERDATA);
@@ -84,10 +85,20 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 			send_event = true;
 		} break;
 
+        case WM_UNICHAR: {
+            int k = 0;
+        } break;
+
 		case WM_CHAR: {
-			const u8 key_code = (u8)w_param;
-			if ((key_code < 32 && key_code != '\t') || key_code > 126) break;
-			event_to_send = make_char_entered_event(key_code);
+			const u32 key_code = (u32)w_param;
+			if (key_code < 32 && key_code != '\t') break;
+            if (key_code == 127) break;
+
+            if (key_code < 256 || key_code > 0xffff) {
+			    event_to_send = make_char_entered_event(key_code);
+            } else { // check for surrogate pair
+                break; // @Temporary.
+            }
 			send_event = true;
 		} break;
 

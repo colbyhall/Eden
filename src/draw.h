@@ -34,6 +34,6 @@ Vector2 get_draw_string_size(const String& str, const Font& font);
 
 void immediate_quad(float x0, float y0, float x1, float y1, const Color& color);
 void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color, const Font& font);
-Font_Glyph immediate_char(u8 c, float x, float y, const Color& color, const Font& font);
+Font_Glyph immediate_char(u32 c, float x, float y, const Color& color, const Font& font);
 
 Vector2 immediate_string(const String& str, float x, float y, const Color& color, const Font& font);

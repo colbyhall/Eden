@@ -59,7 +59,7 @@ Event make_key_released_event(u8 key_code) {
 	return result;
 }
 
-Event make_char_entered_event(u8 c) {
+Event make_char_entered_event(u32 c) {
 	Event result = {};
 	result.type = ET_Char_Entered;
 	result.c = c;
@@ -90,7 +90,7 @@ void process_input_event(Input_State* input, Event* event) {
 			break;
 		case ET_Key_Pressed:
 		case ET_Key_Released:
-			const u8 key_code = event->key_code;
+			const u32 key_code = event->key_code;
 			if (key_code == KEY_CTRL) {
 				input->ctrl_is_down = event->type == ET_Key_Pressed;
 			} else if (key_code == KEY_ALT) {

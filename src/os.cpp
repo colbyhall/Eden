@@ -16,14 +16,15 @@ String os_load_file_into_memory(const char* path) {
 	fseek(f, 0, SEEK_SET);
 
 	u8* file_data = (u8*)c_alloc(size + 1);
-	fread(file_data, size, 1, f);
+	size_t num_chars_read = fread(file_data, 1, size, f);
 	fclose(f);
-	file_data[size] = 0;
+    assert(num_chars_read <= size);
+	file_data[num_chars_read] = 0;
 
 	String result;
 	result.data = file_data;
 	result.allocated = size + 1;
-	result.count = size;
+	result.count = num_chars_read;
 
 	return result;
 }

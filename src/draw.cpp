@@ -311,7 +311,7 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& col
 	immediate_vertex(x1, y0, v4_color, bottom_left);
 }
 
-Font_Glyph immediate_char(u8 c, float x, float y, const Color& color, const Font& font) {
+Font_Glyph immediate_char(u32 c, float x, float y, const Color& color, const Font& font) {
 	Font_Glyph glyph = font_find_glyph(&font, c);
 
 	immediate_glyph(glyph, x, y, color, font);
@@ -563,7 +563,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 #endif
 			continue;
 		default:
-			Font_Glyph glyph = immediate_char((u8)c, x, y, color, font);
+			Font_Glyph glyph = immediate_char(c, x, y, color, font);
 			x += glyph.advance;
 		}
 

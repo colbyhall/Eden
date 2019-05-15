@@ -94,6 +94,8 @@ Font font_load_from_os(const char* file_name) {
 	return result;
 }
 
-Font_Glyph font_find_glyph(const Font* font, u8 c) {
+Font_Glyph font_find_glyph(const Font* font, u32 c) {
+    if (c < 32) return font_find_glyph(font, '?');
+    if (c - 32 > NUM_CHARACTERS) return font_find_glyph(font, '?');
 	return font->glyphs[c - 32];
 }
