@@ -471,8 +471,6 @@ static void key_pressed(void* owner, Event* event) {
 			view->cursor -= 1;
             if (!input->shift_is_down) {
                 view->selection = view->cursor;
-            } else {
-                view->selection -= 1;
             }
 			refresh_cursor_info(view);
 		}
