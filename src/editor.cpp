@@ -16,6 +16,7 @@
 #include <stdio.h>
 
 const float scroll_speed = 10.f;
+Editor_State g_editor;
 
 static void editor_exit_requested(void* owner, Event* event) {
 	Editor_State* editor = (Editor_State*)owner;
@@ -77,10 +78,6 @@ void editor_init(Editor_State* editor) {
 	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_mouse_wheel_scrolled, ET_Mouse_Wheel_Scrolled));
 
 	editor->loaded_font = font_load_from_os("consola.ttf");
-
-	for (int i = 0; i < views_allocated; i++) {
-		editor->views[i].editor = editor;
-	}
 	
 	Buffer* buffer = editor_create_buffer(editor);
 	buffer_load_from_file(buffer, "src\\editor.cpp");

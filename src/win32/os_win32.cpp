@@ -171,18 +171,17 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	window_handle = CreateWindow(window_class.lpszClassName, TEXT(WINDOW_TITLE), WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height, NULL, NULL, instance, NULL);
 
-	Editor_State editor;
-	SetWindowLongPtr(window_handle, GWLP_USERDATA, (LONG_PTR)&editor);
+	SetWindowLongPtr(window_handle, GWLP_USERDATA, (LONG_PTR)&g_editor);
 
-	editor_init(&editor);
+	editor_init(&g_editor);
 	ShowWindow(window_handle, SW_SHOW);
 #if BUILD_DEBUG
 	wglSwapIntervalEXT(false);
 #else
 	wglSwapIntervalEXT(true);
 #endif
-	editor_loop(&editor);
-	editor_shutdown(&editor);
+	editor_loop(&g_editor);
+	editor_shutdown(&g_editor);
 
 	return 0;
 }

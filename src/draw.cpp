@@ -427,7 +427,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 	const float starting_x = x;
 	const float starting_y = y;
 
-	Buffer* buffer = editor_find_buffer(view->editor, view->id);
+	Buffer* buffer = editor_find_buffer(&g_editor, view->id);
 	assert(buffer);
 
     if (buffer->syntax_is_dirty) {
@@ -520,7 +520,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 		}
 
         if ((view->cursor > view->selection && i >= view->selection && i < view->cursor) || 
-            (view->cursor < view->selection && i <= view->selection && i > view->cursor)) {
+            (view->cursor < view->selection && i < view->selection && i > view->cursor)) {
             Font_Glyph glyph = font_find_glyph(&font, c);
 
             if (is_whitespace(c)) {

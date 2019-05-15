@@ -77,8 +77,6 @@ struct Buffer_View {
 	u64 current_line_number = 0;
 	u64 current_column_number = 0;
 	u64 desired_column_number = 0;
-
-	struct Editor_State* editor;
 };
 
 Buffer* get_buffer(Buffer_View* view);
