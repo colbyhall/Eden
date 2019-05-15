@@ -26,6 +26,8 @@ struct Editor_State {
 	Buffer_ID last_buffer_id;
 };
 
+extern Editor_State g_editor;
+
 void editor_init(Editor_State* editor);
 void editor_loop(Editor_State* editor);
 void editor_shutdown(Editor_State* editor);

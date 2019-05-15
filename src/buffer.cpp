@@ -262,7 +262,7 @@ size_t get_line_index(const Buffer& buffer, size_t index) {
 
 
 Buffer* get_buffer(Buffer_View* view) {
-	Buffer* result = editor_find_buffer(view->editor, view->id);
+	Buffer* result = editor_find_buffer(&g_editor, view->id);
 	assert(result);
 	return result;
 }
@@ -386,6 +386,14 @@ void seek_horizontal(Buffer_View* view, bool right) {
 	refresh_cursor_info(view);
 }
 
+static bool has_valid_selection(const Buffer_View& view) {
+    
+}
+
+static bool remove_selection(Buffer_View* view) {
+    
+}
+
 static void char_entered(void* owner, Event* event) {
 	Buffer_View* view = (Buffer_View*)owner;
 	Buffer* buffer = get_buffer(view);
@@ -398,7 +406,7 @@ static void char_entered(void* owner, Event* event) {
 
 static void key_pressed(void* owner, Event* event) {
 	Buffer_View* view = (Buffer_View*)owner;
-	Editor_State* editor = view->editor;
+	Editor_State* editor = &g_editor;
 	Input_State* input = &editor->input_state;
 	Buffer* buffer = get_buffer(view);
 	const size_t buffer_count = get_count(*buffer);
@@ -416,6 +424,8 @@ static void key_pressed(void* owner, Event* event) {
 			view->cursor -= 1;
             if (!input->shift_is_down) {
                 view->selection = view->cursor;
+            } else {
+                view->selection -= 1;
             }
 			refresh_cursor_info(view);
 		}
@@ -485,15 +495,11 @@ static void key_pressed(void* owner, Event* event) {
 }
 
 void buffer_view_lost_focus(Buffer_View* view) {
-	Editor_State* editor = view->editor;
-
-	unbind_event_listener(&editor->input_state, make_event_listener(view, char_entered, ET_Char_Entered));
-	unbind_event_listener(&editor->input_state, make_event_listener(view, key_pressed, ET_Key_Pressed));
+	unbind_event_listener(&g_editor.input_state, make_event_listener(view, char_entered, ET_Char_Entered));
+	unbind_event_listener(&g_editor.input_state, make_event_listener(view, key_pressed, ET_Key_Pressed));
 }
 
 void buffer_view_gained_focus(Buffer_View* view) {
-	Editor_State* editor = view->editor;
-
-	bind_event_listener(&editor->input_state, make_event_listener(view, char_entered, ET_Char_Entered));
-	bind_event_listener(&editor->input_state, make_event_listener(view, key_pressed, ET_Key_Pressed));
+	bind_event_listener(&g_editor.input_state, make_event_listener(view, char_entered, ET_Char_Entered));
+	bind_event_listener(&g_editor.input_state, make_event_listener(view, key_pressed, ET_Key_Pressed));
 }

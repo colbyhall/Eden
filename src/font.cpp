@@ -14,7 +14,7 @@ struct Bitmap {
 	u8* data;
 };
 
-float font_size = 14.f;
+float font_size = 20.f;
 
 Font* current_font = nullptr;
 
