@@ -221,6 +221,16 @@ Vector2 os_get_mouse_position() {
 	return v2(0.f);
 }
 
+void *os_virtual_reserve(size_t reserved_size) {
+    return VirtualAlloc(nullptr, reserved_size, MEM_RESERVE, 0);
+}
+void os_virtual_commit(void *reserved_range, size_t committed_size) {
+    VirtualAlloc(reserved_range, committed_size, MEM_RESERVE | MEM_COMMIT, 0);
+}
+void os_virtual_release(void *reserved_range) {
+    VirtualFree(reserved_range, 0, MEM_RELEASE);
+}
+
 void os_set_path_to_fonts() {
 	char buffer[MAX_PATH];
 	GetWindowsDirectory(buffer, MAX_PATH);

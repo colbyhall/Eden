@@ -4,41 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if BUILD_DEBUG && defined(_WIN32) // mega debug
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-void* memory_alloc(size_t size) {
-	return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-}
-
-void memory_free(void* block) {
-    if (!block) return;
-    VirtualFree(block, 0, MEM_DECOMMIT);
-}
-
-void* memory_realloc(void* ptr, size_t new_size) {
-	if (!ptr) return memory_alloc(new_size);
-    if (!new_size) {
-        memory_free(ptr);
-        return 0;
-    }
-
-    void *new_block = memory_alloc(new_size);
-    if (!new_block) return nullptr;
-    MEMORY_BASIC_INFORMATION mbi = {0};
-    VirtualQuery(ptr, &mbi, sizeof(mbi));
-    size_t bytes_to_copy = mbi.RegionSize;
-    if (bytes_to_copy > new_size) {
-        bytes_to_copy = new_size;
-    }
-    memcpy(new_block, ptr, bytes_to_copy);
-    memory_free(ptr);
-    return new_block;
-}
-
-
-#else
 void* memory_alloc(size_t size) {
 	return malloc(size);
 }
@@ -50,7 +15,6 @@ void* memory_realloc(void* ptr, size_t new_size) {
 void memory_free(void* block) {
 	free(block);
 }
-#endif
 
 #if BUILD_DEBUG
 struct Memory_Header {

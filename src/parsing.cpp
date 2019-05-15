@@ -112,7 +112,7 @@ static bool c_ends_statement(u32 c) {
 #define BUF_GAP 0xfffffffe
 
 static bool c_buffer_match_string(size_t gap_size,
-                                  u32 *tok,
+                                  const u32 *tok,
                                   size_t tok_len,
                                   const char *match,
                                   size_t match_len) {
@@ -138,8 +138,8 @@ static bool c_buffer_match_string(size_t gap_size,
 #define BUFMATCH_LIT(start, len, str) c_buffer_match_string(gap_size, start, len, str, sizeof(str) - 1)
 
 struct Cpp_Lexer {
-    u32 *index_offset = nullptr;
-    u32 *p = nullptr;
+    const u32 *index_offset = nullptr;
+    const u32 *p = nullptr;
     Syntax_Highlight *sh = nullptr;
     size_t gap_size = 0;
 
@@ -147,7 +147,7 @@ struct Cpp_Lexer {
 
 #define CPP_MATCH_ASCII(tok) || BUFMATCH_LIT(start, n, tok)
 #include "cpp_syntax.h"
-    static bool is_keyword(size_t gap_size, u32 *start, size_t n) {
+    static bool is_keyword(size_t gap_size, const u32 *start, size_t n) {
         if (n < 2 || n > 16) return false;
         // @Todo: switch on length instead of linear search.
         if (false CPP_KEYWORDS(CPP_MATCH_ASCII)) return true;
@@ -155,14 +155,14 @@ struct Cpp_Lexer {
         return false;
     }
 
-    static bool is_type_keyword(size_t gap_size, u32 *start, size_t n) {
+    static bool is_type_keyword(size_t gap_size, const u32 *start, size_t n) {
         if (n < 3 || n > 8) return false;
         if (false CPP_TYPE_KEYWORDS(CPP_MATCH_ASCII)) return true;
 
         return false;
     }
 
-    static bool is_type(size_t gap_size, u32 *start, size_t n) {
+    static bool is_type(size_t gap_size, const u32 *start, size_t n) {
         if (n < 6 || n > 14) return false; // @Temporary: only for builtins.
         if (false CPP_TYPES(CPP_MATCH_ASCII)) return true;
         
@@ -343,6 +343,7 @@ struct Cpp_Lexer {
                     } else {
                         p++;
                         continue;
+
                     }
                 }
             }
@@ -373,7 +374,7 @@ struct Cpp_Lexer {
     bool eat_escaped_newline_if_present() {
         if (p[0] != '\\') return false;
 
-        u32 *q = p + 1;
+        const u32 *q = p + 1;
         if (q[0] == BUF_GAP) {
             q += gap_size;
 
@@ -393,7 +394,7 @@ struct Cpp_Lexer {
     }
 
     struct Ident {
-        u32 *p = nullptr;
+        const u32 *p = nullptr;
         size_t n = 0;
     };
     Ident read_ident() {
@@ -517,16 +518,17 @@ struct Cpp_Lexer {
                     skip_gap();
                     continue;
 
-                } else if (eat_escaped_newline_if_present()) {
-                    continue;
-
                 } else if (p[0] == '\\') {
+                    // This naturally handles escaped newlines.
                     p++;
                     if (p[0] == BUF_GAP) skip_gap();
                     if (p[0] == BUF_END) return;
                     p++;
                     continue;
                     
+                } else if (is_eol(p[0])) {
+                    break;
+
                 } else if (p[0] == end) {
                     break;
 
@@ -945,8 +947,8 @@ struct Cpp_Lexer {
     void parse_buffer(Buffer& b) {
         if (b.allocated <= 0) return;
         //move_gap_to_end(b); // @Temporary @Remove
-        u32 *end = &b[get_count(b) - 1]; // will skip gap
-        u32 final_char = end[-1];
+        u32 *const end = &b[get_count(b) - 1]; // will skip gap
+        const u32 final_char = end[-1];
         end[-1] = BUF_END;
     
         assert(b.syntax.count >= get_count(b));
@@ -971,16 +973,14 @@ struct Cpp_Lexer {
         }
 
         end[-1] = final_char;
-        p++;
+        p = end;
         push(SHT_IDENT);
+        p++;
+        push(SHT_IDENT); // @Hack: why is this necessary?
         b.syntax.count = sh - b.syntax.data;
     }
 };
 
-
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include "os.h"
 
 void parse_syntax(Buffer* buffer) {
 	if (!buffer->language) return;
@@ -990,24 +990,21 @@ void parse_syntax(Buffer* buffer) {
     if (buffer->syntax.count < get_count(*buffer)) {
         auto old_cap = buffer->syntax.allocated;
         array_resize(&buffer->syntax, get_count(*buffer));
-        if (buffer->syntax.allocated != old_cap)
-            OutputDebugStringA("Reserving!!\n");
+        //if (buffer->syntax.allocated != old_cap)
+        //    OutputDebugStringA("Reserving!!\n");
     }
 
-    auto begin = os_get_time();
+    //auto begin = os_get_time();
 
     Cpp_Lexer l;
     l.parse_buffer(*buffer);
     buffer->syntax_is_dirty = false;
     
-    auto end = os_get_time();
+    //auto end = os_get_time();
 
-    LARGE_INTEGER freq;
-    QueryPerformanceFrequency(&freq);
-    
-    double microseconds = (end - begin);
-    microseconds *= 1000000;
-    char buf[512];
-    sprintf(buf, "%f microseconds.\n", microseconds);
-    OutputDebugStringA(buf);
+    //double microseconds = (end - begin);
+    //microseconds *= 1000000;
+    //char buf[512];
+    //sprintf(buf, "%f microseconds.\n", microseconds);
+    //OutputDebugStringA(buf);
 }

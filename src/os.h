@@ -28,3 +28,6 @@ void os_set_cursor_type(OS_Cursor_Type type);
 
 Vector2 os_get_mouse_position();
 
+void *os_virtual_reserve(size_t reserved_size);
+void os_virtual_commit(void *reserved_range, size_t committed_size);
+void os_virtual_release(void *reserved_range);
