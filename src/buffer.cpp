@@ -394,21 +394,46 @@ void seek_horizontal(Buffer_View* view, bool right) {
 }
 
 static bool has_valid_selection(const Buffer_View& view) {
-    
+	return view.cursor != view.selection;
 }
 
-static bool remove_selection(Buffer_View* view) {
-    
+static void remove_selection(Buffer_View* view) {
+	assert(has_valid_selection(*view));
+
+	Buffer* buffer = get_buffer(view);
+
+	if (view->cursor > view->selection) {
+		for (size_t i = view->cursor; i > view->selection; i--) {
+			remove_at_index(buffer, i);
+		}
+		view->cursor = view->selection;
+	} else {
+		for (size_t i = view->selection; i > view->cursor; i--) {
+			remove_at_index(buffer, i);
+		}
+		view->selection = view->cursor;
+	}
+}
+
+static void add_char_from_view(Buffer_View* view, u32 c) {
+	Buffer* buffer = get_buffer(view);
+
+
+	if (has_valid_selection(*view)) {
+		remove_selection(view);
+	}
+
+	add_char(buffer, c, view->cursor);
+	view->cursor += 1;
+	view->selection += 1;
+	refresh_cursor_info(view);
 }
 
 static void char_entered(void* owner, Event* event) {
 	Buffer_View* view = (Buffer_View*)owner;
 	Buffer* buffer = get_buffer(view);
 
-	add_char(buffer, event->c, view->cursor);
-	view->cursor += 1;
-    view->selection += 1;
-    refresh_cursor_info(view);
+	add_char_from_view(view, event->c);
 }
 
 static void key_pressed(void* owner, Event* event) {
@@ -454,10 +479,7 @@ static void key_pressed(void* owner, Event* event) {
 		}
 		break;
 	case KEY_ENTER:
-		add_char(buffer, '\n', view->cursor);
-		view->cursor += 1;
-        view->selection = view->cursor;
-		refresh_cursor_info(view);
+		add_char_from_view(view, '\n');
 		break;
 	case KEY_UP:
 		move_cursor_vertical(view, -1);
@@ -485,17 +507,25 @@ static void key_pressed(void* owner, Event* event) {
 		break;
 	case KEY_BACKSPACE:
 		if (view->cursor > 0) {
-            remove_at_index(buffer, view->cursor);
-			view->cursor -= 1;
-            view->selection = view->cursor;
-			refresh_cursor_info(view);
+			if (has_valid_selection(*view)) {
+				remove_selection(view);
+			} else {
+				remove_at_index(buffer, view->cursor);
+				view->cursor -= 1;
+				view->selection = view->cursor;
+				refresh_cursor_info(view);
+			}
 		}
 		break;
 	case KEY_DELETE:
 		const size_t buffer_count = get_count(*buffer);
 		if (view->cursor < buffer_count - 1) {
-			remove_at_index(buffer, view->cursor + 1);
-			refresh_cursor_info(view);
+			if (has_valid_selection(*view)) {
+				remove_selection(view);
+			} else {
+				remove_at_index(buffer, view->cursor + 1);
+				refresh_cursor_info(view);
+			}
 		}
 		break;
 	}
