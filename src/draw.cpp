@@ -606,7 +606,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			const float x = x0 + padding.x / 2.f;
 			const float y = info_bar_y0 + (padding.y / 2.f) + font.ascent;
 			char output_string[1024];
-			sprintf(output_string, "%s      LN: %llu     COL: %llu", buffer->title.data, view->current_line_number, view->current_column_number);
+			sprintf(output_string, "%s      LN: %llu     COL: %llu   Lex @ %f loc/s", buffer->title.data, view->current_line_number, view->current_column_number, buffer->loc_s);
 			immediate_string(output_string, x, y, 0x052329, font);
 		}
 	}

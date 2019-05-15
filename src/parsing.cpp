@@ -375,22 +375,14 @@ struct Cpp_Lexer {
         if (p[0] != '\\') return false;
 
         const u32 *q = p + 1;
-        if (q[0] == BUF_GAP) {
-            q += gap_size;
+        if (q[0] == BUF_GAP) q += gap_size;
 
-            if (!is_eol(q[0])) return false;
+        if (!is_eol(q[0])) return false;
 
-            // Bump offset because we skipped.
-            index_offset += gap_size;
-
-            p = q + 1;
-            return true;
-        } else {
-            if (!is_eol(q[0])) return false;
-            
-            p = q + 1;
-            return true;
-        }
+        // Calculate the amount we skipped via gaps.
+        index_offset += q - p - 1;
+        p = q + 1;
+        return true;
     }
 
     struct Ident {
@@ -982,11 +974,18 @@ struct Cpp_Lexer {
     }
 };
 
-
+#include "os.h"
 void parse_syntax(Buffer* buffer) {
 	if (!buffer->language) return;
 
-    assert(buffer->language == "c" || buffer->language == "cpp");
+    assert(buffer->language == "c" ||
+           buffer->language == "h" ||
+           buffer->language == "cpp" ||
+           buffer->language == "hpp" ||
+           buffer->language == "cc" ||
+           buffer->language == "hh" ||
+           buffer->language == "cxx" ||
+           buffer->language == "hxx");
 
     if (buffer->syntax.count < get_count(*buffer)) {
         auto old_cap = buffer->syntax.allocated;
@@ -995,14 +994,15 @@ void parse_syntax(Buffer* buffer) {
         //    OutputDebugStringA("Reserving!!\n");
     }
 
-    //auto begin = os_get_time();
+    double begin = os_get_time();
 
     Cpp_Lexer l;
     l.parse_buffer(*buffer);
-    buffer->syntax_is_dirty = false;
     
-    //auto end = os_get_time();
+    double end = os_get_time();
 
+    buffer->loc_s = buffer->eol_table.count / (end - begin);
+    buffer->syntax_is_dirty = false;
     //double microseconds = (end - begin);
     //microseconds *= 1000000;
     //char buf[512];

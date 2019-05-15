@@ -48,6 +48,8 @@ struct Buffer {
     Array<Syntax_Highlight> syntax;
     bool syntax_is_dirty;
 
+    double loc_s;
+
 	u32& operator[](size_t index);
 	u32 operator[](size_t index) const;
 };
