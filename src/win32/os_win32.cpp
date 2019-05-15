@@ -85,20 +85,22 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 			send_event = true;
 		} break;
 
-        case WM_UNICHAR: {
-            int k = 0;
-        } break;
-
 		case WM_CHAR: {
-			const u32 key_code = (u32)w_param;
-			if (key_code < 32 && key_code != '\t') break;
-            if (key_code == 127) break;
+			u32 ch = (u32)w_param;
+			if (ch < 32 && ch != '\t') break;
+            if (ch == 127) break;
 
-            if (key_code < 256 || key_code > 0xffff) {
-			    event_to_send = make_char_entered_event(key_code);
-            } else { // check for surrogate pair
-                break; // @Temporary.
+            if (ch >= 0xD800 && ch <= 0xDBFF) {
+                surrogate_pair_first = ch;
+                break;
+
+            } else if (ch >= 0xDC00 && ch <= 0xDFFF) {
+                u32 surrogate_pair_second = ch;
+                ch = 0x10000;
+                ch += (surrogate_pair_first & 0x03FF) << 10;
+                ch += (surrogate_pair_second & 0x03FF);
             }
+            event_to_send = make_char_entered_event(ch);
 			send_event = true;
 		} break;
 
