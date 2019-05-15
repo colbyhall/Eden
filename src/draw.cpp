@@ -265,17 +265,20 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 		}
 
 		if (str.data[i] == '\t') {
-			Font_Glyph space_glyph = font_find_glyph(&font, ' ');
-			x += space_glyph.advance  * 4.f;
+			const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
+            assert(space_glyph);
+			x += space_glyph->advance  * 4.f;
 			verts_culled += 6 * 4;
 			continue;
 		}
 
-		Font_Glyph& glyph = font_find_glyph(&font, str.data[i]);
+		const Font_Glyph* glyph = font_find_glyph(&font, str.data[i]);
 
-		immediate_glyph(glyph, x, y, color, font);
+        if (glyph) {
+            immediate_glyph(*glyph, x, y, color, font);
 
-		x += glyph.advance ;
+		    x += glyph->advance ;
+        }
 
 		if (x - original_x > largest_x) largest_x = x - original_x;
 		if (y - original_y > largest_y) largest_y = x - original_y;
@@ -297,10 +300,10 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& col
 		return;
 	}
 
-	Vector2 bottom_right = v2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-	Vector2 bottom_left = v2(glyph.x1 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
-	Vector2 top_right = v2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y1 / (float)FONT_ATLAS_DIMENSION);
-	Vector2 top_left = v2(glyph.x0 / (float)FONT_ATLAS_DIMENSION, glyph.y0 / (float)FONT_ATLAS_DIMENSION);
+	Vector2 bottom_right = v2(glyph.x1 / (float)font.atlas_w, glyph.y1 / (float)font.atlas_h);
+	Vector2 bottom_left = v2(glyph.x1 / (float)font.atlas_w, glyph.y0 / (float)font.atlas_h);
+	Vector2 top_right = v2(glyph.x0 / (float)font.atlas_w, glyph.y1 / (float)font.atlas_h);
+	Vector2 top_left = v2(glyph.x0 / (float)font.atlas_w, glyph.y0 / (float)font.atlas_h);
 
 	immediate_vertex(x0, y0, v4_color, top_left);
 	immediate_vertex(x0, y1, v4_color, top_right);
@@ -311,12 +314,23 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& col
 	immediate_vertex(x1, y0, v4_color, bottom_left);
 }
 
-Font_Glyph immediate_char(u32 c, float x, float y, const Color& color, const Font& font) {
-	Font_Glyph glyph = font_find_glyph(&font, c);
+#define UNKNOWN_GLYPH 0xff0000
 
-	immediate_glyph(glyph, x, y, color, font);
+const Font_Glyph* immediate_char(u32 c, float x, float y, const Color& color, const Font& font) {
+	const Font_Glyph* glyph = font_find_glyph(&font, c);
+    if (!glyph) {
+        const Font_Glyph* qmark = font_find_glyph(&font, '?');
+        glyph = qmark;
+        if (!qmark) {
+            glyph = font_find_glyph(&font, ' ');
+        }
+        immediate_glyph(*glyph, x, y, UNKNOWN_GLYPH, font);
+        return nullptr;
 
-	return glyph;
+    } else {
+	    immediate_glyph(*glyph, x, y, color, font);
+	    return glyph;
+    }
 }
 
 void draw_string(const String& str, float x, float y, const Color& color, const Font& font) {
@@ -339,22 +353,24 @@ Vector2 get_draw_string_size(const String& str, const Font& font) {
 	y += font.ascent;
 
 	for (size_t i = 0; i < str.count; i++) {
-		Font_Glyph glyph = font_find_glyph(&font, str[i]);
+		const Font_Glyph* glyph = font_find_glyph(&font, str[i]);
 
 		if (str.data[i] == '\n') {
 			y += font_height;
 			x = original_x;
 		} else if (str.data[i] == '\t') {
-			Font_Glyph space_glyph = font_find_glyph(&font, ' ');
-			x += space_glyph.advance  * 4.f;
+			const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
+			x += space_glyph->advance  * 4.f;
+		} else if (glyph) {
+			float x0 = x + glyph->bearing_x ;
+			float y0 = y + glyph->bearing_y ;
+			float x1 = x0 + glyph->width ;
+			float y1 = y0 + glyph->height ;
+			x += glyph->advance ;
+			    if (y1 > largest_y) largest_y = y1;
 		} else {
-			float x0 = x + glyph.bearing_x ;
-			float y0 = y + glyph.bearing_y ;
-			float x1 = x0 + glyph.width ;
-			float y1 = y0 + glyph.height ;
-			x += glyph.advance ;
-			if (y1 > largest_y) largest_y = y1;
-		}
+            // @Todo: Advance by space width
+        }
 
 
 		if (x > largest_x) largest_x = x;
@@ -442,7 +458,8 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 #else
 	const size_t buffer_count = get_count(*buffer);
 #endif
-	const Font_Glyph space_glyph = font_find_glyph(&font, ' ');
+	const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
+    assert(space_glyph);
 
 	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
 	const size_t starting_index = get_line_index(*buffer, lines_scrolled);
@@ -505,15 +522,15 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 		if (i == view->cursor)
 #endif
         {
-			Font_Glyph glyph = font_find_glyph(&font, c);
+            const Font_Glyph* glyph = font_find_glyph(&font, c);
 
-			if (is_whitespace(c)) {
+			if (!glyph || is_whitespace(c)) {
 				glyph = space_glyph;
 			}
 
 			const float cursor_x0 = x;
 			const float cursor_y0 = y - font.ascent;
-			const float cursor_x1 = cursor_x0 + glyph.advance;
+			const float cursor_x1 = cursor_x0 + glyph->advance;
 			const float cursor_y1 = y - font.descent;
 			immediate_quad(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
 			color = 0x052329;
@@ -521,13 +538,13 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
         if ((view->cursor > view->selection && i >= view->selection && i < view->cursor) || 
             (view->cursor < view->selection && i < view->selection && i > view->cursor)) {
-            Font_Glyph glyph = font_find_glyph(&font, c);
-
-            if (is_whitespace(c)) {
+            const Font_Glyph* glyph = font_find_glyph(&font, c);
+            
+            if (!glyph || is_whitespace(c)) {
                 glyph = space_glyph;
             }
 
-            float width = glyph.advance;
+            float width = glyph->advance;
             if (c == '\t') {
                 width *= 4.f;
             }
@@ -541,10 +558,10 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
 		switch (c) {
 		case ' ':
-			x += space_glyph.advance;
+			x += space_glyph->advance;
 			continue;
 		case '\t':
-			x += space_glyph.advance * 4.f;
+			x += space_glyph->advance * 4.f;
 			continue;
 		case '\n':
 			x = starting_x;
@@ -563,8 +580,9 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 #endif
 			continue;
 		default:
-			Font_Glyph glyph = immediate_char(c, x, y, color, font);
-			x += glyph.advance;
+			const Font_Glyph* glyph = immediate_char(c, x, y, color, font);
+            if (!glyph) glyph = space_glyph;
+			x += glyph->advance;
 		}
 
 		if (y - font.ascent > y1) {

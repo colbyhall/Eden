@@ -293,7 +293,7 @@ void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
 		view->desired_column_number = view->current_column_number;
 	}
 
-	const float font_height = FONT_SIZE;
+	const float font_height = FONT_SIZE; // @Todo: obtain font associated with a given view
 	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
 	const size_t lines_in_window = (size_t)(os_window_height() / font_height) - 2;
 

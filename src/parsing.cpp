@@ -924,7 +924,8 @@ struct Cpp_Lexer {
                     not_declaration = true;
                 }
             } else {
-                assert(false);
+                // something weird like ascii 0x01: ignore it
+                p++;
             }
         }
         if (!not_declaration && is_declaration) {
