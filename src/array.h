@@ -85,8 +85,8 @@ template <typename T>
 size_t array_reserve(Array<T>* a, size_t amount) {
     size_t new_size = a->allocated + amount;
     while (a->allocated < new_size) {
+        a->allocated |= 15;
         a->allocated <<= 1;
-        a->allocated |= 1;
     }
 
 	if (a->data) {

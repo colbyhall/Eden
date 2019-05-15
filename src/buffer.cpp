@@ -112,7 +112,7 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 	buffer->allocated = size;
 	buffer->data = (u32*)c_alloc(size * sizeof(u32));
 
-	buffer->gap = 0;
+	buffer->gap = buffer->data;
 	buffer->gap_size = size;
 	array_add(&buffer->eol_table, (size_t)0);
 
@@ -121,6 +121,10 @@ void buffer_init_from_size(Buffer* buffer, size_t size) {
 
 void buffer_resize(Buffer* buffer, size_t new_gap_size) {
 	// @NOTE(Colby): Check if we have been initialized
+    if (!buffer->data) {
+        buffer_init_from_size(buffer, new_gap_size);
+        return;
+    }
 	assert(buffer->data);
 	assert(buffer->gap_size == 0);
 
@@ -173,7 +177,9 @@ void add_char(Buffer* buffer, u32 c, size_t index) {
 		buffer_resize(buffer, DEFAULT_GAP_SIZE);
 	}
 
-	move_gap_to_index(buffer, index);
+	if (get_count(*buffer) > 0) {
+        move_gap_to_index(buffer, index);
+    }
 
 	u32* cursor = get_index_as_cursor(buffer, index);
 	*cursor = c;
@@ -199,7 +205,7 @@ void add_char(Buffer* buffer, u32 c, size_t index) {
         const size_t line_size = buffer->eol_table[index_line];
 		buffer->eol_table[index_line] = index_column + 1;
 		array_add_at_index(&buffer->eol_table, line_size - index_column, index_line + 1);
-	} else {
+	} else if (index_line < buffer->eol_table.count) { // @Hack
         buffer->eol_table[index_line] += 1;
     }
 
@@ -276,6 +282,15 @@ Buffer* get_buffer(Buffer_View* view) {
 
 void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
 	Buffer* buffer = get_buffer(view);
+
+    size_t buffer_count = get_count(*buffer);
+    if (view->cursor < 0) {
+        view->cursor = 0;
+    }
+    if (view->cursor > buffer_count) {
+        view->cursor = buffer_count;
+    }
+
 	view->current_line_number = 0;
 	view->current_column_number = 0;
 	for (size_t i = 0; i < view->cursor; i++) {

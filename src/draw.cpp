@@ -462,7 +462,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
     assert(space_glyph);
 
 	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
-	const size_t starting_index = get_line_index(*buffer, lines_scrolled);
+	const size_t starting_index = buffer->eol_table.count ? get_line_index(*buffer, lines_scrolled) : 0;
 
 	if (buffer_count) y -= view->current_scroll_y;
 
