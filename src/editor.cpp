@@ -76,6 +76,7 @@ static void on_left_mouse_down(void* owner, Event* event) {
     const size_t picked_index = pick_index(view, event->mouse_position);
     view->cursor = picked_index;
     view->selection = picked_index;
+	refresh_cursor_info(view, true);
 }
 
 void editor_init(Editor_State* editor) {
@@ -133,6 +134,7 @@ void editor_tick(Editor_State* editor, float dt) {
     if (editor->input_state.left_mouse_button_down) {
         const size_t picked_index = pick_index(editor->current_view, editor->input_state.current_mouse_position);
         editor->current_view->cursor = picked_index;
+		refresh_cursor_info(editor->current_view, true);
     }
 }
 
