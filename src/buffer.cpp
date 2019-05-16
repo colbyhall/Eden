@@ -408,6 +408,60 @@ void seek_horizontal(Buffer_View* view, bool right) {
 	refresh_cursor_info(view);
 }
 
+size_t pick_index(Buffer_View* view, Vector2 pos) {
+    // @TODO(Colby): Fix for multi view support
+    float x = 0.f;
+    float y = 0.f;
+
+    const float font_height = FONT_SIZE;
+
+    Buffer* buffer = get_buffer(view);
+
+    size_t line_offset = (size_t)((view->current_scroll_y + pos.y) / font_height);
+    if (line_offset >= buffer->eol_table.count) {
+        line_offset = buffer->eol_table.count - 1;
+    }
+
+    y += line_offset * font_height - view->current_scroll_y;
+
+    if (line_offset >= buffer->eol_table.count) {
+        line_offset = buffer->eol_table.count - 1;
+    }
+
+    const size_t start_index = get_line_index(*buffer, line_offset);
+    const size_t buffer_count = get_count(*buffer);
+    for (size_t i = start_index; i < buffer_count; i++) {
+        const u32 c = (*buffer)[i];
+
+        const Font_Glyph* glyph = font_find_glyph(&g_editor.loaded_font, c);
+        if (is_whitespace(c)) {
+            glyph = font_find_glyph(&g_editor.loaded_font, ' ');
+        }
+
+        float width = glyph->advance;
+        if (c == '\t') {
+            width *= 4.f;
+        }
+
+        const float x0 = x;
+        const float y0 = y;
+
+        const float x1 = x0 + width;
+        const float y1 = y0 + font_height;
+
+        if (pos.x >= x0 && pos.x <= x1 && pos.y >= y0 && pos.y <= y1) {
+            return i;
+        }
+        x += width;
+
+        if (is_eol(c)) {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
 static bool has_valid_selection(const Buffer_View& view) {
 	return view.cursor != view.selection;
 }
@@ -430,6 +484,17 @@ static void remove_selection(Buffer_View* view) {
 	}
 }
 
+// @TODO(Colby): Finish this and polish it
+static void ensure_cursor_in_view(Buffer_View* view) {
+    const float font_height = FONT_SIZE;
+    const float cursor_scroll_y = view->current_line_number * font_height;
+
+    if (cursor_scroll_y < view->target_scroll_y) {
+        view->current_scroll_y = cursor_scroll_y;
+        view->target_scroll_y = cursor_scroll_y;
+    }
+}
+
 static void add_char_from_view(Buffer_View* view, u32 c) {
 	Buffer* buffer = get_buffer(view);
 
@@ -442,6 +507,8 @@ static void add_char_from_view(Buffer_View* view, u32 c) {
 	view->cursor += 1;
 	view->selection += 1;
 	refresh_cursor_info(view);
+
+    ensure_cursor_in_view(view);
 }
 
 static void char_entered(void* owner, Event* event) {
@@ -522,6 +589,8 @@ static void key_pressed(void* owner, Event* event) {
 		if (view->cursor > 0) {
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
+                refresh_cursor_info(view);
+                ensure_cursor_in_view(view);
 			} else {
 				remove_at_index(buffer, view->cursor);
 				view->cursor -= 1;
@@ -535,6 +604,8 @@ static void key_pressed(void* owner, Event* event) {
 		if (view->cursor < buffer_count - 1) {
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
+                refresh_cursor_info(view);
+                ensure_cursor_in_view(view);
 			} else {
 				remove_at_index(buffer, view->cursor + 1);
 				refresh_cursor_info(view);

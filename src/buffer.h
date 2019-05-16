@@ -90,5 +90,7 @@ void seek_line_start(Buffer_View* view);
 void seek_line_end(Buffer_View* view);
 void seek_horizontal(Buffer_View* view, bool right);
 
+size_t pick_index(Buffer_View* view, Vector2 pos);
+
 void buffer_view_lost_focus(Buffer_View* view);
 void buffer_view_gained_focus(Buffer_View* view);

@@ -84,9 +84,11 @@ void process_input_event(Input_State* input, Event* event) {
 		switch (event->type) {
 		case ET_Mouse_Down:
 			input->mouse_went_down = true;
+            input->left_mouse_button_down = true;
 			break;
 		case ET_Mouse_Up:
 			input->mouse_went_up = true;
+            input->left_mouse_button_down = false;
 			break;
 		case ET_Key_Pressed:
 		case ET_Key_Released:
