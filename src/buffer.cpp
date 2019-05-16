@@ -312,7 +312,7 @@ void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
 void move_cursor_vertical(Buffer_View* view, s64 delta) {
 	Buffer* buffer = get_buffer(view);
 
-	assert(delta != 0);
+	if (delta == 0) return;
 
 	const size_t buffer_count = get_count(*buffer);
 	if (buffer_count == 0) {
@@ -513,7 +513,9 @@ static void key_pressed(void* owner, Event* event) {
 	Buffer* buffer = get_buffer(view);
 	const size_t buffer_count = get_count(*buffer);
 
-	switch (event->c) {
+	const u32 key_code = event->key_code;
+
+	switch (key_code) {
 	case KEY_LEFT:
 		if (view->cursor > 0) {
 			if (input->ctrl_is_down) {
@@ -550,29 +552,25 @@ static void key_pressed(void* owner, Event* event) {
 		add_char_from_view(view, '\n');
 		break;
 	case KEY_UP:
-		move_cursor_vertical(view, -1);
-        if (!input->shift_is_down) {
-            view->selection = view->cursor;
-        }
-		break;
-	case KEY_DOWN:
-		move_cursor_vertical(view, 1);
-        if (!input->shift_is_down) {
-            view->selection = view->cursor;
-        }
-		break;
+	case KEY_DOWN: {
+		const s64 delta = key_code == KEY_UP ? -1 : 1;
+		move_cursor_vertical(view, delta);
+		if (!input->shift_is_down) {
+			view->selection = view->cursor;
+		}
+	} break;
 	case KEY_HOME:
-		seek_line_start(view);
+	case KEY_END: {
+		if (key_code == KEY_HOME) {
+			seek_line_start(view);
+		} else {
+			seek_line_end(view);
+		}
         if (!input->shift_is_down) {
             view->selection = view->cursor;
         }
-		break;
-	case KEY_END:
-		seek_line_end(view);
-        if (!input->shift_is_down) {
-            view->selection = view->cursor;
-        }
-		break;
+
+	} break;
 	case KEY_BACKSPACE:
 		if (view->cursor > 0) {
 			if (input->ctrl_is_down) {
@@ -590,8 +588,7 @@ static void key_pressed(void* owner, Event* event) {
 			}
 		}
 		break;
-	case KEY_DELETE:
-		const size_t buffer_count = get_count(*buffer);
+	case KEY_DELETE: {
 		if (view->cursor < buffer_count - 1) {
 			if (input->ctrl_is_down) {
 				seek_horizontal(view, true);
@@ -605,7 +602,23 @@ static void key_pressed(void* owner, Event* event) {
 				refresh_cursor_info(view);
 			}
 		}
-		break;
+	} break;
+	case KEY_PAGEUP:
+	case KEY_PAGEDOWN: {
+		const float font_height = FONT_SIZE;
+		const size_t lines_in_view = (size_t)(get_view_inner_size(*view).y / font_height);
+		const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+
+		if (input->ctrl_is_down) {
+			move_cursor_vertical(view, key_code == KEY_PAGEUP ? lines_scrolled - view->current_line_number : (lines_in_view + lines_scrolled) - view->current_line_number);
+		} else {
+			move_cursor_vertical(view, key_code == KEY_PAGEUP ? -lines_in_view : lines_in_view);
+		}
+		if (!input->shift_is_down) {
+			view->selection = view->cursor;
+		}
+
+	} break;
 	}
 	ensure_cursor_in_view(view);
 }
