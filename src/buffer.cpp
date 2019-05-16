@@ -575,6 +575,10 @@ static void key_pressed(void* owner, Event* event) {
 		break;
 	case KEY_BACKSPACE:
 		if (view->cursor > 0) {
+			if (input->ctrl_is_down) {
+				seek_horizontal(view, false);
+			}
+
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
                 refresh_cursor_info(view);
@@ -589,6 +593,10 @@ static void key_pressed(void* owner, Event* event) {
 	case KEY_DELETE:
 		const size_t buffer_count = get_count(*buffer);
 		if (view->cursor < buffer_count - 1) {
+			if (input->ctrl_is_down) {
+				seek_horizontal(view, true);
+			}
+
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
                 refresh_cursor_info(view);
