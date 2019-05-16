@@ -514,11 +514,6 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
         Color color = get_color((Syntax_Highlight_Type)current_highlight->type);
 #endif
 
-		if (x > x1) {
-			x = starting_x;
-			y += font_height;
-		}
-
 #if GAP_BUFFER_DEBUG
 		if (current_point == get_index_as_cursor(buffer, view->cursor))
 #else

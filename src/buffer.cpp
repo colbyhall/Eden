@@ -307,20 +307,6 @@ void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
 	if (update_desired) {
 		view->desired_column_number = view->current_column_number;
 	}
-
-	const float font_height = FONT_SIZE; // @Todo: obtain font associated with a given view
-	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
-	const size_t lines_in_window = (size_t)(os_window_height() / font_height) - 2;
-
-	if (view->current_line_number < lines_scrolled) {
-		view->target_scroll_y = view->current_line_number * font_height;
-		view->current_scroll_y = view->target_scroll_y;
-	}
-
-	if (view->current_line_number > lines_scrolled + lines_in_window) {
-		view->target_scroll_y += (view->current_line_number - (lines_scrolled + lines_in_window)) * font_height;
-		view->current_scroll_y = view->target_scroll_y;
-	}
 }
 
 void move_cursor_vertical(Buffer_View* view, s64 delta) {
@@ -409,9 +395,9 @@ void seek_horizontal(Buffer_View* view, bool right) {
 }
 
 size_t pick_index(Buffer_View* view, Vector2 pos) {
-    // @TODO(Colby): Fix for multi view support
-    float x = 0.f;
-    float y = 0.f;
+	const Vector2 v_pos = get_view_position(*view);
+    float x = v_pos.x;
+    float y = v_pos.y;
 
     const float font_height = FONT_SIZE;
 
@@ -484,20 +470,24 @@ static void remove_selection(Buffer_View* view) {
 	}
 }
 
-// @TODO(Colby): Finish this and polish it
 static void ensure_cursor_in_view(Buffer_View* view) {
     const float font_height = FONT_SIZE;
     const float cursor_scroll_y = view->current_line_number * font_height;
+	const float view_inner_height = get_view_inner_size(*view).y;
 
-    if (cursor_scroll_y < view->target_scroll_y) {
-        view->current_scroll_y = cursor_scroll_y;
-        view->target_scroll_y = cursor_scroll_y;
-    }
+	if (cursor_scroll_y + font_height > view->target_scroll_y + view_inner_height) {
+		const float new_scroll_y = cursor_scroll_y - view_inner_height + font_height;
+		view->target_scroll_y = new_scroll_y;
+		view->current_scroll_y = new_scroll_y;
+	} else if (cursor_scroll_y < view->target_scroll_y) {
+		const float new_scroll_y = cursor_scroll_y;
+		view->target_scroll_y = new_scroll_y;
+		view->current_scroll_y = new_scroll_y;
+	}
 }
 
 static void add_char_from_view(Buffer_View* view, u32 c) {
 	Buffer* buffer = get_buffer(view);
-
 
 	if (has_valid_selection(*view)) {
 		remove_selection(view);
@@ -507,8 +497,6 @@ static void add_char_from_view(Buffer_View* view, u32 c) {
 	view->cursor += 1;
 	view->selection += 1;
 	refresh_cursor_info(view);
-
-    ensure_cursor_in_view(view);
 }
 
 static void char_entered(void* owner, Event* event) {
@@ -590,7 +578,6 @@ static void key_pressed(void* owner, Event* event) {
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
                 refresh_cursor_info(view);
-                ensure_cursor_in_view(view);
 			} else {
 				remove_at_index(buffer, view->cursor);
 				view->cursor -= 1;
@@ -605,7 +592,6 @@ static void key_pressed(void* owner, Event* event) {
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
                 refresh_cursor_info(view);
-                ensure_cursor_in_view(view);
 			} else {
 				remove_at_index(buffer, view->cursor + 1);
 				refresh_cursor_info(view);
@@ -613,6 +599,7 @@ static void key_pressed(void* owner, Event* event) {
 		}
 		break;
 	}
+	ensure_cursor_in_view(view);
 }
 
 void buffer_view_lost_focus(Buffer_View* view) {
@@ -623,4 +610,23 @@ void buffer_view_lost_focus(Buffer_View* view) {
 void buffer_view_gained_focus(Buffer_View* view) {
 	bind_event_listener(&g_editor.input_state, make_event_listener(view, char_entered, ET_Char_Entered));
 	bind_event_listener(&g_editor.input_state, make_event_listener(view, key_pressed, ET_Key_Pressed));
+}
+
+Vector2 get_view_inner_size(const Buffer_View& view) {
+	const float font_height = FONT_SIZE;
+	const Vector2 padding = v2(font_height / 2.f);
+	const float bar_height = font_height + padding.y;
+	const float height = (float)os_window_height() - bar_height;
+	const float width = (float)os_window_width() / g_editor.views_count;
+	return v2(width, height);
+}
+
+Vector2 get_view_size(const Buffer_View& view) {
+	return v2((float)os_window_width() / g_editor.views_count, (float)os_window_height());
+}
+
+Vector2 get_view_position(const Buffer_View& view) {
+	const size_t view_index = &view - &g_editor.views[0];
+	const float width = get_view_size(view).x;
+	return v2(width * view_index, 0.f);
 }

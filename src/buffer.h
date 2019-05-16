@@ -94,3 +94,7 @@ size_t pick_index(Buffer_View* view, Vector2 pos);
 
 void buffer_view_lost_focus(Buffer_View* view);
 void buffer_view_gained_focus(Buffer_View* view);
+
+Vector2 get_view_inner_size(const Buffer_View& view);
+Vector2 get_view_size(const Buffer_View& view);
+Vector2 get_view_position(const Buffer_View& view);
