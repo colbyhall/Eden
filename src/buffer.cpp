@@ -307,26 +307,12 @@ void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
 	if (update_desired) {
 		view->desired_column_number = view->current_column_number;
 	}
-
-	const float font_height = FONT_SIZE; // @Todo: obtain font associated with a given view
-	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
-	const size_t lines_in_window = (size_t)(os_window_height() / font_height) - 2;
-
-	if (view->current_line_number < lines_scrolled) {
-		view->target_scroll_y = view->current_line_number * font_height;
-		view->current_scroll_y = view->target_scroll_y;
-	}
-
-	if (view->current_line_number > lines_scrolled + lines_in_window) {
-		view->target_scroll_y += (view->current_line_number - (lines_scrolled + lines_in_window)) * font_height;
-		view->current_scroll_y = view->target_scroll_y;
-	}
 }
 
 void move_cursor_vertical(Buffer_View* view, s64 delta) {
 	Buffer* buffer = get_buffer(view);
 
-	assert(delta != 0);
+	if (delta == 0) return;
 
 	const size_t buffer_count = get_count(*buffer);
 	if (buffer_count == 0) {
@@ -408,6 +394,60 @@ void seek_horizontal(Buffer_View* view, bool right) {
 	refresh_cursor_info(view);
 }
 
+size_t pick_index(Buffer_View* view, Vector2 pos) {
+	const Vector2 v_pos = get_view_position(*view);
+    float x = v_pos.x;
+    float y = v_pos.y;
+
+    const float font_height = FONT_SIZE;
+
+    Buffer* buffer = get_buffer(view);
+
+    size_t line_offset = (size_t)((view->current_scroll_y + pos.y) / font_height);
+    if (line_offset >= buffer->eol_table.count) {
+        line_offset = buffer->eol_table.count - 1;
+    }
+
+    y += line_offset * font_height - view->current_scroll_y;
+
+    if (line_offset >= buffer->eol_table.count) {
+        line_offset = buffer->eol_table.count - 1;
+    }
+
+    const size_t start_index = get_line_index(*buffer, line_offset);
+    const size_t buffer_count = get_count(*buffer);
+    for (size_t i = start_index; i < buffer_count; i++) {
+        const u32 c = (*buffer)[i];
+
+        const Font_Glyph* glyph = font_find_glyph(&g_editor.loaded_font, c);
+        if (is_whitespace(c)) {
+            glyph = font_find_glyph(&g_editor.loaded_font, ' ');
+        }
+
+        float width = glyph->advance;
+        if (c == '\t') {
+            width *= 4.f;
+        }
+
+        const float x0 = x;
+        const float y0 = y;
+
+        const float x1 = x0 + width;
+        const float y1 = y0 + font_height;
+
+        if (pos.x >= x0 && pos.x <= x1 && pos.y >= y0 && pos.y <= y1) {
+            return i;
+        }
+        x += width;
+
+        if (is_eol(c)) {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
 static bool has_valid_selection(const Buffer_View& view) {
 	return view.cursor != view.selection;
 }
@@ -430,9 +470,24 @@ static void remove_selection(Buffer_View* view) {
 	}
 }
 
+static void ensure_cursor_in_view(Buffer_View* view) {
+    const float font_height = FONT_SIZE;
+    const float cursor_scroll_y = view->current_line_number * font_height;
+	const float view_inner_height = get_view_inner_size(*view).y;
+
+	if (cursor_scroll_y + font_height > view->target_scroll_y + view_inner_height) {
+		const float new_scroll_y = cursor_scroll_y - view_inner_height + font_height;
+		view->target_scroll_y = new_scroll_y;
+		view->current_scroll_y = new_scroll_y;
+	} else if (cursor_scroll_y < view->target_scroll_y) {
+		const float new_scroll_y = cursor_scroll_y;
+		view->target_scroll_y = new_scroll_y;
+		view->current_scroll_y = new_scroll_y;
+	}
+}
+
 static void add_char_from_view(Buffer_View* view, u32 c) {
 	Buffer* buffer = get_buffer(view);
-
 
 	if (has_valid_selection(*view)) {
 		remove_selection(view);
@@ -458,7 +513,9 @@ static void key_pressed(void* owner, Event* event) {
 	Buffer* buffer = get_buffer(view);
 	const size_t buffer_count = get_count(*buffer);
 
-	switch (event->c) {
+	const u32 key_code = event->key_code;
+
+	switch (key_code) {
 	case KEY_LEFT:
 		if (view->cursor > 0) {
 			if (input->ctrl_is_down) {
@@ -495,33 +552,34 @@ static void key_pressed(void* owner, Event* event) {
 		add_char_from_view(view, '\n');
 		break;
 	case KEY_UP:
-		move_cursor_vertical(view, -1);
-        if (!input->shift_is_down) {
-            view->selection = view->cursor;
-        }
-		break;
-	case KEY_DOWN:
-		move_cursor_vertical(view, 1);
-        if (!input->shift_is_down) {
-            view->selection = view->cursor;
-        }
-		break;
+	case KEY_DOWN: {
+		const s64 delta = key_code == KEY_UP ? -1 : 1;
+		move_cursor_vertical(view, delta);
+		if (!input->shift_is_down) {
+			view->selection = view->cursor;
+		}
+	} break;
 	case KEY_HOME:
-		seek_line_start(view);
+	case KEY_END: {
+		if (key_code == KEY_HOME) {
+			seek_line_start(view);
+		} else {
+			seek_line_end(view);
+		}
         if (!input->shift_is_down) {
             view->selection = view->cursor;
         }
-		break;
-	case KEY_END:
-		seek_line_end(view);
-        if (!input->shift_is_down) {
-            view->selection = view->cursor;
-        }
-		break;
+
+	} break;
 	case KEY_BACKSPACE:
 		if (view->cursor > 0) {
+			if (input->ctrl_is_down) {
+				seek_horizontal(view, false);
+			}
+
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
+                refresh_cursor_info(view);
 			} else {
 				remove_at_index(buffer, view->cursor);
 				view->cursor -= 1;
@@ -530,18 +588,39 @@ static void key_pressed(void* owner, Event* event) {
 			}
 		}
 		break;
-	case KEY_DELETE:
-		const size_t buffer_count = get_count(*buffer);
+	case KEY_DELETE: {
 		if (view->cursor < buffer_count - 1) {
+			if (input->ctrl_is_down) {
+				seek_horizontal(view, true);
+			}
+
 			if (has_valid_selection(*view)) {
 				remove_selection(view);
+                refresh_cursor_info(view);
 			} else {
 				remove_at_index(buffer, view->cursor + 1);
 				refresh_cursor_info(view);
 			}
 		}
-		break;
+	} break;
+	case KEY_PAGEUP:
+	case KEY_PAGEDOWN: {
+		const float font_height = FONT_SIZE;
+		const size_t lines_in_view = (size_t)(get_view_inner_size(*view).y / font_height);
+		const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+
+		if (input->ctrl_is_down) {
+			move_cursor_vertical(view, key_code == KEY_PAGEUP ? lines_scrolled - view->current_line_number : (lines_in_view + lines_scrolled) - view->current_line_number);
+		} else {
+			move_cursor_vertical(view, key_code == KEY_PAGEUP ? -lines_in_view : lines_in_view);
+		}
+		if (!input->shift_is_down) {
+			view->selection = view->cursor;
+		}
+
+	} break;
 	}
+	ensure_cursor_in_view(view);
 }
 
 void buffer_view_lost_focus(Buffer_View* view) {
@@ -552,4 +631,23 @@ void buffer_view_lost_focus(Buffer_View* view) {
 void buffer_view_gained_focus(Buffer_View* view) {
 	bind_event_listener(&g_editor.input_state, make_event_listener(view, char_entered, ET_Char_Entered));
 	bind_event_listener(&g_editor.input_state, make_event_listener(view, key_pressed, ET_Key_Pressed));
+}
+
+Vector2 get_view_inner_size(const Buffer_View& view) {
+	const float font_height = FONT_SIZE;
+	const Vector2 padding = v2(font_height / 2.f);
+	const float bar_height = font_height + padding.y;
+	const float height = (float)os_window_height() - bar_height;
+	const float width = (float)os_window_width() / g_editor.views_count;
+	return v2(width, height);
+}
+
+Vector2 get_view_size(const Buffer_View& view) {
+	return v2((float)os_window_width() / g_editor.views_count, (float)os_window_height());
+}
+
+Vector2 get_view_position(const Buffer_View& view) {
+	const size_t view_index = &view - &g_editor.views[0];
+	const float width = get_view_size(view).x;
+	return v2(width * view_index, 0.f);
 }

@@ -61,6 +61,8 @@ struct Input_State {
 	bool mouse_went_down = false;
 	bool mouse_went_up = false;
 
+    bool left_mouse_button_down = false;
+
 	Vector2 last_mouse_position;
 	Vector2 current_mouse_position;
 

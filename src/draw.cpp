@@ -461,7 +461,10 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 	const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
     assert(space_glyph);
 
-	const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+	size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+    if (lines_scrolled >= buffer->eol_table.count) {
+        lines_scrolled = buffer->eol_table.count - 1;
+    }
 	const size_t starting_index = buffer->eol_table.count ? get_line_index(*buffer, lines_scrolled) : 0;
 
 	if (buffer_count) y -= view->current_scroll_y;
@@ -510,11 +513,6 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
         Color color = get_color((Syntax_Highlight_Type)current_highlight->type);
 #endif
-
-		if (x > x1) {
-			x = starting_x;
-			y += font_height;
-		}
 
 #if GAP_BUFFER_DEBUG
 		if (current_point == get_index_as_cursor(buffer, view->cursor))

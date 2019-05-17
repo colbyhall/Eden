@@ -69,6 +69,16 @@ static void editor_mouse_wheel_scrolled(void* owner, Event* event) {
 	if (view->target_scroll_y > max_scroll) view->target_scroll_y = max_scroll;
 }
 
+static void on_left_mouse_down(void* owner, Event* event) {
+    Editor_State* editor = (Editor_State*)owner;
+    Buffer_View* view = get_hovered_view(editor);
+
+    const size_t picked_index = pick_index(view, event->mouse_position);
+    view->cursor = picked_index;
+    view->selection = picked_index;
+	refresh_cursor_info(view, true);
+}
+
 void editor_init(Editor_State* editor) {
 	// @NOTE(Colby): init systems here
 	gl_init();
@@ -76,6 +86,7 @@ void editor_init(Editor_State* editor) {
 
 	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_exit_requested, ET_Exit_Requested));
 	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_mouse_wheel_scrolled, ET_Mouse_Wheel_Scrolled));
+    bind_event_listener(&editor->input_state, make_event_listener(editor, on_left_mouse_down, ET_Mouse_Down));
 
 	editor->loaded_font = font_load_from_os("consola.ttf");
 	
@@ -119,6 +130,12 @@ void editor_tick(Editor_State* editor, float dt) {
 		Buffer_View* view = &editor->views[i];
 		view->current_scroll_y = finterpto(view->current_scroll_y, view->target_scroll_y, dt, scroll_speed);
 	}
+
+    if (editor->input_state.left_mouse_button_down) {
+        const size_t picked_index = pick_index(editor->current_view, editor->input_state.current_mouse_position);
+        editor->current_view->cursor = picked_index;
+		refresh_cursor_info(editor->current_view, true);
+    }
 }
 
 void editor_draw(Editor_State* editor) {
