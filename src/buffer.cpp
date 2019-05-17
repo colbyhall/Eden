@@ -612,7 +612,7 @@ static void key_pressed(void* owner, Event* event) {
 		if (input->ctrl_is_down) {
 			move_cursor_vertical(view, key_code == KEY_PAGEUP ? lines_scrolled - view->current_line_number : (lines_in_view + lines_scrolled) - view->current_line_number);
 		} else {
-			move_cursor_vertical(view, key_code == KEY_PAGEUP ? -lines_in_view : lines_in_view);
+			move_cursor_vertical(view, key_code == KEY_PAGEUP ? ~lines_in_view + 1 : lines_in_view);
 		}
 		if (!input->shift_is_down) {
 			view->selection = view->cursor;
