@@ -34,6 +34,7 @@ enum Syntax_Highlight_Type {
     SHT_STRING_LITERAL,
     SHT_DIRECTIVE,
     SHT_ANNOTATION,
+    SHT_PARAMETER,
 };
 struct Syntax_Highlight {
     //size_t type : 4;

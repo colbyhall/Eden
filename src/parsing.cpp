@@ -96,11 +96,11 @@ C_Char_Type c_char_type(u8 c) {
       0,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,1,1,0,0,0,0,
       3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,1,3,
       3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,1,0,
-      // 128 and greater: all identifier except 127
+      // 128 and greater: all identifier
       3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
       3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
       3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
-      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,
+      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
     };
     return (C_Char_Type)lut[c];
 }
@@ -176,48 +176,22 @@ struct C_Ident {
 
 // 512 bytes
 static const u64 (chunk_masks[2])[32] = {{
-    0x0000000000000000,
-    0x00000000000000ff,
-    0x000000000000ffff,
-    0x0000000000ffffff,
-    0x00000000ffffffff,
-    0x000000ffffffffff,
-    0x0000ffffffffffff,
-    0x00ffffffffffffff,
-    0xffffffffffffffff,
-    0xffffffffffffffff,
-    0xffffffffffffffff,
-    0xffffffffffffffff,
-    0xffffffffffffffff,
-    0xffffffffffffffff,
-    0xffffffffffffffff,
-    0xffffffffffffffff,
+    0x0000000000000000, 0x00000000000000ff, 0x000000000000ffff, 0x0000000000ffffff,
+    0x00000000ffffffff, 0x000000ffffffffff, 0x0000ffffffffffff, 0x00ffffffffffffff,
+    0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff,
+    0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff,
     0xffffffffffffffff,},{
-    0x0000000000000000,
-    0x0000000000000000,
-    0x0000000000000000,
-    0x0000000000000000,
-    0x0000000000000000,
-    0x0000000000000000,
-    0x0000000000000000,
-    0x0000000000000000,
-    0x0000000000000000,
-    0x00000000000000ff,
-    0x000000000000ffff,
-    0x0000000000ffffff,
-    0x00000000ffffffff,
-    0x000000ffffffffff,
-    0x0000ffffffffffff,
-    0x00ffffffffffffff,
+    0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+    0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000,
+    0x0000000000000000, 0x00000000000000ff, 0x000000000000ffff, 0x0000000000ffffff,
+    0x00000000ffffffff, 0x000000ffffffffff, 0x0000ffffffffffff, 0x00ffffffffffffff,
     0xffffffffffffffff,}
 };
 
 static u64 get_chunk0(const C_Ident& i) {
-    //if (i.n > 8) return 0;
     return *(u64*)i.p & chunk_masks[0][i.n];
 }
 static u64 get_chunk1(const C_Ident& i) {
-    //if (i.n > 16) return 0;
     return *(u64*)(i.p + 8) & chunk_masks[1][i.n];
 }
 
@@ -240,14 +214,14 @@ C_Keyword keyword_check(const C_Ident& i) {
      KW_CHUNK_(s, offset, 4) | KW_CHUNK_(s, offset, 5) |                       \
      KW_CHUNK_(s, offset, 6) | KW_CHUNK_(s, offset, 7))
 
-#define KW_CHUNK1(s) KW_CHUNK(s, 0)
-#define KW_CHUNK2(s) KW_CHUNK(s, 8)
+#define KW_CHUNK0(s) KW_CHUNK(s, 0)
+#define KW_CHUNK1(s) KW_CHUNK(s, 8)
 
 #define KW_CASE(x)                                                             \
-    case KW_CHUNK1(#x):                                                        \
+    case KW_CHUNK0(#x):                                                        \
         if ((sizeof(#x) - 1) > 8)                                              \
             switch (get_chunk1(i)) {                                           \
-            case KW_CHUNK2(#x):                                                \
+            case KW_CHUNK1(#x):                                                \
                 return C##x;                                                   \
             default:                                                           \
                 return NOT_KEYWORD;                                            \
@@ -257,13 +231,14 @@ C_Keyword keyword_check(const C_Ident& i) {
 
         C_KEYWORDS(KW_CASE);
 
-    case KW_CHUNK1("atomic_c"):
+    case KW_CHUNK0("atomic_c"):
         switch (get_chunk1(i)) {
-        case KW_CHUNK2("atomic_commit"):
+        case KW_CHUNK1("atomic_commit"):
             return Catomic_commit;
-        case KW_CHUNK2("atomic_cancel"):
+        case KW_CHUNK1("atomic_cancel"):
             return Catomic_cancel;
         }
+        break;
 
     default:
         return NOT_KEYWORD;
@@ -384,31 +359,31 @@ struct C_Lexer {
         switch (get_chunk0(i)) {
         default:
             directive->type = SHT_IDENT; // invalid directive
-        case KW_CHUNK1("elif"):
-        case KW_CHUNK1("else"):
-        case KW_CHUNK1("endif"):
-        case KW_CHUNK1("error"):
-        case KW_CHUNK1("if"):
-        case KW_CHUNK1("line"):
-        case KW_CHUNK1("pragma"):
+        case KW_CHUNK0("elif"):
+        case KW_CHUNK0("else"):
+        case KW_CHUNK0("endif"):
+        case KW_CHUNK0("error"):
+        case KW_CHUNK0("if"):
+        case KW_CHUNK0("line"):
+        case KW_CHUNK0("pragma"):
             break; // valid directives
-        case KW_CHUNK1("define"): {
+        case KW_CHUNK0("define"): {
             if (c_starts_ident(p[0])) {
                 push(SHT_MACRO);
                 skip_ident();
             }
             break;
         }
-        case KW_CHUNK1("ifdef"):
-        case KW_CHUNK1("ifndef"):
-        case KW_CHUNK1("undef"): {
+        case KW_CHUNK0("ifdef"):
+        case KW_CHUNK0("ifndef"):
+        case KW_CHUNK0("undef"): {
             if (c_starts_ident(p[0])) {
                 push(SHT_IDENT);
                 skip_ident();
             }
             break;
         }
-        case KW_CHUNK1("include"): {
+        case KW_CHUNK0("include"): {
             if (p[0] == '"' || p[0] == '<') {
                 push(SHT_STRING_LITERAL);
                 scan_include_string();
@@ -495,7 +470,7 @@ struct C_Lexer {
         p++;
         while (next()) {
             next_token();
-            parse_stmt(SHT_OPERATOR, nullptr, true);
+            parse_stmt(SHT_PARAMETER, nullptr, true);
             if (c_ends_expression(p[0])) break;
         }
         if (p[0] == ')') {
@@ -745,7 +720,7 @@ struct C_Lexer {
             auto current = push(mark_vars_as);
             C_Ident ident = read_ident();
 
-#define DBG_BRKON(tok) if (static bool break_on_##tok = true) if (ident.chunk[0] == KW_CHUNK1(#tok) && ident.chunk[1] == KW_CHUNK2(#tok)) __debugbreak();
+#define DBG_BRKON(tok) if (static bool break_on_##tok = true) if (ident.chunk[0] == KW_CHUNK0(#tok) && ident.chunk[1] == KW_CHUNK1(#tok)) __debugbreak();
             //16 chrs:xxxxxxxxxxxxxxxx
             //DBG_BRKON(stb_c_lexer_get_);
 
@@ -885,9 +860,24 @@ struct C_Lexer {
                     SET_AS_DECL_EVEN_WITHOUT_VAR();
                     break;
                 } else if (!any_decl_var) {
-                    // Just one ident + comma == stmt is just an expr.
-                    parse_exprs();
-                    break;
+                    if (inside_parameter_list) {
+                        // We aren't a default-arg ('=' would've happened already),
+                        // so we are inside a nested param list. Parse them as decls.
+                        while (next()) {
+                            parse_stmt(SHT_PARAMETER, nullptr, true);
+                            next_token();
+                            if (c_ends_expression(p[0])) {
+                                push(SHT_OPERATOR);
+                                p++;
+                                break;
+                            }
+                        }
+                        continue;
+                    } else {
+                        // Just one ident + comma == stmt is just an expr.
+                        parse_exprs();
+                        break;
+                    }
                 } else {
                     if (paren_nesting) {
                         // Var name + comma inside parens == function call.
@@ -925,23 +915,27 @@ struct C_Lexer {
         return;
     }
 
-    __declspec(noinline) // @Temporary @Debug @Remove
+    //__declspec(noinline) // @Temporary @Debug @Remove
     void parse_buffer(Buffer& b) {
         if (b.allocated <= 0) return;
         //u32 *const end = b.data + b.allocated;
         //u32 *const end = &b[get_count(b) - 1] + 1;
         //const u32 final_char = end[-1];
         //end[-1] = BUF_END;
-    
-        assert(b.syntax.count >= get_count(b));
-        assert(b.as_ascii.count >= get_count(b));
+        
+        static
+            bool copied = false;
+        assert(b.syntax.count >= get_count(b) + 16);
+        //assert(b.as_ascii.count >= get_count(b) + 16);
         //index_offset = b.data;
         //p = b.data;
-        {
+        if (!copied) {
+            copied = true;
+            array_resize(&b.as_ascii, get_count(b) + 16);
             u8* dst = b.as_ascii.data;
             const u32* src = b.data;
             while (src < b.gap) {
-                if (src[0] >= 128) {
+                if (src[0] & 0xffffff80) {
                     dst[0] = '$';
                 } else {
                     dst[0] = src[0];
@@ -951,7 +945,7 @@ struct C_Lexer {
             }
             src += b.gap_size;
             while (src < b.data + b.allocated) {
-                if (src[0] >= 128) {
+                if (src[0] & 0xffffff80) {
                     dst[0] = '$';
                 } else {
                     dst[0] = src[0];
@@ -959,7 +953,19 @@ struct C_Lexer {
                 src++;
                 dst++;
             }
-            dst[0] = BUF_END;
+            //dst[0] = BUF_END;
+            *dst++ = ' ';
+            *dst++ = '"';
+            *dst++ = '\'';
+            *dst++ = '*';
+            *dst++ = '/';
+            *dst++ = '\n';
+            *dst++ = ' ';
+            *dst++ = '"';
+            *dst++ = '\'';
+            *dst++ = '*';
+            *dst++ = '/';
+            *dst++ = '\n';
         }
         buf_end = b.as_ascii.end() - 1;
         p = b.as_ascii.data;
@@ -970,6 +976,8 @@ struct C_Lexer {
         //}
 
 #if 0
+        parse_pda();
+#elif 0
         // Speed test
         /*scan_lexeme();
         if (p[0] == '#') parse_pp();
@@ -982,6 +990,7 @@ struct C_Lexer {
         while (p < end) {
         //while (p != end) {
         //while (p[0] != BUF_END) {
+            //if (p[0] == BUF_END) break;
             p++;
         }
         push(SHT_IDENT);
@@ -1034,10 +1043,10 @@ void parse_syntax(Buffer* buffer) {
 
     if (buffer->syntax.count < get_count(*buffer)) {
         auto old_cap = buffer->syntax.allocated;
-        array_resize(&buffer->syntax, get_count(*buffer));
+        array_resize(&buffer->syntax, get_count(*buffer) + 16);
+        //array_resize(&buffer->as_ascii, get_count(*buffer) + 16);
         //if (buffer->syntax.allocated != old_cap)
         //    OutputDebugStringA("Reserving!!\n");
-        array_resize(&buffer->as_ascii, get_count(*buffer) + 1);
     }
 
     double begin = os_get_time();
