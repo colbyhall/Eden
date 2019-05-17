@@ -1,4 +1,15 @@
-#define CPP_KEYWORDS(X)   \
+#define C_KEYWORDS(X)   \
+    X(_Alignas) \
+    X(_Alignof) \
+    X(_Atomic) \
+    X(_Bool) \
+    X(_Complex) \
+    X(_Generic) \
+    X(_Imaginary) \
+    X(_Noreturn) \
+    X(_Pragma) \
+    X(_Static_assert) \
+    X(_Thread_local) \
     X(alignas) \
     X(alignof) \
     X(and) \
@@ -96,60 +107,64 @@
     X(xor) \
     X(xor_eq) \
 
-#define CPP_TYPE_KEYWORDS(X)    \
-    X("auto"            ) \
-    X("bool"            ) \
-    X("char"            ) \
-    X("char8_t"         ) \
-    X("char16_t"        ) \
-    X("char32_t"        ) \
-    X("class"           ) \
-    X("const"           ) \
-    X("decltype"        ) \
-    X("double"          ) \
-    X("enum"            ) \
-    X("float"           ) \
-    X("int"             ) \
-    X("long"            ) \
-    X("register"        ) \
-    X("short"           ) \
-    X("signed"          ) \
-    X("struct"          ) \
-    X("typename"        ) \
-    X("union"           ) \
-    X("unsigned"        ) \
-    X("void"            ) \
-    X("volatile"        ) \
-    X("wchar_t"         ) \
+#define C_TYPE_KEYWORDS(X)    \
+    X(auto) \
+    X(bool) \
+    X(char) \
+    X(char8_t) \
+    X(char16_t) \
+    X(char32_t) \
+    X(double) \
+    X(float) \
+    X(int) \
+    X(long) \
+    X(register) \
+    X(short) \
+    X(signed) \
+    X(unsigned) \
+    X(void) \
+    X(wchar_t) \
 
-#define CPP_TYPES(X) \
-    X("int8_t"        ) \
-    X("int16_t"       ) \
-    X("int32_t"       ) \
-    X("int64_t"       ) \
-    X("uint8_t"       ) \
-    X("uint16_t"      ) \
-    X("uint32_t"      ) \
-    X("uint64_t"      ) \
-    X("int_least8_t"  ) \
-    X("int_least16_t" ) \
-    X("int_least32_t" ) \
-    X("int_least64_t" ) \
-    X("uint_least8_t" ) \
-    X("uint_least16_t") \
-    X("uint_least32_t") \
-    X("uint_least64_t") \
-    X("int_fast8_t"   ) \
-    X("int_fast16_t"  ) \
-    X("int_fast32_t"  ) \
-    X("int_fast64_t"  ) \
-    X("uint_fast8_t"  ) \
-    X("uint_fast16_t" ) \
-    X("uint_fast32_t" ) \
-    X("uint_fast64_t" ) \
-    X("intmax_t"      ) \
-    X("uintmax_t"     ) \
-    X("size_t"        ) \
-    X("ptrdiff_t"     ) \
-    X("intptr_t"      ) \
+#define C_TYPE_QUALIFIERS(X) \
+    X(class) \
+    X(const) \
+    X(decltype) \
+    X(enum) \
+    X(extern) \
+    X(static) \
+    X(struct) \
+    X(typename) \
+    X(union) \
+    X(volatile) \
+
+#define C_TYPES(X) \
+    X(int8_t) \
+    X(int16_t) \
+    X(int32_t) \
+    X(int64_t) \
+    X(uint8_t) \
+    X(uint16_t) \
+    X(uint32_t) \
+    X(uint64_t) \
+    X(int_least8_t) \
+    X(int_least16_t) \
+    X(int_least32_t) \
+    X(int_least64_t) \
+    X(uint_least8_t) \
+    X(uint_least16_t) \
+    X(uint_least32_t) \
+    X(uint_least64_t) \
+    X(int_fast8_t) \
+    X(int_fast16_t) \
+    X(int_fast32_t) \
+    X(int_fast64_t) \
+    X(uint_fast8_t) \
+    X(uint_fast16_t) \
+    X(uint_fast32_t) \
+    X(uint_fast64_t) \
+    X(intmax_t) \
+    X(uintmax_t) \
+    X(size_t) \
+    X(ptrdiff_t) \
+    X(intptr_t) \
 
