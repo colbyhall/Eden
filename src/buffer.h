@@ -45,9 +45,12 @@ struct Buffer {
 
 	Array<size_t> eol_table;
 
+    Array<u8> as_ascii; // Used for lexing!!!
+
     Array<Syntax_Highlight> syntax;
     bool syntax_is_dirty;
 
+    double s;
     double loc_s;
     double chars_s;
 

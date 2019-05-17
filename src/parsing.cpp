@@ -79,34 +79,78 @@ u32 to_uppercase(u32 c) {
 
 #include "buffer.h"
 
-// Unprintable, bad characters that we should pretend don't exist.
-static bool c_should_skip(u32 c) {
-    return (c >= 0 && c <= 8) || (c >= 14 && c <= 31) || c == 127;
+enum C_Char_Type {
+    CT_WHITE = 0,
+    CT_OP = 1,
+    CT_DIGIT = 2,
+    CT_IDENT = 3,
+};
+C_Char_Type c_char_type(u8 c) {
 
-    return false;
+    static u8 lut[256] = {
+    //[ 0   - - -   8 ] t n v f r [ 1 4   - - - - - - - - - -   3 1 ]
+    //  ! " # $ % & ' ( ) * + , - . / 0 1 2 3 4 5 6 7 8 9 : ; < = > ?
+    //@ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z [ \ ] ^ _
+    //` a b c d e f g h i j k l m n o p q r s t u v w x y z { | } ~ \127
+      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+      0,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,1,1,0,0,0,0,
+      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,1,3,
+      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,1,0,
+      // 128 and greater: all identifier except 127
+      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
+      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
+      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,
+      3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,
+    };
+    return (C_Char_Type)lut[c];
 }
+// Unprintable, bad characters that we should pretend don't exist.
+//static bool c_should_skip(u32 c) {
+//    return (c >= 0 && c <= 8) || (c >= 14 && c <= 31) || c == 127;
+//
+//    return false;
+//}
 
+#if 0
 static bool c_starts_ident(u32 c) {
-    return c >= 128 || c == '$' || (c >= '@' && c <= 'Z') || (c >= '_' && c <= 'z');
+    //return c >= 128 || c == '$' || (c >= '@' && c <= 'Z') || (c >= '_' && c <= 'z');
+    c |= 0x40;
+    return c >= '`' && c <= 'z' || c == 127;
+}
+bool c_is_digit(u32 c) {
+	return c >= '0' && c <= '9';
 }
 static bool c_is_ident(u32 c) {
-    return c_starts_ident(c) || is_digit(c);
+    return c_starts_ident(c) || c_is_digit(c);
 }
 
 static bool c_is_op(u32 c) {
     return c != '$' && c != '#' && is_symbol(c);
+    //return is_symbol(c);
+}
+bool c_is_eol(u32 c) {
+	return c == '\n' || c == '\r';
 }
 
-static bool c_ends_statement(u32 c) {
-    return c == ';' || c == '}';
+bool c_is_whitespace(u32 c) {
+	return c >= '\t' && c <= '\r' || c == ' ';
 }
+static bool c_ends_statement(u32 c) { return c == ';' || c == '}'; }
+static bool c_ends_expression(u32 c) { return c == ')' || c_ends_statement(c); }
+#else
+static bool c_starts_ident(u8 c) { return c_char_type(c) == CT_IDENT; }
+static bool c_is_ident(u8 c) { return c_char_type(c) >= CT_DIGIT; }
+static bool c_is_digit(u8 c) { return c_char_type(c) == CT_DIGIT; }
+static bool c_is_op(u8 c) { return c_char_type(c) == CT_OP; }
+static bool c_is_eol(u32 c) { return c == '\n'; }
+static bool c_is_whitespace(u8 c) { return c_char_type(c) == CT_WHITE; }
+static bool c_ends_statement(u32 c) { return c == ';' || c == '}'; }
+static bool c_ends_expression(u32 c) { return c == ')' || c_ends_statement(c); }
+#endif
 
-static bool c_ends_expression(u32 c) {
-    return c == ')' || c_ends_statement(c);
-}
-
-#define BUF_END 0xffffffff
-#define BUF_GAP 0xfffffffe
+//#define BUF_END 0xffffffff
+//#define BUF_GAP 0xfffffffe
+#define BUF_END 0xff
 
 #include "cpp_syntax.h"
 
@@ -121,13 +165,61 @@ enum C_Keyword {
 };
 
 struct C_Ident {
-    const u32* p = nullptr;
+    //const u32* p = nullptr;
+    const u8* p = nullptr;
     size_t n = 0;
-    union {
-        char check_keyword[16];
-        u64 chunk[2];
-    };
+    //union {
+    //    char check_keyword[16];
+    //    u64 chunk[2];
+    //};
 };
+
+// 512 bytes
+static const u64 (chunk_masks[2])[32] = {{
+    0x0000000000000000,
+    0x00000000000000ff,
+    0x000000000000ffff,
+    0x0000000000ffffff,
+    0x00000000ffffffff,
+    0x000000ffffffffff,
+    0x0000ffffffffffff,
+    0x00ffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,
+    0xffffffffffffffff,},{
+    0x0000000000000000,
+    0x0000000000000000,
+    0x0000000000000000,
+    0x0000000000000000,
+    0x0000000000000000,
+    0x0000000000000000,
+    0x0000000000000000,
+    0x0000000000000000,
+    0x0000000000000000,
+    0x00000000000000ff,
+    0x000000000000ffff,
+    0x0000000000ffffff,
+    0x00000000ffffffff,
+    0x000000ffffffffff,
+    0x0000ffffffffffff,
+    0x00ffffffffffffff,
+    0xffffffffffffffff,}
+};
+
+static u64 get_chunk0(const C_Ident& i) {
+    //if (i.n > 8) return 0;
+    return *(u64*)i.p & chunk_masks[0][i.n];
+}
+static u64 get_chunk1(const C_Ident& i) {
+    //if (i.n > 16) return 0;
+    return *(u64*)(i.p + 8) & chunk_masks[1][i.n];
+}
 
 // This is THE FASTEST WAY to check if a token is a keyword.
 // I wrote and profiled 2 other routines (200 lines). One was identical, the
@@ -135,7 +227,7 @@ struct C_Ident {
 C_Keyword keyword_check(const C_Ident& i) {
     if (i.n < 2 || i.n > 16) return NOT_KEYWORD;
 
-    switch (i.chunk[0]) {
+    switch (get_chunk0(i)) {
 
 #define KW_CHUNK_(s, offset, I)                                                \
     ((I) + offset < (sizeof(s) - 1)                                            \
@@ -154,7 +246,7 @@ C_Keyword keyword_check(const C_Ident& i) {
 #define KW_CASE(x)                                                             \
     case KW_CHUNK1(#x):                                                        \
         if ((sizeof(#x) - 1) > 8)                                              \
-            switch (i.chunk[1]) {                                              \
+            switch (get_chunk1(i)) {                                           \
             case KW_CHUNK2(#x):                                                \
                 return C##x;                                                   \
             default:                                                           \
@@ -165,8 +257,8 @@ C_Keyword keyword_check(const C_Ident& i) {
 
         C_KEYWORDS(KW_CASE);
 
-    case KW_CHUNK1("atomic_commit"):
-        switch (i.chunk[1]) {
+    case KW_CHUNK1("atomic_c"):
+        switch (get_chunk1(i)) {
         case KW_CHUNK2("atomic_commit"):
             return Catomic_commit;
         case KW_CHUNK2("atomic_cancel"):
@@ -179,26 +271,29 @@ C_Keyword keyword_check(const C_Ident& i) {
 }
 
 struct C_Lexer {
-    const u32 *index_offset = nullptr;
-    const u32 *p = nullptr;
+    //const u32 *index_offset = nullptr;
+    //const u32 *p = nullptr;
+    const u8* p = nullptr;
     Syntax_Highlight *sh = nullptr;
-    size_t gap_size = 0;
+    const u8* buf_end = nullptr;
+    //size_t gap_size = 0;
 
     Syntax_Highlight* push(Syntax_Highlight_Type new_type) {
         sh->type = new_type;
-        sh->where = (size_t)(p - index_offset);
+        sh->where = (size_t)p;//(size_t)(p - index_offset);
         sh++;
         return sh - 1;
     }
 
     void skip_gap() {
-        p += gap_size;
-        index_offset += gap_size;
+        //p += gap_size;
+        //index_offset += gap_size;
     }
 
     bool next() {
-        if (p[0] == BUF_GAP) skip_gap();
-        if (p[0] == BUF_END) return false;
+        //if (p[0] == BUF_GAP) skip_gap();
+        if (p >= buf_end) return false;
+        //if (p[0] == BUF_END) return false;
         return true;
     }
 
@@ -206,10 +301,13 @@ struct C_Lexer {
         while (next()) {
             if (p[0] == '\\') {
                 p++;
-                if (p[0] == BUF_GAP) skip_gap();
-                if (is_eol(p[0])) continue;
+                //if (p[0] == BUF_GAP) skip_gap();
+                if (c_is_eol(p[0])) {
+                    p++;
+                    continue;
+                }
                 break;
-            } else if (is_eol(p[0])) {
+            } else if (c_is_eol(p[0])) {
                 break;
             } else {
                 p++;
@@ -222,7 +320,7 @@ struct C_Lexer {
         while (next()) {
             if (p[0] == '*') {
                 p++;
-                if (p[0] == BUF_GAP) skip_gap();
+                //if (p[0] == BUF_GAP) skip_gap();
                 if (p[0] != '/') continue;
                 p++;
                 break;
@@ -238,11 +336,11 @@ struct C_Lexer {
         Syntax_Highlight* comment = nullptr;
         while (next()) {
             if (p[0] == '/') {
-                const u32* q = p + 1;
-                if (q[0] == BUF_GAP) q += gap_size;
+                auto q = p + 1;
+                //if (q[0] == BUF_GAP) q += gap_size;
                 if (q[0] == '/' || q[0] == '*') {
                     if (!comment) comment = push(SHT_COMMENT);
-                    index_offset += q - p - 1;
+                    //index_offset += q - p - 1;
                     p = q + 1;
                     if (q[0] == '/') {
                         scan_line_comment();
@@ -254,8 +352,8 @@ struct C_Lexer {
                 }
                 break;
             }
-            if (is_eol(p[0])) break;
-            if (is_whitespace(p[0])) {
+            if (c_is_eol(p[0])) break;
+            if (c_is_whitespace(p[0])) {
                 p++;
                 continue;
             }
@@ -270,7 +368,7 @@ struct C_Lexer {
         p++;
         while (next()) {
             if (skip_escaped_newline()) continue;
-            if (is_eol(p[0])) break;
+            if (c_is_eol(p[0])) break;
             p++;
             if (p[-1] == end) break;
         }
@@ -283,7 +381,7 @@ struct C_Lexer {
         auto directive = push(SHT_DIRECTIVE);
         C_Ident i = read_ident();
         scan_lexeme();
-        switch (i.chunk[0]) {
+        switch (get_chunk0(i)) {
         default:
             directive->type = SHT_IDENT; // invalid directive
         case KW_CHUNK1("elif"):
@@ -321,7 +419,7 @@ struct C_Lexer {
         push(SHT_DIRECTIVE);
         while (next()) {
             if (skip_escaped_newline()) continue;
-            if (is_eol(p[0])) break;
+            if (c_is_eol(p[0])) break;
             p++;
             if (scan_lexeme()) push(SHT_DIRECTIVE);
         }
@@ -329,7 +427,7 @@ struct C_Lexer {
 
     void next_token() {
         scan_lexeme();
-        while (is_eol(p[0])) {
+        while (c_is_eol(p[0])) {
             p++;
             scan_lexeme();
             if (p[0] == '#') parse_pp();
@@ -338,27 +436,31 @@ struct C_Lexer {
 
     bool skip_escaped_newline() {
         if (p[0] != '\\') return false;
-        const u32* q = p + 1;
-        if (q[0] == BUF_GAP) q += gap_size;
-        if (!is_eol(q[0])) return false;
+        auto q = p + 1;
+        //if (q[0] == BUF_GAP) q += gap_size;
+        if (!c_is_eol(q[0])) return false;
         // Calculate the amount we skipped via gaps.
-        index_offset += q - p - 1;
+        //index_offset += q - p - 1;
         p = q + 1;
         return true;
     }
 
     C_Ident read_ident() {
-        C_Ident result = {0}; // zero the check_keyword array
+        C_Ident result; // zero the check_keyword array
         result.p = p;
+        //result.n = 0;
+        //result.chunk[0] = 0;
+        //result.chunk[1] = 0;
         while (next()) {
-            if (skip_escaped_newline()) continue;
+            //if (skip_escaped_newline()) continue;
             if (!c_is_ident(p[0])) break;
             
-            if (p[0] >= 128) result.check_keyword[0] = 0; // No keyword is Unicode
-            if (result.n < 16) result.check_keyword[result.n] = p[0];
+            //if (p[0] >= 128) result.check_keyword[0] = 0; // No keyword is Unicode
+            //if (result.n < 16) result.check_keyword[result.n] = p[0];
             p++;
-            result.n++;
+            //result.n++;
         }
+        result.n = p - result.p;
         return result;
     }
 
@@ -366,7 +468,7 @@ struct C_Lexer {
     size_t skip_ident() {
         size_t n = 0;
         while (next()) {
-            if (skip_escaped_newline()) continue;
+            //if (skip_escaped_newline()) continue;
             if (!c_is_ident(p[0])) break;
             p++;
             n++;
@@ -518,10 +620,10 @@ struct C_Lexer {
                 if (skip_escaped_newline()) continue;
                 if (p[0] == '\\') {
                     p++;
-                    if (p[0] == BUF_GAP) skip_gap();
+                    //if (p[0] == BUF_GAP) skip_gap();
                     continue;
                 }
-                if (is_eol(p[0])) break;
+                if (c_is_eol(p[0])) break;
                 if (p[0] == end) {
                     p++;
                     break;
@@ -533,19 +635,21 @@ struct C_Lexer {
             p++;
             next_token();
             parse_exprs();
-        } else if (is_digit(p[0])) {
+        } else if (c_is_digit(p[0])) {
             push(SHT_NUMERIC_LITERAL);
             p++;
             while (next()) {
                 if (skip_escaped_newline()) continue;
 
-                if (is_digit(p[0]) || is_letter(p[0]) || p[0] == '.' || p[0] == '+' || p[0] == '\'') {
+                if (c_is_ident(p[0]) || p[0] == '.' || p[0] == '+' || p[0] == '\'') {
                     p++;
                     continue;
                 } else {
                     break;
                 }
             }
+        } else if (c_is_ident(p[0])) {
+            return;
         } else { // @Hack?
             push(SHT_IDENT);
             p++;
@@ -595,9 +699,13 @@ struct C_Lexer {
         }
     }
 
-    const char32_t* DBG_stmt_begin; // @Temporary @Debug
+#ifndef NDEBUG
+    const char32_t* DBG_stmt_begin; // @Debug
+#endif
     void parse_stmt(Syntax_Highlight_Type mark_vars_as = SHT_IDENT, Syntax_Highlight** const decl_type_p = nullptr, bool inside_parameter_list = false) {
-        DBG_stmt_begin = (const char32_t*)p;
+#ifndef NDEBUG
+        DBG_stmt_begin = (const char32_t*)p; // @Debug
+#endif
 
         if (decl_type_p) *decl_type_p = nullptr;
         if (c_ends_statement(p[0])) return;
@@ -817,30 +925,74 @@ struct C_Lexer {
         return;
     }
 
+    __declspec(noinline) // @Temporary @Debug @Remove
     void parse_buffer(Buffer& b) {
         if (b.allocated <= 0) return;
         //u32 *const end = b.data + b.allocated;
-        u32 *const end = &b[get_count(b) - 1] + 1;
-        const u32 final_char = end[-1];
-        end[-1] = BUF_END;
+        //u32 *const end = &b[get_count(b) - 1] + 1;
+        //const u32 final_char = end[-1];
+        //end[-1] = BUF_END;
     
         assert(b.syntax.count >= get_count(b));
-        index_offset = b.data;
-        p = b.data;
-        sh = b.syntax.data;
-        gap_size = b.gap_size;
-        if (gap_size) {
-            b.gap[0] = BUF_GAP;
+        assert(b.as_ascii.count >= get_count(b));
+        //index_offset = b.data;
+        //p = b.data;
+        {
+            u8* dst = b.as_ascii.data;
+            const u32* src = b.data;
+            while (src < b.gap) {
+                if (src[0] >= 128) {
+                    dst[0] = '$';
+                } else {
+                    dst[0] = src[0];
+                }
+                src++;
+                dst++;
+            }
+            src += b.gap_size;
+            while (src < b.data + b.allocated) {
+                if (src[0] >= 128) {
+                    dst[0] = '$';
+                } else {
+                    dst[0] = src[0];
+                }
+                src++;
+                dst++;
+            }
+            dst[0] = BUF_END;
         }
+        buf_end = b.as_ascii.end() - 1;
+        p = b.as_ascii.data;
+        sh = b.syntax.data;
+        //gap_size = b.gap_size;
+        //if (gap_size) {
+        //    b.gap[0] = BUF_GAP;
+        //}
 
+#if 0
+        // Speed test
+        /*scan_lexeme();
+        if (p[0] == '#') parse_pp();
+        while (next()) {
+            next_token();
+            p++;
+        }*/
+        push(SHT_IDENT);
+        auto end = b.as_ascii.end() - 1;
+        while (p < end) {
+        //while (p != end) {
+        //while (p[0] != BUF_END) {
+            p++;
+        }
+        push(SHT_IDENT);
+#else
         scan_lexeme();
         if (p[0] == '#') parse_pp();
         while (next()) {
             next_token();
             parse_stmt();
-            assert(p < end);
+            //assert(p < buf_end);
 
-            assert(p[0] != ')'); // @Temporary @Debug
             if (p[0] == ')') {
                 // something's malformed, just struggle on.
                 push(SHT_OPERATOR);
@@ -851,13 +1003,19 @@ struct C_Lexer {
                 p++;
             }
         }
+#endif
 
-        end[-1] = final_char;
-        p = end;
+        //end[-1] = final_char;
+        //p = end;
         push(SHT_IDENT);
         p++;
+        p = b.as_ascii.end();
         push(SHT_IDENT); // @Hack: why is this necessary?
         b.syntax.count = sh - b.syntax.data;
+
+        for (auto&& sh : b.syntax) {
+            sh.where -= (size_t)b.as_ascii.data;
+        }
     }
 };
 
@@ -879,6 +1037,7 @@ void parse_syntax(Buffer* buffer) {
         array_resize(&buffer->syntax, get_count(*buffer));
         //if (buffer->syntax.allocated != old_cap)
         //    OutputDebugStringA("Reserving!!\n");
+        array_resize(&buffer->as_ascii, get_count(*buffer) + 1);
     }
 
     double begin = os_get_time();
@@ -888,8 +1047,11 @@ void parse_syntax(Buffer* buffer) {
     
     double end = os_get_time();
 
-    buffer->loc_s = buffer->eol_table.count / (end - begin);
-    buffer->chars_s = get_count(*buffer) / (end - begin);
+    double s = (end - begin);
+
+    buffer->s = s;
+    buffer->loc_s = buffer->eol_table.count / s;
+    buffer->chars_s = get_count(*buffer) / s;
     buffer->syntax_is_dirty = false;
     //double microseconds = (end - begin);
     //microseconds *= 1000000;

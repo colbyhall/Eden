@@ -506,12 +506,14 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 		}
 #else
 		const u32 c = (*buffer)[i];
-        while (i >= current_highlight[1].where) {
+        while (i >= current_highlight[0].where) {
+            //immediate_string("|", x, y, 0xff00ff, font);
+            //x += space_glyph->advance;
             current_highlight += 1;
-            assert(current_highlight + 1 < buffer->syntax.cend());
+            assert(current_highlight < buffer->syntax.cend());
         }
 
-        Color color = get_color((Syntax_Highlight_Type)current_highlight->type);
+        Color color = get_color((Syntax_Highlight_Type)current_highlight[-1].type);
 #endif
 
 #if GAP_BUFFER_DEBUG
@@ -604,7 +606,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			const float x = x0 + padding.x / 2.f;
 			const float y = info_bar_y0 + (padding.y / 2.f) + font.ascent;
 			char output_string[1024];
-			sprintf(output_string, "%s      LN: %llu     COL: %llu   Lex @ %f kloc/s (%f MB/s)", buffer->title.data, view->current_line_number, view->current_column_number, buffer->loc_s/1000, buffer->chars_s * 4 / (1024 * 1024));
+			sprintf(output_string, "%s      LN: %llu     COL: %llu   Lex @ %fms %f kloc/s (%f MB/s)",  buffer->title.data, view->current_line_number, view->current_column_number, buffer->s * 1000, buffer->loc_s/1000, buffer->chars_s * 4 / (1024 * 1024));
 			immediate_string(output_string, x, y, 0x052329, font);
 		}
 	}
