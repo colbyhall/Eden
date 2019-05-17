@@ -93,7 +93,7 @@ C_Char_Type c_char_type(u8 c) {
     //@ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z [ \ ] ^ _
     //` a b c d e f g h i j k l m n o p q r s t u v w x y z { | } ~ \127
       0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-      0,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,1,1,0,0,0,0,
+      0,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,1,1,1,1,1,1,
       3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,1,3,
       3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1,1,0,
       // 128 and greater: all identifier
@@ -551,7 +551,7 @@ struct C_Lexer {
         }
     }
 
-    void parse_expr() {
+    void parse_expr(bool inside_parameters = false) {
         if (c_starts_ident(p[0])) {
             auto expr = push(SHT_IDENT);
             C_Ident i = read_ident();
@@ -582,10 +582,20 @@ struct C_Lexer {
             parse_exprs(end);
             if (p[0] == end) {
                 p++;
+                if (p[-1] == ')') {
+                    // Check for ident (cast expression).
+                    if (!c_ends_expression(p[0])) {
+                        if (c_is_op(p[0]) || c_is_ident(p[0])) {
+                            parse_expr();
+                        }
+                    }
+                }
             }
         } else if (p[0] == '{') {
             parse_braces();
         } else if (c_ends_expression(p[0])) {
+            return;
+        } else if (p[0] == ',' && inside_parameters) {
             return;
         } else if (p[0] == '"' || p[0] == '\'') {
             push(SHT_STRING_LITERAL);
@@ -633,8 +643,10 @@ struct C_Lexer {
 
         next_token();
 
-        if (!c_ends_expression(p[0]) && c_is_op(p[0])) {
-            parse_expr();
+        if (!c_ends_expression(p[0])) {
+            if (c_is_op(p[0])) {
+                parse_expr();
+            }
         }
         //if (p[0] == ')') {
         //    push(SHT_OPERATOR);
@@ -675,11 +687,11 @@ struct C_Lexer {
     }
 
 #ifndef NDEBUG
-    const char32_t* DBG_stmt_begin; // @Debug
+    const char* DBG_stmt_begin; // @Debug
 #endif
-    void parse_stmt(Syntax_Highlight_Type mark_vars_as = SHT_IDENT, Syntax_Highlight** const decl_type_p = nullptr, bool inside_parameter_list = false) {
+    void parse_stmt(Syntax_Highlight_Type mark_vars_as = SHT_IDENT, Syntax_Highlight** const decl_type_p = nullptr, bool inside_parameters = false) {
 #ifndef NDEBUG
-        DBG_stmt_begin = (const char32_t*)p; // @Debug
+        DBG_stmt_begin = (const char*)p; // @Debug
 #endif
 
         if (decl_type_p) *decl_type_p = nullptr;
@@ -824,7 +836,7 @@ struct C_Lexer {
                 next_token();
                 paren_nesting++;
             } else if (p[0] == ')') {
-                if (!paren_nesting && inside_parameter_list) {
+                if (!paren_nesting && inside_parameters) {
                     SET_AS_DECL_EVEN_WITHOUT_VAR();
                     break;
                 } else {
@@ -847,7 +859,7 @@ struct C_Lexer {
                 next_token();
                 if (!paren_nesting) {
                     SET_AS_DECL();
-                    parse_expr();
+                    parse_expr(true);
                 }
             } else if (p[0] == ';') {
                 SET_AS_DECL();
@@ -856,11 +868,11 @@ struct C_Lexer {
                 current->type = SHT_OPERATOR;
                 p++;
                 next_token();
-                if (!paren_nesting && inside_parameter_list) {
+                if (!paren_nesting && inside_parameters) {
                     SET_AS_DECL_EVEN_WITHOUT_VAR();
                     break;
                 } else if (!any_decl_var) {
-                    if (inside_parameter_list) {
+                    if (inside_parameters) {
                         // We aren't a default-arg ('=' would've happened already),
                         // so we are inside a nested param list. Parse them as decls.
                         while (next()) {
@@ -923,7 +935,7 @@ struct C_Lexer {
         //const u32 final_char = end[-1];
         //end[-1] = BUF_END;
         
-        static
+        //static // @Debug.
             bool copied = false;
         assert(b.syntax.count >= get_count(b) + 16);
         //assert(b.as_ascii.count >= get_count(b) + 16);
