@@ -47,6 +47,8 @@ typedef enum PROCESS_DPI_AWARENESS {
 
 typedef HRESULT(*Set_Process_DPI_Awareness)(PROCESS_DPI_AWARENESS value);
 
+static bool mouse_tracking = false;
+
 u16 surrogate_pair_first; // @Refactor: get some persistent state instead of global :)
 static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_param) {
 
@@ -118,16 +120,17 @@ static LRESULT window_proc(HWND handle, UINT message, WPARAM w_param, LPARAM l_p
 		} break;
 
 		case WM_LBUTTONDOWN: {
+            SetCapture(window_handle);
 			event_to_send = make_mouse_down_event(os_get_mouse_position());
 			send_event = true;
 		} break;
 
 		case WM_LBUTTONUP: {
+            ReleaseCapture();
 			event_to_send = make_mouse_up_event(os_get_mouse_position());
 			send_event = true;
 		} break;
 
-		case WM_NCLBUTTONUP: 
 		case WM_KILLFOCUS: {
 			event_to_send = make_mouse_up_event(v2(0.f));
 			send_event = true;
