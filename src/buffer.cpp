@@ -549,9 +549,22 @@ static void key_pressed(void* owner, Event* event) {
 			refresh_cursor_info(view);
 		}
 		break;
-	case KEY_ENTER:
+	case KEY_ENTER: {
 		add_char_from_view(view, '\n');
-		break;
+
+        // @NOTE(Colby): Auto tabbing
+        const size_t prev_line = view->current_line_number - 1;
+        assert(prev_line >= 0);
+        const size_t line_length = buffer->eol_table[prev_line];
+        const size_t prev_line_index = get_line_index(*buffer, view->current_line_number - 1);
+        for (size_t i = 0; i < line_length; i++) {
+            const u32 c = (*buffer)[i + prev_line_index];
+            if (!is_whitespace(c) || is_eol(c)) {
+                break;
+            }
+            add_char_from_view(view, c);
+        }
+    } break;
 	case KEY_UP:
 	case KEY_DOWN: {
 		const s64 delta = key_code == KEY_UP ? -1 : 1;
