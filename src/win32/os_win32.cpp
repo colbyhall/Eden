@@ -270,3 +270,43 @@ String os_get_path() {
 bool os_set_path(const String& string) {
 	return SetCurrentDirectory(string);
 }
+
+bool os_copy_to_clipboard(const void* buffer, size_t size) {
+	HGLOBAL g_mem = GlobalAlloc(GMEM_MOVEABLE, size);
+	memcpy(GlobalLock(g_mem), buffer, size);
+	GlobalUnlock(g_mem);
+	if (!OpenClipboard(window_handle)) {
+		GlobalFree(g_mem);
+		return false;
+	}
+	EmptyClipboard();
+	SetClipboardData(CF_TEXT, g_mem);
+	CloseClipboard();
+	return true;
+}
+
+bool os_copy_out_of_clipboard(String* out_string) {
+	if (!OpenClipboard(window_handle)) {
+		return false;
+	}
+
+	defer(CloseClipboard());
+
+	HANDLE c_data = GetClipboardData(CF_TEXT);
+	if (!c_data) return false;
+
+	char* out_data = (char*)GlobalLock(c_data);
+	if (!out_data) return false;
+
+	const size_t str_size = strlen(out_data);
+	out_string->count = str_size;
+	out_string->allocated = str_size + 1;
+	out_string->data = (u8*)c_alloc(str_size + 1);
+
+	memcpy(out_string->data, out_data, str_size);
+	out_string->data[str_size] = 0;
+
+	GlobalUnlock(c_data);
+	
+	return true;
+}

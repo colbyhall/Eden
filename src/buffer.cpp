@@ -503,6 +503,7 @@ static void char_entered(void* owner, Event* event) {
 	Buffer_View* view = (Buffer_View*)owner;
 	Buffer* buffer = get_buffer(view);
 
+
 	add_char_from_view(view, event->c);
 }
 
@@ -619,6 +620,33 @@ static void key_pressed(void* owner, Event* event) {
 		}
 
 	} break;
+	case 'V':
+		if (editor->input_state.ctrl_is_down) {
+			String results;
+			if (os_copy_out_of_clipboard(&results)) {
+				for (size_t i = 0; i < results.count; i++) {
+					u8 c = results[i];
+					if (c == '\r') continue;
+					add_char_from_view(view, c);
+				}
+				c_free(results.data);
+			}
+		}
+		break;
+	case 'C':
+		if (editor->input_state.ctrl_is_down && has_valid_selection(*view)) {
+			const size_t buffer_count = get_count(*buffer);
+			const size_t index = (view->cursor > view->selection) ? view->selection : view->cursor;
+			const size_t size = (view->cursor > view->selection) ? (view->cursor - view->selection) : (view->selection - view->cursor);
+			u8* out_buffer = (u8*)c_alloc(size + 1);
+			defer(c_free(out_buffer));
+			for (size_t i = 0; i < size; i++) {
+				out_buffer[i] = (u8)(*buffer)[index + i];
+			}
+			out_buffer[size] = 0;
+			os_copy_to_clipboard(out_buffer, size + 1);
+		}
+		break;
 	}
 	ensure_cursor_in_view(view);
 }

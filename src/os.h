@@ -26,6 +26,9 @@ String os_load_file_into_memory(const char* path);
 
 void os_set_cursor_type(OS_Cursor_Type type);
 
+bool os_copy_to_clipboard(const void* buffer, size_t size);
+bool os_copy_out_of_clipboard(String* out_string);
+
 Vector2 os_get_mouse_position();
 
 void *os_virtual_reserve(size_t reserved_size);
