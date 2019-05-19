@@ -166,12 +166,12 @@ enum C_Keyword {
 
 struct C_Ident {
     //const u32* p = nullptr;
-    const u8* p = nullptr;
+    const u32* p = nullptr;
     size_t n = 0;
-    //union {
-    //    char check_keyword[16];
-    //    u64 chunk[2];
-    //};
+    union {
+        char check_keyword[16];
+        u64 chunk[2];
+    };
 };
 
 // 512 bytes
@@ -189,10 +189,12 @@ static const u64 (chunk_masks[2])[32] = {{
 };
 
 static u64 get_chunk0(const C_Ident& i) {
-    return *(u64*)i.p & chunk_masks[0][i.n];
+    //return *(u64*)i.p & chunk_masks[0][i.n];
+    return i.chunk[0];
 }
 static u64 get_chunk1(const C_Ident& i) {
-    return *(u64*)(i.p + 8) & chunk_masks[1][i.n];
+    //return *(u64*)(i.p + 8) & chunk_masks[1][i.n];
+    return i.chunk[1];
 }
 
 // This is THE FASTEST WAY to check if a token is a keyword.
@@ -243,32 +245,32 @@ C_Keyword keyword_check(const C_Ident& i) {
     default:
         return NOT_KEYWORD;
     }
+    return NOT_KEYWORD;
 }
 
 struct C_Lexer {
-    //const u32 *index_offset = nullptr;
-    //const u32 *p = nullptr;
-    const u8* p = nullptr;
+    const u32* index_offset = nullptr;
+    const u32* p = nullptr;
+    const u32* buf_gap = nullptr;
+    const u32* buf_end = nullptr;
     Syntax_Highlight *sh = nullptr;
-    const u8* buf_end = nullptr;
-    //size_t gap_size = 0;
+    size_t gap_size = 0;
 
     Syntax_Highlight* push(Syntax_Highlight_Type new_type) {
         sh->type = new_type;
-        sh->where = (size_t)p;//(size_t)(p - index_offset);
+        sh->where = p;
         sh++;
         return sh - 1;
     }
 
     void skip_gap() {
-        //p += gap_size;
-        //index_offset += gap_size;
+        p += gap_size;
+        index_offset += gap_size;
     }
 
     bool next() {
-        //if (p[0] == BUF_GAP) skip_gap();
+        if (p == buf_gap) skip_gap();
         if (p >= buf_end) return false;
-        //if (p[0] == BUF_END) return false;
         return true;
     }
 
@@ -276,7 +278,7 @@ struct C_Lexer {
         while (next()) {
             if (p[0] == '\\') {
                 p++;
-                //if (p[0] == BUF_GAP) skip_gap();
+                if (p == buf_gap) skip_gap();
                 if (c_is_eol(p[0])) {
                     p++;
                     continue;
@@ -295,7 +297,7 @@ struct C_Lexer {
         while (next()) {
             if (p[0] == '*') {
                 p++;
-                //if (p[0] == BUF_GAP) skip_gap();
+                if (p == buf_gap) skip_gap();
                 if (p[0] != '/') continue;
                 p++;
                 break;
@@ -312,10 +314,10 @@ struct C_Lexer {
         while (next()) {
             if (p[0] == '/') {
                 auto q = p + 1;
-                //if (q[0] == BUF_GAP) q += gap_size;
+                if (q == buf_gap) q += gap_size;
                 if (q[0] == '/' || q[0] == '*') {
                     if (!comment) comment = push(SHT_COMMENT);
-                    //index_offset += q - p - 1;
+                    index_offset += q - p - 1;
                     p = q + 1;
                     if (q[0] == '/') {
                         scan_line_comment();
@@ -412,10 +414,10 @@ struct C_Lexer {
     bool skip_escaped_newline() {
         if (p[0] != '\\') return false;
         auto q = p + 1;
-        //if (q[0] == BUF_GAP) q += gap_size;
+        if (q == buf_gap) q += gap_size;
         if (!c_is_eol(q[0])) return false;
         // Calculate the amount we skipped via gaps.
-        //index_offset += q - p - 1;
+        index_offset += q - p - 1;
         p = q + 1;
         return true;
     }
@@ -423,19 +425,18 @@ struct C_Lexer {
     C_Ident read_ident() {
         C_Ident result; // zero the check_keyword array
         result.p = p;
-        //result.n = 0;
-        //result.chunk[0] = 0;
-        //result.chunk[1] = 0;
+        result.n = 0;
+        result.chunk[0] = 0;
+        result.chunk[1] = 0;
         while (next()) {
-            //if (skip_escaped_newline()) continue;
+            if (skip_escaped_newline()) continue;
             if (!c_is_ident(p[0])) break;
             
-            //if (p[0] >= 128) result.check_keyword[0] = 0; // No keyword is Unicode
-            //if (result.n < 16) result.check_keyword[result.n] = p[0];
+            if (p[0] >= 128) result.check_keyword[0] = 0; // No keyword is Unicode
+            if (result.n < 16) result.check_keyword[result.n] = p[0];
             p++;
-            //result.n++;
+            result.n++;
         }
-        result.n = p - result.p;
         return result;
     }
 
@@ -443,7 +444,7 @@ struct C_Lexer {
     size_t skip_ident() {
         size_t n = 0;
         while (next()) {
-            //if (skip_escaped_newline()) continue;
+            if (skip_escaped_newline()) continue;
             if (!c_is_ident(p[0])) break;
             p++;
             n++;
@@ -458,8 +459,14 @@ struct C_Lexer {
         while (next()) {
             next_token();
             parse_stmt();
-            if (p[0] == ')') p++;
-            if (p[0] == ';') p++;
+            if (p[0] == ')') {
+                push(SHT_OPERATOR);
+                p++;
+            }
+            if (p[0] == ';') {
+                push(SHT_OPERATOR);
+                p++;
+            }
             if (p[0] == '}') break;
         }
     }
@@ -581,14 +588,19 @@ struct C_Lexer {
             next_token();
             parse_exprs(end);
             if (p[0] == end) {
-                p++;
-                if (p[-1] == ')') {
+                push(SHT_OPERATOR);
+                if (p[0] == ')') {
+                    p++;
+                    next_token();
                     // Check for ident (cast expression).
                     if (!c_ends_expression(p[0])) {
                         if (c_is_op(p[0]) || c_is_ident(p[0])) {
                             parse_expr();
                         }
                     }
+                } else {
+                    p++;
+                    next_token();
                 }
             }
         } else if (p[0] == '{') {
@@ -605,7 +617,7 @@ struct C_Lexer {
                 if (skip_escaped_newline()) continue;
                 if (p[0] == '\\') {
                     p++;
-                    //if (p[0] == BUF_GAP) skip_gap();
+                    if (p == buf_gap) skip_gap();
                     continue;
                 }
                 if (c_is_eol(p[0])) break;
@@ -687,11 +699,11 @@ struct C_Lexer {
     }
 
 #ifndef NDEBUG
-    const char* DBG_stmt_begin; // @Debug
+    const char32_t* DBG_stmt_begin; // @Debug
 #endif
     void parse_stmt(Syntax_Highlight_Type mark_vars_as = SHT_IDENT, Syntax_Highlight** const decl_type_p = nullptr, bool inside_parameters = false) {
 #ifndef NDEBUG
-        DBG_stmt_begin = (const char*)p; // @Debug
+        DBG_stmt_begin = (const char32_t*)p; // @Debug
 #endif
 
         if (decl_type_p) *decl_type_p = nullptr;
@@ -927,85 +939,325 @@ struct C_Lexer {
         return;
     }
 
+enum State {
+    STATE_NEWLINE = 0,
+    STATE_PREPROC = 1,
+    STATE_PREPROC_BACKSLASH = 2,
+    STATE_SEEN_SLASH = 3,
+    STATE_COMMENT_LINE = 4,
+    STATE_COMMENT_LINE_BACKSLASH = 5,
+    STATE_COMMENT_BLOCK = 6,
+    STATE_COMMENT_BLOCK_STAR = 7,
+
+    STATE_DECL_TYPE = 8,
+    //STATE_DECL_VAR = 9,
+
+    NUM_STATES
+};
+static State
+parse_dfa(State initial_state,
+          const u32* p,
+         const u32* const pend,
+          Syntax_Highlight*& sh) {
+    enum Char_Type {
+        IDENT = 0, // ident
+        NEWLINE = 1, // '\r' '\n'
+        SLASH = 2, // '/'
+        BACKSLASH = 3, // '\\'
+        STAR = 4, // '*'
+        POUND = 5, // '#'
+        WHITE = 6, // anything below 32 besides newline 
+        DIGIT = 7, // '0' '1' '2' '3' '4' '5' '6' '7' '8' '9'
+        QUOTE = 8, // '\'' '"'
+        LPAREN = 9, // '('
+        LSQUARE = 10, // '['
+        LCURLY = 11, // '{'
+        LTRI = 12, // '<'
+        RPAREN = 13, // ')'
+        RSQUARE = 14, // ']'
+        RCURLY = 15, // '}'
+        RTRI = 16, // '>'
+        AND = 17, // '&'
+        EQU = 18, // '='
+        SEMI = 19, // ';'
+        COMMA = 20, // ','
+        MISCOP = 21, // '~' '!' '%' '^' '-' '+' '|' ':' '.' '?'
+        NUM_CHAR_TYPES
+    };
+    static const unsigned char char_type[128] {
+//[0 ----------- 8] t n v f r [14 --------------------------- 31]
+  6,6,6,6,6,6,6,6,6,6,1,6,6,1,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
+//   ! " # $  %  & ' (  ) *  +  ,  -  . / 0 1 2 3 4 5 6 7 8 9  :  ;  <  =  >  ?
+  6,21,8,5,0,21,17,8,9,13,4,21,20,21,21,2,7,7,7,7,7,7,7,7,7,7,21,19,12,18,16,21,
+//@ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z  [  \  ]  ^ _
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10, 3,14,21,0,
+//` a b c d e f g h i j k l m n o p q r s t u v w x y z  {  |  }  ~ \127
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,21,15,21,
+  0,//6,
+//// 128 and greater: all identifier
+//6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
+//6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
+};
+static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
+    { // STATE_NEWLINE
+        /* IDENT */ STATE_NEWLINE, // @Temporary
+        /* NEWLINE */ STATE_NEWLINE,
+        /* SLASH */ STATE_SEEN_SLASH,
+        /* BACKSLASH */ STATE_NEWLINE,
+        /* STAR */ STATE_NEWLINE,
+        /* POUND */ STATE_PREPROC,
+        /* WHITE */ STATE_NEWLINE,
+        /* DIGIT */ STATE_NEWLINE, // @Temporary
+        /* QUOTE */ STATE_NEWLINE, // @Temporary
+        /* LPAREN */ STATE_NEWLINE, // @Temporary
+        /* LSQUARE */ STATE_NEWLINE, // @Temporary
+        /* LCURLY */ STATE_NEWLINE, // @Temporary
+        /* LTRI */ STATE_NEWLINE, // @Temporary
+        /* RPAREN */ STATE_NEWLINE, // @Temporary
+        /* RSQUARE */ STATE_NEWLINE, // @Temporary
+        /* RCURLY */ STATE_NEWLINE, // @Temporary
+        /* RTRI */ STATE_NEWLINE, // @Temporary
+        /* AND */ STATE_NEWLINE, // @Temporary
+        /* EQU */ STATE_NEWLINE, // @Temporary
+        /* SEMI */ STATE_NEWLINE, // @Temporary
+        /* COMMA */ STATE_NEWLINE, // @Temporary
+        /* MISCOP */ STATE_NEWLINE, // @Temporary
+    },
+    { // STATE_PREPROC
+        /* IDENT */ STATE_PREPROC,
+        /* NEWLINE */ STATE_NEWLINE,
+        /* SLASH */ STATE_PREPROC,
+        /* BACKSLASH */ STATE_PREPROC_BACKSLASH,
+        /* STAR */ STATE_PREPROC,
+        /* POUND */ STATE_PREPROC,
+        /* WHITE */ STATE_PREPROC,
+        /* DIGIT */ STATE_PREPROC,
+        /* QUOTE */ STATE_PREPROC,
+        /* LPAREN */ STATE_PREPROC,
+        /* LSQUARE */ STATE_PREPROC,
+        /* LCURLY */ STATE_PREPROC,
+        /* LTRI */ STATE_PREPROC,
+        /* RPAREN */ STATE_PREPROC,
+        /* RSQUARE */ STATE_PREPROC,
+        /* RCURLY */ STATE_PREPROC,
+        /* RTRI */ STATE_PREPROC, 
+        /* AND */ STATE_PREPROC, 
+        /* EQU */ STATE_PREPROC, 
+        /* SEMI */ STATE_PREPROC, 
+        /* COMMA */ STATE_PREPROC, 
+        /* MISCOP */ STATE_PREPROC, 
+    },
+    { // STATE_PREPROC_BACKSLASH
+        /* IDENT */ STATE_PREPROC,
+        /* NEWLINE */ STATE_PREPROC,
+        /* SLASH */ STATE_PREPROC,
+        /* BACKSLASH */ STATE_PREPROC_BACKSLASH,
+        /* STAR */ STATE_PREPROC,
+        /* POUND */ STATE_PREPROC,
+        /* WHITE */ STATE_PREPROC,
+        /* DIGIT */ STATE_PREPROC,
+        /* QUOTE */ STATE_PREPROC,
+        /* LPAREN */ STATE_PREPROC,
+        /* LSQUARE */ STATE_PREPROC,
+        /* LCURLY */ STATE_PREPROC,
+        /* LTRI */ STATE_PREPROC,
+        /* RPAREN */ STATE_PREPROC,
+        /* RSQUARE */ STATE_PREPROC,
+        /* RCURLY */ STATE_PREPROC,
+        /* RTRI */ STATE_PREPROC, 
+        /* AND */ STATE_PREPROC, 
+        /* EQU */ STATE_PREPROC, 
+        /* SEMI */ STATE_PREPROC, 
+        /* COMMA */ STATE_PREPROC, 
+        /* MISCOP */ STATE_PREPROC, 
+    },
+    { // STATE_SEEN_SLASH
+        /* IDENT */ STATE_NEWLINE,
+        /* NEWLINE */ STATE_NEWLINE,
+        /* SLASH */ STATE_COMMENT_LINE,
+        /* BACKSLASH */ STATE_NEWLINE,
+        /* STAR */ STATE_COMMENT_BLOCK,
+        /* POUND */ STATE_NEWLINE,
+        /* WHITE */ STATE_NEWLINE,
+        /* DIGIT */ STATE_NEWLINE,
+        /* QUOTE */ STATE_NEWLINE,
+        /* LPAREN */ STATE_NEWLINE,
+        /* LSQUARE */ STATE_NEWLINE,
+        /* LCURLY */ STATE_NEWLINE,
+        /* LTRI */ STATE_NEWLINE,
+        /* RPAREN */ STATE_NEWLINE,
+        /* RSQUARE */ STATE_NEWLINE,
+        /* RCURLY */ STATE_NEWLINE,
+        /* RTRI */ STATE_NEWLINE, 
+        /* AND */ STATE_NEWLINE, 
+        /* EQU */ STATE_NEWLINE, 
+        /* SEMI */ STATE_NEWLINE, 
+        /* COMMA */ STATE_NEWLINE, 
+        /* MISCOP */ STATE_NEWLINE,
+    },
+    { // STATE_COMMENT_LINE
+        /* IDENT */ STATE_COMMENT_LINE,
+        /* NEWLINE */ STATE_NEWLINE,
+        /* SLASH */ STATE_COMMENT_LINE,
+        /* BACKSLASH */ STATE_COMMENT_LINE_BACKSLASH,
+        /* STAR */ STATE_COMMENT_LINE,
+        /* POUND */ STATE_COMMENT_LINE,
+        /* WHITE */ STATE_COMMENT_LINE,
+        /* DIGIT */ STATE_COMMENT_LINE,
+        /* QUOTE */ STATE_COMMENT_LINE,
+        /* LPAREN */ STATE_COMMENT_LINE,
+        /* LSQUARE */ STATE_COMMENT_LINE,
+        /* LCURLY */ STATE_COMMENT_LINE,
+        /* LTRI */ STATE_COMMENT_LINE,
+        /* RPAREN */ STATE_COMMENT_LINE,
+        /* RSQUARE */ STATE_COMMENT_LINE,
+        /* RCURLY */ STATE_COMMENT_LINE,
+        /* RTRI */ STATE_COMMENT_LINE, 
+        /* AND */ STATE_COMMENT_LINE, 
+        /* EQU */ STATE_COMMENT_LINE, 
+        /* SEMI */ STATE_COMMENT_LINE, 
+        /* COMMA */ STATE_COMMENT_LINE, 
+        /* MISCOP */ STATE_COMMENT_LINE,
+    },
+    { // STATE_COMMENT_LINE_BACKSLASH
+        /* IDENT */ STATE_COMMENT_LINE,
+        /* NEWLINE */ STATE_COMMENT_LINE,
+        /* SLASH */ STATE_COMMENT_LINE,
+        /* BACKSLASH */ STATE_COMMENT_LINE_BACKSLASH,
+        /* STAR */ STATE_COMMENT_LINE,
+        /* POUND */ STATE_COMMENT_LINE,
+        /* WHITE */ STATE_COMMENT_LINE,
+        /* DIGIT */ STATE_COMMENT_LINE,
+        /* QUOTE */ STATE_COMMENT_LINE,
+        /* LPAREN */ STATE_COMMENT_LINE,
+        /* LSQUARE */ STATE_COMMENT_LINE,
+        /* LCURLY */ STATE_COMMENT_LINE,
+        /* LTRI */ STATE_COMMENT_LINE,
+        /* RPAREN */ STATE_COMMENT_LINE,
+        /* RSQUARE */ STATE_COMMENT_LINE,
+        /* RCURLY */ STATE_COMMENT_LINE,
+        /* RTRI */ STATE_COMMENT_LINE, 
+        /* AND */ STATE_COMMENT_LINE, 
+        /* EQU */ STATE_COMMENT_LINE, 
+        /* SEMI */ STATE_COMMENT_LINE, 
+        /* COMMA */ STATE_COMMENT_LINE, 
+        /* MISCOP */ STATE_COMMENT_LINE,
+    },
+    { // STATE_COMMENT_BLOCK
+        /* IDENT */ STATE_COMMENT_BLOCK,
+        /* NEWLINE */ STATE_COMMENT_BLOCK,
+        /* SLASH */ STATE_COMMENT_BLOCK,
+        /* BACKSLASH */ STATE_COMMENT_BLOCK,
+        /* STAR */ STATE_COMMENT_BLOCK_STAR,
+        /* POUND */ STATE_COMMENT_BLOCK,
+        /* WHITE */ STATE_COMMENT_BLOCK,
+        /* DIGIT */ STATE_COMMENT_BLOCK,
+        /* QUOTE */ STATE_COMMENT_BLOCK,
+        /* LPAREN */ STATE_COMMENT_BLOCK,
+        /* LSQUARE */ STATE_COMMENT_BLOCK,
+        /* LCURLY */ STATE_COMMENT_BLOCK,
+        /* LTRI */ STATE_COMMENT_BLOCK,
+        /* RPAREN */ STATE_COMMENT_BLOCK,
+        /* RSQUARE */ STATE_COMMENT_BLOCK,
+        /* RCURLY */ STATE_COMMENT_BLOCK,
+        /* RTRI */ STATE_COMMENT_BLOCK, 
+        /* AND */ STATE_COMMENT_BLOCK, 
+        /* EQU */ STATE_COMMENT_BLOCK, 
+        /* SEMI */ STATE_COMMENT_BLOCK, 
+        /* COMMA */ STATE_COMMENT_BLOCK, 
+        /* MISCOP */ STATE_COMMENT_BLOCK,
+    },
+    { // STATE_COMMENT_BLOCK_STAR
+        /* IDENT */ STATE_COMMENT_BLOCK,
+        /* NEWLINE */ STATE_COMMENT_BLOCK,
+        /* SLASH */ STATE_NEWLINE,
+        /* BACKSLASH */ STATE_COMMENT_BLOCK,
+        /* STAR */ STATE_COMMENT_BLOCK_STAR,
+        /* POUND */ STATE_COMMENT_BLOCK,
+        /* WHITE */ STATE_COMMENT_BLOCK,
+        /* DIGIT */ STATE_COMMENT_BLOCK,
+        /* QUOTE */ STATE_COMMENT_BLOCK,
+        /* LPAREN */ STATE_COMMENT_BLOCK,
+        /* LSQUARE */ STATE_COMMENT_BLOCK,
+        /* LCURLY */ STATE_COMMENT_BLOCK,
+        /* LTRI */ STATE_COMMENT_BLOCK,
+        /* RPAREN */ STATE_COMMENT_BLOCK,
+        /* RSQUARE */ STATE_COMMENT_BLOCK,
+        /* RCURLY */ STATE_COMMENT_BLOCK,
+        /* RTRI */ STATE_COMMENT_BLOCK, 
+        /* AND */ STATE_COMMENT_BLOCK, 
+        /* EQU */ STATE_COMMENT_BLOCK, 
+        /* SEMI */ STATE_COMMENT_BLOCK, 
+        /* COMMA */ STATE_COMMENT_BLOCK, 
+        /* MISCOP */ STATE_COMMENT_BLOCK,
+    },
+    { // STATE_DECL_TYPE
+        /* IDENT */ STATE_DECL_TYPE,
+        /* NEWLINE */ STATE_NEWLINE,//STATE_DECL_VAR,
+        /* SLASH */ STATE_SEEN_SLASH,//STATE_DECL_VAR,
+        /* BACKSLASH */ STATE_NEWLINE,
+        /* STAR */ STATE_NEWLINE,//STATE_DECL_VAR,
+        /* POUND */ STATE_NEWLINE,//STATE_PREPROC,
+        /* WHITE */ STATE_NEWLINE,//STATE_DECL_VAR,
+        /* DIGIT */ STATE_DECL_TYPE,//STATE_DECL_VAR,
+        /* QUOTE */ STATE_NEWLINE, // @Temporary
+        /* LPAREN */ STATE_NEWLINE, // @Temporary
+        /* LSQUARE */ STATE_NEWLINE, // @Temporary
+        /* LCURLY */ STATE_NEWLINE, // @Temporary
+        /* LTRI */ STATE_NEWLINE, // @Temporary
+        /* RPAREN */ STATE_NEWLINE, // @Temporary
+        /* RSQUARE */ STATE_NEWLINE, // @Temporary
+        /* RCURLY */ STATE_NEWLINE, // @Temporary
+        /* RTRI */ STATE_NEWLINE, // @Temporary
+        /* AND */ STATE_NEWLINE, // @Temporary
+        /* EQU */ STATE_NEWLINE, // @Temporary
+        /* SEMI */ STATE_NEWLINE, // @Temporary
+        /* COMMA */ STATE_NEWLINE, // @Temporary
+        /* MISCOP */ STATE_NEWLINE, // @Temporary
+    },
+};
+    State state = initial_state;
+    while (p < pend) {
+        s32 raw = (s32)*p;
+        u8 c = (raw | -(raw >> 7) >> 31);
+        //u8 c;
+        //if (c >= 128) c = 127;
+        //else c = raw & 0x7f;
+        Char_Type type = (Char_Type)char_type[(u8)(c & 0x7f)];
+        State new_state = (State)(state_table[state])[(u8)type];
+        if (new_state != state) {
+            sh->type = (Syntax_Highlight_Type)new_state;
+            sh->where = p;
+            sh++;
+        }
+        
+        state = new_state;
+        p++;
+    }
+
+    return state;
+}
+
     //__declspec(noinline) // @Temporary @Debug @Remove
     void parse_buffer(Buffer& b) {
         if (b.allocated <= 0) return;
-        //u32 *const end = b.data + b.allocated;
-        //u32 *const end = &b[get_count(b) - 1] + 1;
-        //const u32 final_char = end[-1];
-        //end[-1] = BUF_END;
-        
-        //static // @Debug.
-            bool copied = false;
-        assert(b.syntax.count >= get_count(b) + 16);
-        //assert(b.as_ascii.count >= get_count(b) + 16);
-        //index_offset = b.data;
-        //p = b.data;
-        if (!copied) {
-            copied = true;
-            array_resize(&b.as_ascii, get_count(b) + 16);
-            u8* dst = b.as_ascii.data;
-            const u32* src = b.data;
-            while (src < b.gap) {
-                if (src[0] & 0xffffff80) {
-                    dst[0] = '$';
-                } else {
-                    dst[0] = src[0];
-                }
-                src++;
-                dst++;
-            }
-            src += b.gap_size;
-            while (src < b.data + b.allocated) {
-                if (src[0] & 0xffffff80) {
-                    dst[0] = '$';
-                } else {
-                    dst[0] = src[0];
-                }
-                src++;
-                dst++;
-            }
-            //dst[0] = BUF_END;
-            *dst++ = ' ';
-            *dst++ = '"';
-            *dst++ = '\'';
-            *dst++ = '*';
-            *dst++ = '/';
-            *dst++ = '\n';
-            *dst++ = ' ';
-            *dst++ = '"';
-            *dst++ = '\'';
-            *dst++ = '*';
-            *dst++ = '/';
-            *dst++ = '\n';
-        }
-        buf_end = b.as_ascii.end() - 1;
-        p = b.as_ascii.data;
-        sh = b.syntax.data;
-        //gap_size = b.gap_size;
-        //if (gap_size) {
-        //    b.gap[0] = BUF_GAP;
-        //}
 
-#if 0
-        parse_pda();
-#elif 0
-        // Speed test
-        /*scan_lexeme();
-        if (p[0] == '#') parse_pp();
-        while (next()) {
-            next_token();
-            p++;
-        }*/
+        sh = b.syntax.data;
+        p = b.data;
+        buf_end = b.data + b.allocated;
+        buf_gap = b.gap;
+        gap_size = b.gap_size;
+
         push(SHT_IDENT);
-        auto end = b.as_ascii.end() - 1;
-        while (p < end) {
-        //while (p != end) {
-        //while (p[0] != BUF_END) {
-            //if (p[0] == BUF_END) break;
-            p++;
+#if DFA_PARSER
+        {
+            if (gap_size) b.gap[0] = 0; // @Debug.
+            Syntax_Highlight* dfa_sh = b.syntax.data;
+            State state = parse_dfa(STATE_NEWLINE, b.data, b.gap, dfa_sh);
+            state = parse_dfa(state, buf_gap + gap_size, buf_end, dfa_sh);
+            this->sh = dfa_sh;
+            this->p = buf_end;
         }
-        push(SHT_IDENT);
 #else
         scan_lexeme();
         if (p[0] == '#') parse_pp();
@@ -1025,18 +1277,8 @@ struct C_Lexer {
             }
         }
 #endif
-
-        //end[-1] = final_char;
-        //p = end;
         push(SHT_IDENT);
-        p++;
-        p = b.as_ascii.end();
-        push(SHT_IDENT); // @Hack: why is this necessary?
         b.syntax.count = sh - b.syntax.data;
-
-        for (auto&& sh : b.syntax) {
-            sh.where -= (size_t)b.as_ascii.data;
-        }
     }
 };
 
@@ -1055,8 +1297,8 @@ void parse_syntax(Buffer* buffer) {
 
     if (buffer->syntax.count < get_count(*buffer)) {
         auto old_cap = buffer->syntax.allocated;
-        array_resize(&buffer->syntax, get_count(*buffer) + 16);
-        //array_resize(&buffer->as_ascii, get_count(*buffer) + 16);
+        array_resize(&buffer->syntax, get_count(*buffer));
+        //array_resize(&buffer->as_ascii, get_count(*buffer));
         //if (buffer->syntax.allocated != old_cap)
         //    OutputDebugStringA("Reserving!!\n");
     }
