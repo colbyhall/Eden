@@ -154,6 +154,127 @@ static bool c_ends_expression(u32 c) { return c == ')' || c_ends_statement(c); }
 
 #include "cpp_syntax.h"
 
+typedef u64 Parse_State;
+enum Preproc_State {
+    PP_NEW_LINE = 0,
+    PP_MID_LINE = 1,
+    PP_NEW_LINE_SLASH = 2, // anticipating a comment
+    PP_MID_LINE_SLASH = 3, // anticipating a comment
+    PP_MID_LINE_BS = 4, // ignore next newline
+    PP_PREPROC = 5, // inside #
+    PP_PREPROC_SLASH = 6, // anticipating a comment
+    PP_PREPROC_BS = 7, // backslash inside #
+    PP_COMMENT_LINE = 8,
+    PP_COMMENT_LINE_BS = 9, // anticipating a newline
+    PP_NEW_LINE_COMMENT_BLOCK = 10,
+    PP_NEW_LINE_COMMENT_BLOCK_STAR = 11, // anticipating '/'
+    PP_MID_LINE_COMMENT_BLOCK = 12,
+    PP_MID_LINE_COMMENT_BLOCK_STAR = 13, // anticipating '/'
+    PP_PREPROC_COMMENT_BLOCK = 14,
+    PP_PREPROC_COMMENT_BLOCK_STAR = 15, // anticipating '/'
+
+    NUM_PREPROC_STATES
+};
+enum Main_State {
+    STATEMENT = 0,
+    STATEMENT_TYPED = 1,
+    STATEMENT_EXPRESSION = 2, // Array size etc.
+    PARAMS = 3,
+    PARAM_GOT_TYPE = 4,
+    PARAM_EXPRESSION = 5, // Default arg.
+    EXPRESSION = 6,
+    //MAYBE_TEMPLATE =  9,
+
+    FUNCTION_CALL_DO_NOT_USE,
+    NUM_MAIN_STATES
+};
+enum Preproc_Char_Type {
+    PP_MISC      = 0x0,
+    PP_WHITE     = 0x1,
+    PP_NEWLINE   = 0x2, // '\r' '\n'
+    PP_POUND     = 0x3, // '#'
+    PP_SLASH     = 0x4, // '/'
+    PP_STAR      = 0x5, // '*'
+    PP_BACKSLASH = 0x6, // '\\'
+    PP_QUOTE     = 0x7, // '"' '\''
+
+    NUM_PREPROC_TYPES
+};
+enum Main_Char_Type {
+    MISC    = 0x0, // whitespace '#' '@' '!' '%' '&' '+' '-' '.' '/' ':' '?' '
+    IDENT   = 0x1, // A-Z a-z '$' '_' '`'
+    DIGIT   = 0x2, // 0-9
+    QUOTE   = 0x3, // '\'' '"'
+    LPAREN  = 0x4, // '('
+    RPAREN  = 0x5, // ')'
+    LSQUARE = 0x6, // '['
+    RSQUARE = 0x7, // ']'
+    LCURLY  = 0x8, // '{'
+    RCURLY  = 0x9, // '}'
+    LTRI    = 0xA, // '<'
+    RTRI    = 0xB, // '>'
+    REFPTR  = 0xC, // '&' '*'
+    EQUALS  = 0xD, // '='
+    SEMI    = 0xE, // ';'
+    COMMA   = 0xF, // ','
+
+    NUM_MAIN_TYPES
+};
+
+#define MAIN(state) (((state) >> 0) & 0xff)
+#define PREPROC(state) (((state) >> 8) & 0xff)
+#define STASHED(state) (((state) >> 16) & 0xff)
+#define COMPOSE_STATE(m, p, s) ((m) | ((p) << 8) | ((s) << 16))
+
+#if DFA_PARSER
+Syntax_Highlight_Type get_color_type(const Syntax_Highlight* sh, const u32* p) {
+    u64 type = sh->type;
+
+    u8 preproc = PREPROC(sh->type);
+    if (preproc >= PP_COMMENT_LINE) {
+        return SHT_COMMENT;
+    }
+    //if (preproc == PP_NEW_LINE_SLASH ||
+    //    preproc == PP_MID_LINE_SLASH ||
+    //    preproc == PP_PREPROC_SLASH) {
+    //    if (PREPROC(sh[1].type) >= PP_COMMENT_LINE) {
+    //        return SHT_COMMENT;
+    //    }
+    //}
+    if (preproc == PP_PREPROC) {
+        if (p[0] == '#') return SHT_DIRECTIVE;
+    }
+    u8 main = MAIN(type);
+    //if (main == EXPRESSION) {
+    //    if (is_letter(sh[0].where[0])) {
+    //        if (sh[1].where[0] == '(') return SHT_FUNCTION;
+    //    }
+    //    return SHT_IDENT;
+    //} else if (main == STATEMENT) {
+    //    return SHT_TYPE;
+    //}// else if (main == STATEMENT_TYPED) {
+     //   return SHT_IDENT;
+    //}//
+
+
+    if (c_is_op(p[0])) return SHT_OPERATOR;
+    switch (main) {
+    case STATEMENT: return SHT_TYPE;
+    case STATEMENT_TYPED: return SHT_IDENT;
+    case PARAM_EXPRESSION:
+    case EXPRESSION:
+    case STATEMENT_EXPRESSION: return SHT_IDENT;
+    case PARAMS: return SHT_TYPE;
+    case PARAM_GOT_TYPE: return SHT_PARAMETER;
+    }
+    return SHT_IDENT;
+}
+#else
+Syntax_Highlight_Type get_color_type(const Syntax_Highlight* sh, const u32* p) {
+    return sh->type;
+}
+#endif
+
 #define C_KW_DECL(name) C##name,
 enum C_Keyword {
     NOT_KEYWORD,
@@ -939,303 +1060,310 @@ struct C_Lexer {
         return;
     }
 
-enum State {
-    STATE_NEWLINE = 0,
-    STATE_PREPROC = 1,
-    STATE_PREPROC_BACKSLASH = 2,
-    STATE_SEEN_SLASH = 3,
-    STATE_COMMENT_LINE = 4,
-    STATE_COMMENT_LINE_BACKSLASH = 5,
-    STATE_COMMENT_BLOCK = 6,
-    STATE_COMMENT_BLOCK_STAR = 7,
+static Parse_State parse_dfa(const Parse_State initial_state, const u32* p,
+                             const u32* const pend, Syntax_Highlight** const sh) {
+static const u8 char_type[128] = {
+//[0 ------------------------------------  8]    t    n    v    f    r    [14 ----
+  0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x20,0x10,0x10,0x20,0x10,0x10,
+//-------------------------------------------------------------------------- 31]
+  0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,
+//       !    "    #    $    %    &    '    (    )    *    +    ,    -    .    /  
+  0x10,0x00,0x03,0x30,0x01,0x00,0x0C,0x03,0x04,0x05,0x5C,0x00,0x0F,0x00,0x00,0x40,
+//  0    1    2    3    4    5    6    7    8    9    :    ;    <    =    >    ?
+  0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x00,0x0E,0x0A,0x0D,0x0B,0x00,
+//  @    A    B    C    D    E    F    G    H    I    J    K    L    M    N    O  
+  0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
+//  P    Q    R    S    T    U    V    W    X    Y    Z    [    \    ]    ^    _
+  0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x06,0x60,0x07,0x00,0x01,
+//  `    a    b    c    d    e    f    g    h    i    j    k    l    m    n    o  
+  0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
+//  p    q    r    s    t    u    v    w    x    y    z    {    |    }    ~    \127
+  0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x08,0x00,0x00,0x00,0x11,
+};
+static const u8 (preproc_table[NUM_PREPROC_STATES])[NUM_PREPROC_TYPES] = {
+    { // PP_NEW_LINE
+        /* MISC      = */ PP_MID_LINE,
+        /* WHITE     = */ PP_NEW_LINE,
+        /* NEWLINE   = */ PP_NEW_LINE,
+        /* POUND     = */ PP_PREPROC,
+        /* SLASH     = */ PP_NEW_LINE_SLASH,
+        /* STAR      = */ PP_MID_LINE,
+        /* BACKSLASH = */ PP_NEW_LINE,
+    },
+    { // PP_MID_LINE
+        /* MISC      = */ PP_MID_LINE,
+        /* WHITE     = */ PP_MID_LINE,
+        /* NEWLINE   = */ PP_NEW_LINE,
+        /* POUND     = */ PP_MID_LINE,
+        /* SLASH     = */ PP_MID_LINE_SLASH,
+        /* STAR      = */ PP_MID_LINE,
+        /* BACKSLASH = */ PP_MID_LINE_BS,
+    },
+    { // PP_NEW_LINE_SLASH
+        /* MISC      = */ PP_MID_LINE,
+        /* WHITE     = */ PP_MID_LINE,
+        /* NEWLINE   = */ PP_NEW_LINE,
+        /* POUND     = */ PP_MID_LINE,
+        /* SLASH     = */ PP_COMMENT_LINE,
+        /* STAR      = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* BACKSLASH = */ PP_MID_LINE_BS,
+    },
+    { // PP_MID_LINE_SLASH
+        /* MISC      = */ PP_MID_LINE,
+        /* WHITE     = */ PP_MID_LINE,
+        /* NEWLINE   = */ PP_NEW_LINE,
+        /* POUND     = */ PP_MID_LINE,
+        /* SLASH     = */ PP_COMMENT_LINE,
+        /* STAR      = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* BACKSLASH = */ PP_MID_LINE_BS,
+    },
+    { // PP_MID_LINE_BS
+        /* MISC      = */ PP_MID_LINE,
+        /* WHITE     = */ PP_MID_LINE,
+        /* NEWLINE   = */ PP_MID_LINE,
+        /* POUND     = */ PP_MID_LINE,
+        /* SLASH     = */ PP_MID_LINE_SLASH,
+        /* STAR      = */ PP_MID_LINE,
+        /* BACKSLASH = */ PP_MID_LINE_BS,
+    },
+    { // PP_PREPROC
+        /* MISC      = */ PP_PREPROC,
+        /* WHITE     = */ PP_PREPROC,
+        /* NEWLINE   = */ PP_NEW_LINE,
+        /* POUND     = */ PP_PREPROC,
+        /* SLASH     = */ PP_PREPROC_SLASH,
+        /* STAR      = */ PP_PREPROC,
+        /* BACKSLASH = */ PP_PREPROC_BS,
+    },
+    { // PP_PREPROC_SLASH
+        /* MISC      = */ PP_PREPROC,
+        /* WHITE     = */ PP_PREPROC,
+        /* NEWLINE   = */ PP_PREPROC,
+        /* POUND     = */ PP_PREPROC,
+        /* SLASH     = */ PP_COMMENT_LINE,
+        /* STAR      = */ PP_PREPROC_COMMENT_BLOCK,
+        /* BACKSLASH = */ PP_PREPROC_BS,
+    },
+    { // PP_PREPROC_BS
+        /* MISC      = */ PP_PREPROC,
+        /* WHITE     = */ PP_PREPROC,
+        /* NEWLINE   = */ PP_PREPROC,
+        /* POUND     = */ PP_PREPROC,
+        /* SLASH     = */ PP_PREPROC_SLASH,
+        /* STAR      = */ PP_PREPROC,
+        /* BACKSLASH = */ PP_PREPROC_BS,
+    },
+    { // PP_COMMENT_LINE
+        /* MISC      = */ PP_COMMENT_LINE,
+        /* WHITE     = */ PP_COMMENT_LINE,
+        /* NEWLINE   = */ PP_NEW_LINE,
+        /* POUND     = */ PP_COMMENT_LINE,
+        /* SLASH     = */ PP_COMMENT_LINE,
+        /* STAR      = */ PP_COMMENT_LINE,
+        /* BACKSLASH = */ PP_COMMENT_LINE_BS,
+    },
+    { // PP_COMMENT_LINE_BS
+        /* MISC      = */ PP_COMMENT_LINE,
+        /* WHITE     = */ PP_COMMENT_LINE,
+        /* NEWLINE   = */ PP_COMMENT_LINE,
+        /* POUND     = */ PP_COMMENT_LINE,
+        /* SLASH     = */ PP_COMMENT_LINE,
+        /* STAR      = */ PP_COMMENT_LINE,
+        /* BACKSLASH = */ PP_COMMENT_LINE_BS,
+    },
+    { // PP_NEW_LINE_COMMENT_BLOCK
+        /* MISC      = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* WHITE     = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* NEWLINE   = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* POUND     = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* SLASH     = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* STAR      = */ PP_NEW_LINE_COMMENT_BLOCK_STAR,
+        /* BACKSLASH = */ PP_NEW_LINE_COMMENT_BLOCK,
+    },
+    { // PP_NEW_LINE_COMMENT_BLOCK_STAR
+        /* MISC      = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* WHITE     = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* NEWLINE   = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* POUND     = */ PP_NEW_LINE_COMMENT_BLOCK,
+        /* SLASH     = */ PP_NEW_LINE,
+        /* STAR      = */ PP_NEW_LINE_COMMENT_BLOCK_STAR,
+        /* BACKSLASH = */ PP_NEW_LINE_COMMENT_BLOCK,
+    },
+    { // PP_MID_LINE_COMMENT_BLOCK
+        /* MISC      = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* WHITE     = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* NEWLINE   = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* POUND     = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* SLASH     = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* STAR      = */ PP_MID_LINE_COMMENT_BLOCK_STAR,
+        /* BACKSLASH = */ PP_MID_LINE_COMMENT_BLOCK,
+    },
+    { // PP_MID_LINE_COMMENT_BLOCK_STAR
+        /* MISC      = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* WHITE     = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* NEWLINE   = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* POUND     = */ PP_MID_LINE_COMMENT_BLOCK,
+        /* SLASH     = */ PP_MID_LINE,
+        /* STAR      = */ PP_MID_LINE_COMMENT_BLOCK_STAR,
+        /* BACKSLASH = */ PP_MID_LINE_COMMENT_BLOCK,
+    },
+    { // PP_PREPROC_COMMENT_BLOCK
+        /* MISC      = */ PP_PREPROC_COMMENT_BLOCK,
+        /* WHITE     = */ PP_PREPROC_COMMENT_BLOCK,
+        /* NEWLINE   = */ PP_PREPROC_COMMENT_BLOCK,
+        /* POUND     = */ PP_PREPROC_COMMENT_BLOCK,
+        /* SLASH     = */ PP_PREPROC_COMMENT_BLOCK,
+        /* STAR      = */ PP_PREPROC_COMMENT_BLOCK_STAR,
+        /* BACKSLASH = */ PP_PREPROC_COMMENT_BLOCK,
+    },
+    { // PP_MID_LINE_COMMENT_BLOCK_STAR
+        /* MISC      = */ PP_PREPROC_COMMENT_BLOCK,
+        /* WHITE     = */ PP_PREPROC_COMMENT_BLOCK,
+        /* NEWLINE   = */ PP_PREPROC_COMMENT_BLOCK,
+        /* POUND     = */ PP_PREPROC_COMMENT_BLOCK,
+        /* SLASH     = */ PP_PREPROC,
+        /* STAR      = */ PP_PREPROC_COMMENT_BLOCK_STAR,
+        /* BACKSLASH = */ PP_PREPROC_COMMENT_BLOCK,
+    },
+};
+static const u8 (main_table[NUM_MAIN_STATES])[NUM_MAIN_TYPES] = {
+    { // STATEMENT
+        /* MISC    = */ STATEMENT_TYPED,
+        /* IDENT   = */ STATEMENT,
+        /* DIGIT   = */ STATEMENT,
+        /* QUOTE   = */ EXPRESSION,
+        /* LPAREN  = */ STATEMENT_TYPED,
+        /* RPAREN  = */ STATEMENT_TYPED,
+        /* LSQUARE = */ EXPRESSION,
+        /* RSQUARE = */ EXPRESSION,
+        /* LCURLY  = */ STATEMENT,
+        /* RCURLY  = */ STATEMENT,
+        /* LTRI    = */ EXPRESSION, //MAYBE_TEMPLATE,
+        /* RTRI    = */ EXPRESSION,
+        /* REFPTR  = */ STATEMENT_TYPED,
+        /* EQUALS  = */ EXPRESSION,
+        /* SEMI    = */ STATEMENT,
+        /* COMMA   = */ EXPRESSION,
+    },
+    { // STATEMENT_TYPED
+        /* MISC    = */ STATEMENT_TYPED,
+        /* IDENT   = */ STATEMENT_TYPED,
+        /* DIGIT   = */ STATEMENT_TYPED,
+        /* QUOTE   = */ EXPRESSION,
+        /* LPAREN  = */ STATEMENT,//PARAMS,
+        /* RPAREN  = */ STATEMENT,
+        /* LSQUARE = */ EXPRESSION,
+        /* RSQUARE = */ EXPRESSION,
+        /* LCURLY  = */ STATEMENT,
+        /* RCURLY  = */ STATEMENT,
+        /* LTRI    = */ STATEMENT,//MAYBE_TEMPLATE,
+        /* RTRI    = */ EXPRESSION,
+        /* REFPTR  = */ STATEMENT_TYPED,
+        /* EQUALS  = */ EXPRESSION,
+        /* SEMI    = */ STATEMENT,
+        /* COMMA   = */ EXPRESSION,
+    },
+    { // STATEMENT_EXPRESSION
+    //    /* MISC    = */ STATEMENT_EXPRESSION,
+    //    /* IDENT   = */ STATEMENT_EXPRESSION,
+    //    /* DIGIT   = */ STATEMENT_EXPRESSION,
+    //    /* QUOTE   = */ STATEMENT_EXPRESSION,
+    //    /* LPAREN  = */ STATEMENT_EXPRESSION,
+    //    /* RPAREN  = */ PARAMS,
+    //    /* LSQUARE = */ STATEMENT_EXPRESSION,
+    //    /* RSQUARE = */ STATEMENT_TYPED,
+    //    /* LCURLY  = */ STATEMENT_EXPRESSION,
+    //    /* RCURLY  = */ STATEMENT,
+    //    /* LTRI    = */ STATEMENT_EXPRESSION,
+    //    /* RTRI    = */ STATEMENT_EXPRESSION,
+    //    /* REFPTR  = */ STATEMENT_TYPED,
+    //    /* EQUALS  = */ STATEMENT_EXPRESSION,
+    //    /* SEMI    = */ STATEMENT,
+    //    /* COMMA   = */ STATEMENT_EXPRESSION,
+    },
+    { // PARAMS
+    //    /* MISC    = */ PARAM_GOT_TYPE,
+    //    /* IDENT   = */ PARAMS,
+    //    /* DIGIT   = */ PARAMS,
+    //    /* QUOTE   = */ EXPRESSION,
+    //    /* LPAREN  = */ PARAM_EXPRESSION,
+    //    /* RPAREN  = */ PARAM_EXPRESSION,
+    //    /* LSQUARE = */ PARAM_EXPRESSION,
+    //    /* RSQUARE = */ PARAM_EXPRESSION,
+    //    /* LCURLY  = */ PARAM_EXPRESSION,
+    //    /* RCURLY  = */ PARAM_EXPRESSION,
+    //    /* LTRI    = */ PARAM_EXPRESSION, //MAYBE_TEMPLATE,
+    //    /* RTRI    = */ PARAM_EXPRESSION,
+    //    /* REFPTR  = */ STATEMENT_TYPED,
+    //    /* EQUALS  = */ PARAM_EXPRESSION,
+    //    /* SEMI    = */ STATEMENT,
+    //    /* COMMA   = */ EXPRESSION,
+    },
+    { // PARAM_GOT_TYPE
+    },
+    { // PARAM_EXPRESSION
+    },
+    { // EXPRESSION
+        /* MISC    = */ EXPRESSION,
+        /* IDENT   = */ EXPRESSION,
+        /* DIGIT   = */ EXPRESSION,
+        /* QUOTE   = */ EXPRESSION,
+        /* LPAREN  = */ EXPRESSION,
+        /* RPAREN  = */ EXPRESSION,
+        /* LSQUARE = */ EXPRESSION,
+        /* RSQUARE = */ EXPRESSION,
+        /* LCURLY  = */ EXPRESSION,
+        /* RCURLY  = */ STATEMENT,
+        /* LTRI    = */ EXPRESSION, //MAYBE_TEMPLATE,
+        /* RTRI    = */ EXPRESSION,
+        /* REFPTR  = */ EXPRESSION,
+        /* EQUALS  = */ EXPRESSION,
+        /* SEMI    = */ STATEMENT,
+        /* COMMA   = */ EXPRESSION,
+    },
+};
 
-    STATE_DECL_TYPE = 8,
-    //STATE_DECL_VAR = 9,
+    Parse_State state = initial_state;
 
-    NUM_STATES
-};
-static State
-parse_dfa(State initial_state,
-          const u32* p,
-         const u32* const pend,
-          Syntax_Highlight*& sh) {
-    enum Char_Type {
-        IDENT = 0, // ident
-        NEWLINE = 1, // '\r' '\n'
-        SLASH = 2, // '/'
-        BACKSLASH = 3, // '\\'
-        STAR = 4, // '*'
-        POUND = 5, // '#'
-        WHITE = 6, // anything below 32 besides newline 
-        DIGIT = 7, // '0' '1' '2' '3' '4' '5' '6' '7' '8' '9'
-        QUOTE = 8, // '\'' '"'
-        LPAREN = 9, // '('
-        LSQUARE = 10, // '['
-        LCURLY = 11, // '{'
-        LTRI = 12, // '<'
-        RPAREN = 13, // ')'
-        RSQUARE = 14, // ']'
-        RCURLY = 15, // '}'
-        RTRI = 16, // '>'
-        AND = 17, // '&'
-        EQU = 18, // '='
-        SEMI = 19, // ';'
-        COMMA = 20, // ','
-        MISCOP = 21, // '~' '!' '%' '^' '-' '+' '|' ':' '.' '?'
-        NUM_CHAR_TYPES
-    };
-    static const unsigned char char_type[128] {
-//[0 ----------- 8] t n v f r [14 --------------------------- 31]
-  6,6,6,6,6,6,6,6,6,6,1,6,6,1,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
-//   ! " # $  %  & ' (  ) *  +  ,  -  . / 0 1 2 3 4 5 6 7 8 9  :  ;  <  =  >  ?
-  6,21,8,5,0,21,17,8,9,13,4,21,20,21,21,2,7,7,7,7,7,7,7,7,7,7,21,19,12,18,16,21,
-//@ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z  [  \  ]  ^ _
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10, 3,14,21,0,
-//` a b c d e f g h i j k l m n o p q r s t u v w x y z  {  |  }  ~ \127
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11,21,15,21,
-  0,//6,
-//// 128 and greater: all identifier
-//6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
-//6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
-};
-static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
-    { // STATE_NEWLINE
-        /* IDENT */ STATE_NEWLINE, // @Temporary
-        /* NEWLINE */ STATE_NEWLINE,
-        /* SLASH */ STATE_SEEN_SLASH,
-        /* BACKSLASH */ STATE_NEWLINE,
-        /* STAR */ STATE_NEWLINE,
-        /* POUND */ STATE_PREPROC,
-        /* WHITE */ STATE_NEWLINE,
-        /* DIGIT */ STATE_NEWLINE, // @Temporary
-        /* QUOTE */ STATE_NEWLINE, // @Temporary
-        /* LPAREN */ STATE_NEWLINE, // @Temporary
-        /* LSQUARE */ STATE_NEWLINE, // @Temporary
-        /* LCURLY */ STATE_NEWLINE, // @Temporary
-        /* LTRI */ STATE_NEWLINE, // @Temporary
-        /* RPAREN */ STATE_NEWLINE, // @Temporary
-        /* RSQUARE */ STATE_NEWLINE, // @Temporary
-        /* RCURLY */ STATE_NEWLINE, // @Temporary
-        /* RTRI */ STATE_NEWLINE, // @Temporary
-        /* AND */ STATE_NEWLINE, // @Temporary
-        /* EQU */ STATE_NEWLINE, // @Temporary
-        /* SEMI */ STATE_NEWLINE, // @Temporary
-        /* COMMA */ STATE_NEWLINE, // @Temporary
-        /* MISCOP */ STATE_NEWLINE, // @Temporary
-    },
-    { // STATE_PREPROC
-        /* IDENT */ STATE_PREPROC,
-        /* NEWLINE */ STATE_NEWLINE,
-        /* SLASH */ STATE_PREPROC,
-        /* BACKSLASH */ STATE_PREPROC_BACKSLASH,
-        /* STAR */ STATE_PREPROC,
-        /* POUND */ STATE_PREPROC,
-        /* WHITE */ STATE_PREPROC,
-        /* DIGIT */ STATE_PREPROC,
-        /* QUOTE */ STATE_PREPROC,
-        /* LPAREN */ STATE_PREPROC,
-        /* LSQUARE */ STATE_PREPROC,
-        /* LCURLY */ STATE_PREPROC,
-        /* LTRI */ STATE_PREPROC,
-        /* RPAREN */ STATE_PREPROC,
-        /* RSQUARE */ STATE_PREPROC,
-        /* RCURLY */ STATE_PREPROC,
-        /* RTRI */ STATE_PREPROC, 
-        /* AND */ STATE_PREPROC, 
-        /* EQU */ STATE_PREPROC, 
-        /* SEMI */ STATE_PREPROC, 
-        /* COMMA */ STATE_PREPROC, 
-        /* MISCOP */ STATE_PREPROC, 
-    },
-    { // STATE_PREPROC_BACKSLASH
-        /* IDENT */ STATE_PREPROC,
-        /* NEWLINE */ STATE_PREPROC,
-        /* SLASH */ STATE_PREPROC,
-        /* BACKSLASH */ STATE_PREPROC_BACKSLASH,
-        /* STAR */ STATE_PREPROC,
-        /* POUND */ STATE_PREPROC,
-        /* WHITE */ STATE_PREPROC,
-        /* DIGIT */ STATE_PREPROC,
-        /* QUOTE */ STATE_PREPROC,
-        /* LPAREN */ STATE_PREPROC,
-        /* LSQUARE */ STATE_PREPROC,
-        /* LCURLY */ STATE_PREPROC,
-        /* LTRI */ STATE_PREPROC,
-        /* RPAREN */ STATE_PREPROC,
-        /* RSQUARE */ STATE_PREPROC,
-        /* RCURLY */ STATE_PREPROC,
-        /* RTRI */ STATE_PREPROC, 
-        /* AND */ STATE_PREPROC, 
-        /* EQU */ STATE_PREPROC, 
-        /* SEMI */ STATE_PREPROC, 
-        /* COMMA */ STATE_PREPROC, 
-        /* MISCOP */ STATE_PREPROC, 
-    },
-    { // STATE_SEEN_SLASH
-        /* IDENT */ STATE_NEWLINE,
-        /* NEWLINE */ STATE_NEWLINE,
-        /* SLASH */ STATE_COMMENT_LINE,
-        /* BACKSLASH */ STATE_NEWLINE,
-        /* STAR */ STATE_COMMENT_BLOCK,
-        /* POUND */ STATE_NEWLINE,
-        /* WHITE */ STATE_NEWLINE,
-        /* DIGIT */ STATE_NEWLINE,
-        /* QUOTE */ STATE_NEWLINE,
-        /* LPAREN */ STATE_NEWLINE,
-        /* LSQUARE */ STATE_NEWLINE,
-        /* LCURLY */ STATE_NEWLINE,
-        /* LTRI */ STATE_NEWLINE,
-        /* RPAREN */ STATE_NEWLINE,
-        /* RSQUARE */ STATE_NEWLINE,
-        /* RCURLY */ STATE_NEWLINE,
-        /* RTRI */ STATE_NEWLINE, 
-        /* AND */ STATE_NEWLINE, 
-        /* EQU */ STATE_NEWLINE, 
-        /* SEMI */ STATE_NEWLINE, 
-        /* COMMA */ STATE_NEWLINE, 
-        /* MISCOP */ STATE_NEWLINE,
-    },
-    { // STATE_COMMENT_LINE
-        /* IDENT */ STATE_COMMENT_LINE,
-        /* NEWLINE */ STATE_NEWLINE,
-        /* SLASH */ STATE_COMMENT_LINE,
-        /* BACKSLASH */ STATE_COMMENT_LINE_BACKSLASH,
-        /* STAR */ STATE_COMMENT_LINE,
-        /* POUND */ STATE_COMMENT_LINE,
-        /* WHITE */ STATE_COMMENT_LINE,
-        /* DIGIT */ STATE_COMMENT_LINE,
-        /* QUOTE */ STATE_COMMENT_LINE,
-        /* LPAREN */ STATE_COMMENT_LINE,
-        /* LSQUARE */ STATE_COMMENT_LINE,
-        /* LCURLY */ STATE_COMMENT_LINE,
-        /* LTRI */ STATE_COMMENT_LINE,
-        /* RPAREN */ STATE_COMMENT_LINE,
-        /* RSQUARE */ STATE_COMMENT_LINE,
-        /* RCURLY */ STATE_COMMENT_LINE,
-        /* RTRI */ STATE_COMMENT_LINE, 
-        /* AND */ STATE_COMMENT_LINE, 
-        /* EQU */ STATE_COMMENT_LINE, 
-        /* SEMI */ STATE_COMMENT_LINE, 
-        /* COMMA */ STATE_COMMENT_LINE, 
-        /* MISCOP */ STATE_COMMENT_LINE,
-    },
-    { // STATE_COMMENT_LINE_BACKSLASH
-        /* IDENT */ STATE_COMMENT_LINE,
-        /* NEWLINE */ STATE_COMMENT_LINE,
-        /* SLASH */ STATE_COMMENT_LINE,
-        /* BACKSLASH */ STATE_COMMENT_LINE_BACKSLASH,
-        /* STAR */ STATE_COMMENT_LINE,
-        /* POUND */ STATE_COMMENT_LINE,
-        /* WHITE */ STATE_COMMENT_LINE,
-        /* DIGIT */ STATE_COMMENT_LINE,
-        /* QUOTE */ STATE_COMMENT_LINE,
-        /* LPAREN */ STATE_COMMENT_LINE,
-        /* LSQUARE */ STATE_COMMENT_LINE,
-        /* LCURLY */ STATE_COMMENT_LINE,
-        /* LTRI */ STATE_COMMENT_LINE,
-        /* RPAREN */ STATE_COMMENT_LINE,
-        /* RSQUARE */ STATE_COMMENT_LINE,
-        /* RCURLY */ STATE_COMMENT_LINE,
-        /* RTRI */ STATE_COMMENT_LINE, 
-        /* AND */ STATE_COMMENT_LINE, 
-        /* EQU */ STATE_COMMENT_LINE, 
-        /* SEMI */ STATE_COMMENT_LINE, 
-        /* COMMA */ STATE_COMMENT_LINE, 
-        /* MISCOP */ STATE_COMMENT_LINE,
-    },
-    { // STATE_COMMENT_BLOCK
-        /* IDENT */ STATE_COMMENT_BLOCK,
-        /* NEWLINE */ STATE_COMMENT_BLOCK,
-        /* SLASH */ STATE_COMMENT_BLOCK,
-        /* BACKSLASH */ STATE_COMMENT_BLOCK,
-        /* STAR */ STATE_COMMENT_BLOCK_STAR,
-        /* POUND */ STATE_COMMENT_BLOCK,
-        /* WHITE */ STATE_COMMENT_BLOCK,
-        /* DIGIT */ STATE_COMMENT_BLOCK,
-        /* QUOTE */ STATE_COMMENT_BLOCK,
-        /* LPAREN */ STATE_COMMENT_BLOCK,
-        /* LSQUARE */ STATE_COMMENT_BLOCK,
-        /* LCURLY */ STATE_COMMENT_BLOCK,
-        /* LTRI */ STATE_COMMENT_BLOCK,
-        /* RPAREN */ STATE_COMMENT_BLOCK,
-        /* RSQUARE */ STATE_COMMENT_BLOCK,
-        /* RCURLY */ STATE_COMMENT_BLOCK,
-        /* RTRI */ STATE_COMMENT_BLOCK, 
-        /* AND */ STATE_COMMENT_BLOCK, 
-        /* EQU */ STATE_COMMENT_BLOCK, 
-        /* SEMI */ STATE_COMMENT_BLOCK, 
-        /* COMMA */ STATE_COMMENT_BLOCK, 
-        /* MISCOP */ STATE_COMMENT_BLOCK,
-    },
-    { // STATE_COMMENT_BLOCK_STAR
-        /* IDENT */ STATE_COMMENT_BLOCK,
-        /* NEWLINE */ STATE_COMMENT_BLOCK,
-        /* SLASH */ STATE_NEWLINE,
-        /* BACKSLASH */ STATE_COMMENT_BLOCK,
-        /* STAR */ STATE_COMMENT_BLOCK_STAR,
-        /* POUND */ STATE_COMMENT_BLOCK,
-        /* WHITE */ STATE_COMMENT_BLOCK,
-        /* DIGIT */ STATE_COMMENT_BLOCK,
-        /* QUOTE */ STATE_COMMENT_BLOCK,
-        /* LPAREN */ STATE_COMMENT_BLOCK,
-        /* LSQUARE */ STATE_COMMENT_BLOCK,
-        /* LCURLY */ STATE_COMMENT_BLOCK,
-        /* LTRI */ STATE_COMMENT_BLOCK,
-        /* RPAREN */ STATE_COMMENT_BLOCK,
-        /* RSQUARE */ STATE_COMMENT_BLOCK,
-        /* RCURLY */ STATE_COMMENT_BLOCK,
-        /* RTRI */ STATE_COMMENT_BLOCK, 
-        /* AND */ STATE_COMMENT_BLOCK, 
-        /* EQU */ STATE_COMMENT_BLOCK, 
-        /* SEMI */ STATE_COMMENT_BLOCK, 
-        /* COMMA */ STATE_COMMENT_BLOCK, 
-        /* MISCOP */ STATE_COMMENT_BLOCK,
-    },
-    { // STATE_DECL_TYPE
-        /* IDENT */ STATE_DECL_TYPE,
-        /* NEWLINE */ STATE_NEWLINE,//STATE_DECL_VAR,
-        /* SLASH */ STATE_SEEN_SLASH,//STATE_DECL_VAR,
-        /* BACKSLASH */ STATE_NEWLINE,
-        /* STAR */ STATE_NEWLINE,//STATE_DECL_VAR,
-        /* POUND */ STATE_NEWLINE,//STATE_PREPROC,
-        /* WHITE */ STATE_NEWLINE,//STATE_DECL_VAR,
-        /* DIGIT */ STATE_DECL_TYPE,//STATE_DECL_VAR,
-        /* QUOTE */ STATE_NEWLINE, // @Temporary
-        /* LPAREN */ STATE_NEWLINE, // @Temporary
-        /* LSQUARE */ STATE_NEWLINE, // @Temporary
-        /* LCURLY */ STATE_NEWLINE, // @Temporary
-        /* LTRI */ STATE_NEWLINE, // @Temporary
-        /* RPAREN */ STATE_NEWLINE, // @Temporary
-        /* RSQUARE */ STATE_NEWLINE, // @Temporary
-        /* RCURLY */ STATE_NEWLINE, // @Temporary
-        /* RTRI */ STATE_NEWLINE, // @Temporary
-        /* AND */ STATE_NEWLINE, // @Temporary
-        /* EQU */ STATE_NEWLINE, // @Temporary
-        /* SEMI */ STATE_NEWLINE, // @Temporary
-        /* COMMA */ STATE_NEWLINE, // @Temporary
-        /* MISCOP */ STATE_NEWLINE, // @Temporary
-    },
-};
-    State state = initial_state;
+    Syntax_Highlight* potential_type = nullptr;
+
+    Main_State main_state       = (Main_State)MAIN(state);
+    Preproc_State preproc_state = (Preproc_State)PREPROC(state);
+    Main_State stashed_state    = (Main_State)STASHED(state);
+
     while (p < pend) {
-        s32 raw = (s32)*p;
-        u8 c = (raw | -(raw >> 7) >> 31);
-        //u8 c;
-        //if (c >= 128) c = 127;
-        //else c = raw & 0x7f;
-        Char_Type type = (Char_Type)char_type[(u8)(c & 0x7f)];
-        State new_state = (State)(state_table[state])[(u8)type];
-        if (new_state != state) {
-            sh->type = (Syntax_Highlight_Type)new_state;
-            sh->where = p;
-            sh++;
+        u32 raw = *p;
+        u8 c = '$';
+        if (c < 128) c = raw & 0x7f;
+
+        u8 type = char_type[c];
+
+        u8 main_type = type & 0xf;
+        u8 preproc_type = (type >> 4) & 0xf;
+
+        Main_State new_main_state = (Main_State)main_table[main_state][main_type];
+        Preproc_State new_preproc_state = (Preproc_State)preproc_table[preproc_state][preproc_type];
+
+        if (new_main_state != main_state || new_preproc_state != preproc_state) {
+            if (new_preproc_state < PP_PREPROC && preproc_state >= PP_PREPROC) {
+                new_main_state = stashed_state;
+            }
+            if (new_preproc_state >= PP_PREPROC && preproc_state < PP_PREPROC
+                && new_preproc_state != PP_PREPROC_SLASH) {
+                stashed_state = main_state;
+                main_state = STATEMENT;
+            }
+            (*sh)->type = (Syntax_Highlight_Type)COMPOSE_STATE(new_main_state, new_preproc_state, stashed_state);
+            (*sh)->where = p;
+            (*sh)++;
         }
         
-        state = new_state;
+        main_state = new_main_state;
+        preproc_state = new_preproc_state;
         p++;
     }
 
-    return state;
+    return COMPOSE_STATE(main_state, preproc_state, stashed_state);
 }
 
     //__declspec(noinline) // @Temporary @Debug @Remove
@@ -1253,8 +1381,8 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         {
             if (gap_size) b.gap[0] = 0; // @Debug.
             Syntax_Highlight* dfa_sh = b.syntax.data;
-            State state = parse_dfa(STATE_NEWLINE, b.data, b.gap, dfa_sh);
-            state = parse_dfa(state, buf_gap + gap_size, buf_end, dfa_sh);
+            Parse_State state = parse_dfa(0, b.data, b.gap, &dfa_sh);
+            state = parse_dfa(state, buf_gap + gap_size, buf_end, &dfa_sh);
             this->sh = dfa_sh;
             this->p = buf_end;
         }

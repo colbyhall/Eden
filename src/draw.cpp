@@ -436,23 +436,6 @@ static Color highlight_to_color(Syntax_Highlight_Type type) {
     }
     return 0; // shut up compiler
 }
-#if DFA_PARSER
-static Color get_color(const Syntax_Highlight* sh) {
-    static const Syntax_Highlight_Type state_to_sh[] = {
-        SHT_IDENT,
-        SHT_DIRECTIVE,SHT_DIRECTIVE,
-        SHT_OPERATOR,
-        SHT_COMMENT,SHT_COMMENT,
-        SHT_COMMENT,SHT_COMMENT,
-        SHT_TYPE,
-    };
-    return highlight_to_color(state_to_sh[sh->type]);
-}
-#else
-static Color get_color(const Syntax_Highlight* sh) {
-    return highlight_to_color(sh->type);
-}
-#endif
 
 void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font) {
 	float x = x0;
@@ -523,10 +506,10 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
 		}
 #else
-		const u32 c = (*buffer)[i];
+		const u32& c = (*buffer)[i];
 
         bool highlight_changed = false;
-        while (&(*buffer)[i] >= current_highlight[1].where) {
+        while (&c >= current_highlight[1].where) {
             highlight_changed = true;
             current_highlight += 1;
             assert(current_highlight + 1 < buffer->syntax.cend());
@@ -534,7 +517,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
         // @Debug
         //if (highlight_changed) x += immediate_char('|', x, y, 0xff00ff, font)->advance;
         
-        Color color = get_color(current_highlight);
+        Color color = highlight_to_color(get_color_type(current_highlight, &c));
 #endif
 
         if ((view->cursor > view->selection && i >= view->selection && i < view->cursor) ||
