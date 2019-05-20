@@ -515,7 +515,8 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
             assert(current_highlight + 1 < buffer->syntax.cend());
         }
         // @Debug
-        //if (highlight_changed) x += immediate_char('|', x, y, 0xff00ff, font)->advance;
+        extern bool use_dfa_parser;
+        if (use_dfa_parser) if (highlight_changed) x += immediate_char('|', x, y, 0xff00ff, font)->advance;
         
         Color color = highlight_to_color(get_color_type(current_highlight, &c));
 #endif

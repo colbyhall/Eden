@@ -36,10 +36,8 @@ enum Syntax_Highlight_Type {
     SHT_ANNOTATION,
     SHT_PARAMETER,
 };
-#define DFA_PARSER 0
+
 struct Syntax_Highlight {
-    //size_t type : 4;
-    //size_t where : (sizeof(size_t) * 8 - 4);
     Syntax_Highlight_Type type = {};
     const u32* where = 0;
 };

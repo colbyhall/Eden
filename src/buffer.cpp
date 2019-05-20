@@ -636,6 +636,11 @@ static void key_pressed(void* owner, Event* event) {
 		}
 
 	} break;
+    case KEY_F1: { // @Temporary @Debug
+        extern bool use_dfa_parser;
+        use_dfa_parser = !use_dfa_parser;
+        buffer->syntax_is_dirty = true;
+    }
 	case 'V':
 		if (editor->input_state.ctrl_is_down) {
 			String results;
