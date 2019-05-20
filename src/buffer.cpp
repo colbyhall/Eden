@@ -623,10 +623,13 @@ static void key_pressed(void* owner, Event* event) {
 		const size_t lines_in_view = (size_t)(get_view_inner_size(*view).y / font_height);
 		const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
 
+
 		if (input->ctrl_is_down) {
 			move_cursor_vertical(view, key_code == KEY_PAGEUP ? lines_scrolled - view->current_line_number : (lines_in_view + lines_scrolled) - view->current_line_number);
 		} else {
-			move_cursor_vertical(view, key_code == KEY_PAGEUP ? (size_t)-(s64)lines_in_view : lines_in_view);
+            size_t lines_to_scroll = lines_in_view;
+            if (lines_to_scroll > 3) lines_to_scroll -= 3;
+			move_cursor_vertical(view, key_code == KEY_PAGEUP ? (size_t)-(s64)lines_to_scroll : lines_to_scroll);
 		}
 		if (!input->shift_is_down) {
 			view->selection = view->cursor;

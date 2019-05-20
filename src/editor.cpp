@@ -73,10 +73,12 @@ static void on_left_mouse_down(void* owner, Event* event) {
     Editor_State* editor = (Editor_State*)owner;
     Buffer_View* view = get_hovered_view(editor);
 
-    const size_t picked_index = pick_index(view, event->mouse_position);
-    view->cursor = picked_index;
-    view->selection = picked_index;
-	refresh_cursor_info(view, true);
+    if (view) {
+        const size_t picked_index = pick_index(view, event->mouse_position);
+        view->cursor = picked_index;
+        view->selection = picked_index;
+	    refresh_cursor_info(view, true);
+    }
 }
 
 void editor_init(Editor_State* editor) {
