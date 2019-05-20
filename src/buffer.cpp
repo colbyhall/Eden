@@ -640,7 +640,11 @@ static void key_pressed(void* owner, Event* event) {
         extern bool use_dfa_parser;
         use_dfa_parser = !use_dfa_parser;
         buffer->syntax_is_dirty = true;
-    }
+    } break;
+    case KEY_F2: { // @Temporary @Debug
+        extern bool debug_show_sections;
+        debug_show_sections = !debug_show_sections;
+    } break;
 	case 'V':
 		if (editor->input_state.ctrl_is_down) {
 			String results;

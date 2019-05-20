@@ -437,6 +437,8 @@ static Color highlight_to_color(Syntax_Highlight_Type type) {
     return 0; // shut up compiler
 }
 
+bool debug_show_sections = false;
+
 void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font) {
 	float x = x0;
 	float y = y0;
@@ -508,15 +510,16 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 #else
 		const u32& c = (*buffer)[i];
 
-        bool highlight_changed = false;
+        //bool highlight_changed = false;
         while (&c >= current_highlight[1].where) {
-            highlight_changed = true;
+            //highlight_changed = true;
             current_highlight += 1;
             assert(current_highlight + 1 < buffer->syntax.cend());
+            // @Debug
+            extern bool debug_show_sections;
+            if (debug_show_sections)
+                /*if (highlight_changed)*/ x += immediate_char((current_highlight->type >= 10) ? current_highlight->type - 10 + 'A' : current_highlight->type + '0', x, y, 0xff00ff, font)->advance;
         }
-        // @Debug
-        extern bool use_dfa_parser;
-        if (use_dfa_parser) if (highlight_changed) x += immediate_char('|', x, y, 0xff00ff, font)->advance;
         
         Color color = highlight_to_color(get_color_type(current_highlight, &c));
 #endif

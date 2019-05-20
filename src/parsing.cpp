@@ -155,22 +155,29 @@ static bool c_ends_expression(u32 c) { return c == ')' || c_ends_statement(c); }
 #include "cpp_syntax.h"
 
 enum Dfa {
-    NONE,
+    STMT,
+    STMT_IN_TYPE,
+    STMT_GOT_TYPE,
+
+    ON_NEW_LINE,
+    SAW_SLASH,
+    LINE_COMMENT,
+    LINE_COMMENT_BS,
+    BLOCK_COMMENT,
+    BLOCK_COMMENT_STAR,
     PREPROC,
     PREPROC_BS,
     EXPR,
-    STMT,
-    STMT_GOT_TYPE,
+    //PAREN_EXPR,
+    //SQR_EXPR,
+    //STRINGLIT,
+    //CHARLIT,
+    //NUMLIT,
     //STMT_EXPR, // E.g. array len in decl parens; pops if paren nesting's 0.
     //FUNC_DECL, // Saw '{' after `a b()` or `a(b)()` or `a(b)(c d)` etc.
     //PARAM,
     //PARAM_GOT_TYPE,
     //PARAM_EXPR,
-    //SAW_SLASH,
-    //LINE_COMMENT,
-    //LINE_COMMENT_BS,
-    //BLOCK_COMMENT,
-    //BLOCK_COMMENT_STAR,
 
     NUM_STATES,
 #define NEXT_POW2(x) ((((x) - 1) | \
@@ -181,6 +188,9 @@ enum Dfa {
                    ((x) - 1) >> 16) + 1)
     STATE_BIT_MASK = NEXT_POW2(NUM_STATES) - 1,
     STATE_BIT,
+};
+enum Dfa_Change {
+    NO_CHANGE = 0 * STATE_BIT,
     POP = 1 * STATE_BIT,
     CHANGED = 2 * STATE_BIT,
     PUSH = 3 * STATE_BIT,
@@ -235,15 +245,21 @@ bool use_dfa_parser;
 
 Syntax_Highlight_Type get_color_type(const Syntax_Highlight* sh, const u32* p) {
 if (use_dfa_parser) {//#if DFA_PARSER
-    //return SHT_IDENT;
     switch (sh->type) {
-    case NONE: return SHT_IDENT;
-    case EXPR: return SHT_IDENT;
-    case STMT: return SHT_TYPE;
-    case STMT_GOT_TYPE: return SHT_IDENT;
+    case STMT: /*if (c_is_op(*p)) return SHT_OPERATOR; */return SHT_IDENT;
+    case ON_NEW_LINE: return SHT_IDENT;
+    case SAW_SLASH: return SHT_OPERATOR;
+    case LINE_COMMENT: return SHT_COMMENT;
+    case LINE_COMMENT_BS: assert(0); return SHT_COMMENT;
+    case BLOCK_COMMENT: return SHT_COMMENT;
+    case BLOCK_COMMENT_STAR: assert(0); return SHT_COMMENT;
     case PREPROC: return SHT_DIRECTIVE;
     case PREPROC_BS: assert(0); return SHT_DIRECTIVE;
+    case EXPR: /*if (c_is_op(*p)) return SHT_OPERATOR;*/ return SHT_IDENT;
+    case STMT_IN_TYPE: return SHT_TYPE;
+    case STMT_GOT_TYPE: return SHT_PARAMETER;
     }
+    assert(0); 
     return SHT_IDENT;
 } else {//#else
     return sh->type;
@@ -1035,7 +1051,8 @@ struct C_Lexer {
         return;
     }
 
-static Parse_State parse_dfa(const Parse_State initial_state, const u32* p,
+inline static u32 const* the_buffer_gap = nullptr;
+static Parse_State parse_dfa(Parse_State s, const u32* p,
                              const u32* const pend, Syntax_Highlight** const sh) {
 static const u8 char_type[128] = {
 IDENT, // NUL
@@ -1085,39 +1102,271 @@ WHITE, // 127
 };
 
 static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
-    { // NONE
-        STMT | CHANGED, // 0 '$' '@'-'Z' '_'-'z'
-        NONE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        NONE, // '\r' '\n'
+    { // STMT
+        STMT_IN_TYPE | CHANGED, // 0 '$' '@'-'Z' '_'-'z'
+        STMT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        ON_NEW_LINE | PUSH, // '\r' '\n'
         EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
         EXPR | CHANGED, // '"'
-        PREPROC | PUSH, // '#'
+        EXPR | CHANGED, // '#'
         EXPR | CHANGED, // '&'
         EXPR | CHANGED, // '\''
-        EXPR | CHANGED, // '('
-        EXPR | CHANGED, // ')'
+        /*PAREN_*/EXPR | PUSH, // '('
+        EXPR | CHANGED, // ')' // @NOTE(phil): can't (safely) pop from here... should this trigger an error?
         EXPR | CHANGED, // '*'
         EXPR | CHANGED, // '+'
         EXPR | CHANGED, // ','
         EXPR | CHANGED, // '-'
         EXPR | CHANGED, // '.'
-        EXPR | CHANGED, // '/'
+        SAW_SLASH | PUSH,//EXPR | CHANGED, // '/'
         EXPR | CHANGED, // '0'-'9'
         STMT | CHANGED, // ':'
-        NONE, // ';'
+        STMT, // ';'
         EXPR | CHANGED, // '<'
         EXPR | CHANGED, // '='
         EXPR | CHANGED, // '>'
-        EXPR | CHANGED, // '['
-        NONE, // '\\'
+        /*SQR_*/EXPR | PUSH, // '['
+        STMT, // '\\'
+        EXPR | CHANGED, // ']' // @NOTE(phil): can't pop from "none"... should this trigger an error?
+        STMT, // '{' // @Temporary: need to nest this properly?
+        STMT, // '}'
+    },
+    { // STMT_IN_TYPE
+        STMT_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
+        STMT_GOT_TYPE | CHANGED, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        STMT_GOT_TYPE | CHANGED,//ON_NEW_LINE | PUSH,//STMT_GOT_TYPE | CHANGED, // '\r' '\n'
+        EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
+        EXPR | CHANGED, // '"'
+        EXPR | CHANGED, // '#'
+        STMT_GOT_TYPE | CHANGED, // '&'
+        EXPR | CHANGED, // '\''
+        STMT_GOT_TYPE | CHANGED, // '('
+        STMT_GOT_TYPE | CHANGED, // ')'
+        STMT_GOT_TYPE | CHANGED, // '*'
+        STMT_GOT_TYPE | CHANGED, // '+'
+        STMT_GOT_TYPE | CHANGED, // ','
+        STMT_GOT_TYPE | CHANGED, // '-'
+        STMT_GOT_TYPE | CHANGED, // '.'
+        SAW_SLASH | PUSH,//STMT_GOT_TYPE | CHANGED, // '/'
+        STMT_IN_TYPE, // '0'-'9'
+        STMT | CHANGED, // ':'
+        STMT | CHANGED, // ';'
+        STMT_GOT_TYPE | CHANGED, // '<'
+        EXPR | CHANGED, // '='
+        EXPR | CHANGED, // '>'
+        EXPR | CHANGED, // '[' // @Todo: nest
+        STMT_IN_TYPE, // '\\'
         EXPR | CHANGED, // ']'
-        NONE | CHANGED, // '{'
-        NONE, // '}'
+        EXPR | CHANGED, // '{'
+        EXPR | CHANGED, // '}'
+    },
+    { // STMT_GOT_TYPE
+        STMT_GOT_TYPE, // 0 '$' '@'-'Z' '_'-'z'
+        STMT_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        ON_NEW_LINE | PUSH,//STMT_GOT_TYPE, // '\r' '\n'
+        EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
+        STMT_GOT_TYPE, // '"'
+        PREPROC | PUSH,//STMT_GOT_TYPE, // '#'
+        STMT_GOT_TYPE, // '&'
+        STMT_GOT_TYPE, // '\''
+        EXPR | CHANGED, // '('
+        EXPR | CHANGED, // ')'
+        STMT_GOT_TYPE, // '*'
+        STMT_GOT_TYPE, // '+'
+        STMT_GOT_TYPE, // ','
+        EXPR | CHANGED, // '-'
+        STMT_GOT_TYPE, // '.'
+        SAW_SLASH | PUSH,//STMT_GOT_TYPE, // '/'
+        STMT_GOT_TYPE, // '0'-'9'
+        STMT | CHANGED, // ':'
+        STMT | CHANGED, // ';'
+        EXPR | CHANGED, // '<'
+        EXPR | CHANGED, // '='
+        EXPR | CHANGED, // '>'
+        STMT_GOT_TYPE | CHANGED, // '['
+        STMT_GOT_TYPE, // '\\'
+        EXPR | CHANGED, // ']'
+        STMT | CHANGED, // '{'
+        STMT | CHANGED, // '}'
+    },
+    { // ON_NEW_LINE
+        POP, // 0 '$' '@'-'Z' '_'-'z'
+        ON_NEW_LINE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        ON_NEW_LINE, // '\r' '\n'
+        POP, // '!' '%' '?' '^' '|' '~'
+        POP, // '"'
+        PREPROC | CHANGED, // '#'
+        POP, // '&'
+        POP, // '\''
+        POP, // '('
+        POP, // ')'
+        POP, // '*'
+        POP, // '+'
+        POP, // ','
+        POP, // '-'
+        POP, // '.'
+        SAW_SLASH, // '/' // @Todo: does this need  | CHANGED ?
+        POP, // '0'-'9'
+        POP, // ':'
+        POP, // ';'
+        POP, // '<'
+        POP, // '='
+        POP, // '>'
+        POP, // '['
+        POP, // '\\'
+        POP, // ']'
+        POP, // '{'
+        POP, // '}'
+    },
+    { // SAW_SLASH
+        POP, // 0 '$' '@'-'Z' '_'-'z'
+        POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        POP, // '\r' '\n'
+        POP, // '!' '%' '?' '^' '|' '~'
+        POP, // '"'
+        POP, // '#'
+        POP, // '&'
+        POP, // '\''
+        POP, // '('
+        POP, // ')'
+        BLOCK_COMMENT | CHANGED, // '*'
+        POP, // '+'
+        POP, // ','
+        POP, // '-'
+        POP, // '.'
+        LINE_COMMENT | CHANGED, // '/'
+        POP, // '0'-'9'
+        POP, // ':'
+        POP, // ';'
+        POP, // '<'
+        POP, // '='
+        POP, // '>'
+        POP, // '['
+        POP, // '\\'
+        POP, // ']'
+        POP, // '{'
+        POP, // '}'
+    },
+    { // LINE_COMMENT
+        LINE_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
+        LINE_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        POP, // '\r' '\n'
+        LINE_COMMENT, // '!' '%' '?' '^' '|' '~'
+        LINE_COMMENT, // '"'
+        LINE_COMMENT, // '#'
+        LINE_COMMENT, // '&'
+        LINE_COMMENT, // '\''
+        LINE_COMMENT, // '('
+        LINE_COMMENT, // ')'
+        LINE_COMMENT, // '*'
+        LINE_COMMENT, // '+'
+        LINE_COMMENT, // ','
+        LINE_COMMENT, // '-'
+        LINE_COMMENT, // '.'
+        LINE_COMMENT, // '/'
+        LINE_COMMENT, // '0'-'9'
+        LINE_COMMENT, // ':'
+        LINE_COMMENT, // ';'
+        LINE_COMMENT, // '<'
+        LINE_COMMENT, // '='
+        LINE_COMMENT, // '>'
+        LINE_COMMENT, // '['
+        LINE_COMMENT_BS, // '\\'
+        LINE_COMMENT, // ']'
+        LINE_COMMENT, // '{'
+        LINE_COMMENT, // '}'
+    },
+    { // LINE_COMMENT_BS
+        LINE_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
+        LINE_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        LINE_COMMENT, // '\r' '\n'
+        LINE_COMMENT, // '!' '%' '?' '^' '|' '~'
+        LINE_COMMENT, // '"'
+        LINE_COMMENT, // '#'
+        LINE_COMMENT, // '&'
+        LINE_COMMENT, // '\''
+        LINE_COMMENT, // '('
+        LINE_COMMENT, // ')'
+        LINE_COMMENT, // '*'
+        LINE_COMMENT, // '+'
+        LINE_COMMENT, // ','
+        LINE_COMMENT, // '-'
+        LINE_COMMENT, // '.'
+        LINE_COMMENT, // '/'
+        LINE_COMMENT, // '0'-'9'
+        LINE_COMMENT, // ':'
+        LINE_COMMENT, // ';'
+        LINE_COMMENT, // '<'
+        LINE_COMMENT, // '='
+        LINE_COMMENT, // '>'
+        LINE_COMMENT, // '['
+        LINE_COMMENT_BS, // '\\'
+        LINE_COMMENT, // ']'
+        LINE_COMMENT, // '{'
+        LINE_COMMENT, // '}'
+    },
+    { // BLOCK_COMMENT
+        BLOCK_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
+        BLOCK_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        BLOCK_COMMENT, // '\r' '\n'
+        BLOCK_COMMENT, // '!' '%' '?' '^' '|' '~'
+        BLOCK_COMMENT, // '"'
+        BLOCK_COMMENT, // '#'
+        BLOCK_COMMENT, // '&'
+        BLOCK_COMMENT, // '\''
+        BLOCK_COMMENT, // '('
+        BLOCK_COMMENT, // ')'
+        BLOCK_COMMENT_STAR, // '*'
+        BLOCK_COMMENT, // '+'
+        BLOCK_COMMENT, // ','
+        BLOCK_COMMENT, // '-'
+        BLOCK_COMMENT, // '.'
+        BLOCK_COMMENT, // '/'
+        BLOCK_COMMENT, // '0'-'9'
+        BLOCK_COMMENT, // ':'
+        BLOCK_COMMENT, // ';'
+        BLOCK_COMMENT, // '<'
+        BLOCK_COMMENT, // '='
+        BLOCK_COMMENT, // '>'
+        BLOCK_COMMENT, // '['
+        BLOCK_COMMENT, // '\\'
+        BLOCK_COMMENT, // ']'
+        BLOCK_COMMENT, // '{'
+        BLOCK_COMMENT, // '}'
+    },
+    { // BLOCK_COMMENT_STAR
+        BLOCK_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
+        BLOCK_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        BLOCK_COMMENT, // '\r' '\n'
+        BLOCK_COMMENT, // '!' '%' '?' '^' '|' '~'
+        BLOCK_COMMENT, // '"'
+        BLOCK_COMMENT, // '#'
+        BLOCK_COMMENT, // '&'
+        BLOCK_COMMENT, // '\''
+        BLOCK_COMMENT, // '('
+        BLOCK_COMMENT, // ')'
+        BLOCK_COMMENT_STAR, // '*'
+        BLOCK_COMMENT, // '+'
+        BLOCK_COMMENT, // ','
+        BLOCK_COMMENT, // '-'
+        BLOCK_COMMENT, // '.'
+        POP, // '/'
+        BLOCK_COMMENT, // '0'-'9'
+        BLOCK_COMMENT, // ':'
+        BLOCK_COMMENT, // ';'
+        BLOCK_COMMENT, // '<'
+        BLOCK_COMMENT, // '='
+        BLOCK_COMMENT, // '>'
+        BLOCK_COMMENT, // '['
+        BLOCK_COMMENT, // '\\'
+        BLOCK_COMMENT, // ']'
+        BLOCK_COMMENT, // '{'
+        BLOCK_COMMENT, // '}'
     },
     { // PREPROC
         PREPROC, // 0 '$' '@'-'Z' '_'-'z'
         PREPROC, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        NONE | POP, // '\r' '\n'
+        ON_NEW_LINE | CHANGED, // '\r' '\n'
         PREPROC, // '!' '%' '?' '^' '|' '~'
         PREPROC, // '"'
         PREPROC, // '#'
@@ -1130,7 +1379,7 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         PREPROC, // ','
         PREPROC, // '-'
         PREPROC, // '.'
-        PREPROC, // '/'
+        SAW_SLASH | PUSH, // '/'
         PREPROC, // '0'-'9'
         PREPROC, // ':'
         PREPROC, // ';'
@@ -1159,7 +1408,7 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         PREPROC, // ','
         PREPROC, // '-'
         PREPROC, // '.'
-        PREPROC, // '/'
+        SAW_SLASH | PUSH, // '/'
         PREPROC, // '0'-'9'
         PREPROC, // ':'
         PREPROC, // ';'
@@ -1175,7 +1424,7 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
     { // EXPR
         EXPR, // 0 '$' '@'-'Z' '_'-'z'
         EXPR, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        NONE | CHANGED,//EXPR, // '\r' '\n'
+        ON_NEW_LINE | PUSH,//EXPR, // '\r' '\n'
         EXPR, // '!' '%' '?' '^' '|' '~'
         EXPR, // '"'
         EXPR, // '#'
@@ -1188,10 +1437,10 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         EXPR, // ','
         EXPR, // '-'
         EXPR, // '.'
-        EXPR, // '/'
+        SAW_SLASH | PUSH,//EXPR, // '/'
         EXPR, // '0'-'9'
         EXPR, // ':'
-        NONE | CHANGED, // ';'
+        STMT | CHANGED, // ';'
         EXPR | CHANGED, // '<'
         EXPR, // '='
         EXPR | CHANGED, // '>'
@@ -1201,99 +1450,57 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         EXPR | CHANGED, // '{'
         EXPR | CHANGED, // '}'
     },
-    { // STMT
-        STMT, // 0 '$' '@'-'Z' '_'-'z'
-        STMT_GOT_TYPE | CHANGED, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        NONE | CHANGED,//STMT_GOT_TYPE | CHANGED, // '\r' '\n'
-        EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
-        EXPR | CHANGED, // '"'
-        EXPR | CHANGED, // '#'
-        STMT_GOT_TYPE | CHANGED, // '&'
-        EXPR | CHANGED, // '\''
-        STMT_GOT_TYPE | CHANGED, // '('
-        STMT_GOT_TYPE | CHANGED, // ')'
-        STMT_GOT_TYPE | CHANGED, // '*'
-        STMT_GOT_TYPE | CHANGED, // '+'
-        STMT_GOT_TYPE | CHANGED, // ','
-        STMT_GOT_TYPE | CHANGED, // '-'
-        STMT_GOT_TYPE | CHANGED, // '.'
-        STMT_GOT_TYPE | CHANGED, // '/'
-        STMT, // '0'-'9'
-        NONE | CHANGED, // ':'
-        NONE | CHANGED, // ';'
-        STMT_GOT_TYPE | CHANGED, // '<'
-        STMT, // '='
-        STMT | CHANGED, // '>'
-        EXPR | CHANGED, // '['
-        STMT, // '\\'
-        EXPR | CHANGED, // ']'
-        EXPR | CHANGED, // '{'
-        EXPR | CHANGED, // '}'
-    },
-    { // STMT_GOT_TYPE
-        STMT_GOT_TYPE, // 0 '$' '@'-'Z' '_'-'z'
-        STMT_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        NONE | CHANGED,//STMT_GOT_TYPE, // '\r' '\n'
-        EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
-        STMT_GOT_TYPE, // '"'
-        STMT_GOT_TYPE, // '#'
-        STMT_GOT_TYPE, // '&'
-        STMT_GOT_TYPE, // '\''
-        EXPR | CHANGED, // '('
-        EXPR | CHANGED, // ')'
-        STMT_GOT_TYPE, // '*'
-        STMT_GOT_TYPE, // '+'
-        STMT_GOT_TYPE, // ','
-        STMT_GOT_TYPE, // '-'
-        STMT_GOT_TYPE, // '.'
-        STMT_GOT_TYPE, // '/'
-        STMT_GOT_TYPE, // '0'-'9'
-        STMT | CHANGED, // ':'
-        NONE | CHANGED, // ';'
-        EXPR | CHANGED, // '<'
-        EXPR | CHANGED, // '='
-        EXPR | CHANGED, // '>'
-        STMT_GOT_TYPE | CHANGED, // '['
-        STMT_GOT_TYPE, // '\\'
-        EXPR | CHANGED, // ']'
-        NONE | CHANGED, // '{'
-        NONE | CHANGED, // '}'
-    },
 };
 
-    Dfa dfa = initial_state.dfa;
-    
-    u8 stack[sizeof(initial_state.stack)];
-    u8* sp = &stack[initial_state.sp];
-//#define PUSH() (*sp++ = (u8)dfa)
-//#define POP() (dfa = (Dfa)*--sp)
+    u8* sp = &s.stack[s.sp];
 
-    for (; p < pend; p++) {
-        int raw = (int)*p;
-        int c = ((raw - 128) >> 31) & raw;
-        int raw_type = char_type[c];
-        int ch_type = raw_type;//& CHAR_TYPE_BIT_MASK;
-        int new_state = state_table[dfa][ch_type];
+    while (p < pend) {
+        //if (p >= the_buffer_gap) {
+        //    if (static bool still_break = true)
+        //        __debugbreak();
+        //}
+
+        const int raw = (int)*p;
+        const int c = ((raw - 128) >> 31) & raw;
+        const int raw_type = char_type[c];
+        const int ch_type = raw_type;//& CHAR_TYPE_BIT_MASK;
+        const int new_state = state_table[s.dfa][ch_type];
+
+        int state_that_the_dfa_will_be_assigned = new_state & STATE_BIT_MASK;
 
         if (new_state & CHANGE_BIT_MASK) {
-            *sp = (u8)dfa;
-            sp += new_state / STATE_BIT - 2; // branchlessly move stack ptr
-            dfa = (Dfa)*sp;
+            *sp = (u8)s.dfa;
+            // branchlessly move stack ptr: POP -> -1, CHANGE -> 0, PUSH -> +1
+            const int bump_amount = new_state / STATE_BIT - 2;
+            if ((s.dfa == SAW_SLASH) && (bump_amount == -1)) { // special casing... can this go away?
+                p--;
+            }
+            sp += bump_amount;
+            s.dfa = (Dfa)*sp;
+            if (bump_amount == -1) {
+                state_that_the_dfa_will_be_assigned = s.dfa;
+            }
+
             (*sh)->type = (Syntax_Highlight_Type)(new_state & STATE_BIT_MASK);
             (*sh)->where = p;
             (*sh)++;
 
-            assert(sp >= stack);
+            assert(sp >= s.stack);
+            assert(sp < s.stack + sizeof(s.stack));
         }
 
-        dfa = (Dfa)(new_state & STATE_BIT_MASK);
+        s.dfa = (Dfa)state_that_the_dfa_will_be_assigned;
+
+        p++;
     }
 
-    Parse_State result;
-    result.dfa = dfa;
-    memcpy(result.stack, stack, sizeof(stack));
-    result.sp = sp - &stack[0];
-    return result;
+    //Parse_State result = s;
+    //result.dfa = dfa;
+    //memcpy(result.stack, stack, sizeof(stack));
+    //result.sp = sp - &stack[0];
+    //return result;
+    s.sp = sp - s.stack;
+    return s;
 }
 
     //__declspec(noinline) // @Temporary @Debug @Remove
@@ -1309,9 +1516,15 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         push(SHT_IDENT);
 if (use_dfa_parser) {//#if DFA_PARSER
         {
-            if (gap_size) b.gap[0] = 0; // @Debug.
+            if (gap_size) {
+                b.gap[0] = 0; // @Debug.
+            }
+            the_buffer_gap = b.gap;
             Syntax_Highlight* dfa_sh = sh;
             Parse_State state = {};
+            state.dfa = ON_NEW_LINE;
+            state.stack[0] = STMT;
+            state.sp = 1;
             state = parse_dfa(state, b.data, b.gap, &dfa_sh);
             state = parse_dfa(state, buf_gap + gap_size, buf_end, &dfa_sh);
             this->sh = dfa_sh;
