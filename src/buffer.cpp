@@ -668,6 +668,21 @@ static void key_pressed(void* owner, Event* event) {
 			os_copy_to_clipboard(out_buffer, size + 1);
 		}
 		break;
+    case 'X':
+        if (editor->input_state.ctrl_is_down && has_valid_selection(*view)) {
+            const size_t buffer_count = get_count(*buffer);
+            const size_t index = (view->cursor > view->selection) ? view->selection : view->cursor;
+            const size_t size = (view->cursor > view->selection) ? (view->cursor - view->selection) : (view->selection - view->cursor);
+            u8* out_buffer = (u8*)c_alloc(size + 1);
+			defer(c_free(out_buffer));
+			for (size_t i = 0; i < size; i++) {
+				out_buffer[i] = (u8)(*buffer)[index + i];
+			}
+			out_buffer[size] = 0;
+			os_copy_to_clipboard(out_buffer, size + 1);
+            remove_selection(view);
+        }
+        break;
 	}
 	ensure_cursor_in_view(view);
 }
