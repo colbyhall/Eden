@@ -508,20 +508,23 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
 		}
 #else
-		const u32& c = (*buffer)[i];
+		const u32 c = (*buffer)[i];
+
+        u32* where = buffer->data + i;
+        if (where >= buffer->gap) where += buffer->gap_size;
 
         //bool highlight_changed = false;
-        while (&c >= current_highlight[1].where) {
+        while (where >= current_highlight[1].where) {
             //highlight_changed = true;
             current_highlight += 1;
             assert(current_highlight + 1 < buffer->syntax.cend());
             // @Debug
             extern bool debug_show_sections;
             if (debug_show_sections)
-                /*if (highlight_changed)*/ x += immediate_char((current_highlight->type >= 10) ? current_highlight->type - 10 + 'A' : current_highlight->type + '0', x, y, 0xff00ff, font)->advance;
+                /*if (highlight_changed)*/ x += immediate_string(dbg_get_sh_str(current_highlight), x, y, 0xff00ff, font).x;
         }
         
-        Color color = highlight_to_color(get_color_type(current_highlight, &c));
+        Color color = highlight_to_color(get_color_type(current_highlight, where));
 #endif
 
         if ((view->cursor > view->selection && i >= view->selection && i < view->cursor) ||

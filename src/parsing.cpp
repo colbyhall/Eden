@@ -159,14 +159,16 @@ enum Dfa {
     STMT_IN_TYPE,
     STMT_GOT_TYPE,
 
-    ON_NEW_LINE,
+    ESCAPE_EXPECTING_NEWLINE,
+    //ESCAPED_NEWLINE,
+
     SAW_SLASH,
     LINE_COMMENT,
-    LINE_COMMENT_BS,
     BLOCK_COMMENT,
     BLOCK_COMMENT_STAR,
+    BLOCK_COMMENT_DONE,
     PREPROC,
-    PREPROC_BS,
+    //PREPROC_DONE,
     EXPR,
     //PAREN_EXPR,
     //SQR_EXPR,
@@ -190,14 +192,18 @@ enum Dfa {
     STATE_BIT,
 };
 enum Dfa_Change {
-    NO_CHANGE = 0 * STATE_BIT,
-    POP = 1 * STATE_BIT,
-    CHANGED = 2 * STATE_BIT,
-    PUSH = 3 * STATE_BIT,
+    NO_CHANGE = 0x00,
+    CHANGED = 0x20,
+
+    PUSH = 0x40 | CHANGED,
+    POP = 0xc0 | CHANGED,
+
     _iMPL_NEXT_,
     CHANGE_BIT_MASK = (NEXT_POW2(_iMPL_NEXT_) - 1) & ~STATE_BIT_MASK,
-    CHANGE_BIT,
+    //CHANGE_BIT,
+
 };
+
 enum Char_Type { // ascending from min ascii value per category:
     IDENT, // 0 '$' '@'-'Z' '_'-'z'
     WHITE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
@@ -232,7 +238,6 @@ enum Char_Type { // ascending from min ascii value per category:
 
 };
 struct Parse_State {
-    Dfa dfa;
     u8 stack[4096];
     size_t sp;
 };
@@ -245,25 +250,65 @@ bool use_dfa_parser;
 
 Syntax_Highlight_Type get_color_type(const Syntax_Highlight* sh, const u32* p) {
 if (use_dfa_parser) {//#if DFA_PARSER
-    switch (sh->type) {
+    switch ((Dfa)sh->type) {
     case STMT: /*if (c_is_op(*p)) return SHT_OPERATOR; */return SHT_IDENT;
-    case ON_NEW_LINE: return SHT_IDENT;
-    case SAW_SLASH: return SHT_OPERATOR;
+    case ESCAPE_EXPECTING_NEWLINE: return SHT_OPERATOR; //assert(*p == '\\'); return get_color_type(sh - 1, p - 1);
+    //case ESCAPED_NEWLINE: return SHT_IDENT; // whitespace, doesn't matter.
+    case SAW_SLASH: return SHT_OPERATOR;//if (get_color_type(sh + 1, p + 1) == SHT_COMMENT) return SHT_COMMENT; return SHT_OPERATOR;
     case LINE_COMMENT: return SHT_COMMENT;
-    case LINE_COMMENT_BS: assert(0); return SHT_COMMENT;
     case BLOCK_COMMENT: return SHT_COMMENT;
-    case BLOCK_COMMENT_STAR: assert(0); return SHT_COMMENT;
+    case BLOCK_COMMENT_STAR: /*assert(0);*/ return SHT_COMMENT;
     case PREPROC: return SHT_DIRECTIVE;
-    case PREPROC_BS: assert(0); return SHT_DIRECTIVE;
+    //case PREPROC_DONE: return SHT_IDENT;
     case EXPR: /*if (c_is_op(*p)) return SHT_OPERATOR;*/ return SHT_IDENT;
     case STMT_IN_TYPE: return SHT_TYPE;
-    case STMT_GOT_TYPE: return SHT_PARAMETER;
+    case STMT_GOT_TYPE: return SHT_FUNCTION;
     }
-    assert(0); 
+    assert(0);
     return SHT_IDENT;
 } else {//#else
     return sh->type;
 }//#endif
+}
+
+const char* dbg_get_sh_str(const Syntax_Highlight* sh) {
+if (use_dfa_parser) {
+    switch (sh->type) {
+    case STMT                     : return "St";
+    case STMT_IN_TYPE             : return "Ty";
+    case STMT_GOT_TYPE            : return "Vr";
+    case ESCAPE_EXPECTING_NEWLINE : return "Bs";
+    //case ESCAPED_NEWLINE          : return "LF";
+    case SAW_SLASH                : return "Sl";
+    case LINE_COMMENT             : return "Lc";
+    case BLOCK_COMMENT            : return "Bc";
+    case BLOCK_COMMENT_STAR       : return "Bs";
+    case BLOCK_COMMENT_DONE       : return "Bd";
+    case PREPROC                  : return "Pp";
+    //case PREPROC_DONE             : return "Pd";
+    case EXPR                     : return "Ex";
+    }
+    assert(0);
+    return "?";
+} else {
+    switch (sh->type) {
+    case SHT_IDENT            : return "Id";
+    case SHT_COMMENT          : return "Co";
+    case SHT_KEYWORD          : return "Kw";
+    case SHT_OPERATOR         : return "Op";
+    case SHT_TYPE             : return "Ty";
+    case SHT_FUNCTION         : return "Fn";
+    case SHT_GENERIC_TYPE     : return "Gt";
+    case SHT_GENERIC_FUNCTION : return "Gf";
+    case SHT_MACRO            : return "Ma";
+    case SHT_NUMERIC_LITERAL  : return "Nl";
+    case SHT_STRING_LITERAL   : return "Sl";
+    case SHT_DIRECTIVE        : return "Pp";
+    case SHT_ANNOTATION       : return "An";
+    case SHT_PARAMETER        : return "Pa";
+    }
+    return "Id";
+}
 }
 
 #define C_KW_DECL(name) C##name,
@@ -1051,8 +1096,7 @@ struct C_Lexer {
         return;
     }
 
-inline static u32 const* the_buffer_gap = nullptr;
-static Parse_State parse_dfa(Parse_State s, const u32* p,
+static Parse_State parse_dfa(Parse_State& s, const u32* p,
                              const u32* const pend, Syntax_Highlight** const sh) {
 static const u8 char_type[128] = {
 IDENT, // NUL
@@ -1102,155 +1146,185 @@ WHITE, // 127
 };
 
 static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
+#define Chg CHANGED |
     { // STMT
-        STMT_IN_TYPE | CHANGED, // 0 '$' '@'-'Z' '_'-'z'
+Chg     STMT_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
         STMT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        ON_NEW_LINE | PUSH, // '\r' '\n'
-        EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
-        EXPR | CHANGED, // '"'
-        EXPR | CHANGED, // '#'
-        EXPR | CHANGED, // '&'
-        EXPR | CHANGED, // '\''
-        /*PAREN_*/EXPR | PUSH, // '('
-        EXPR | CHANGED, // ')' // @NOTE(phil): can't (safely) pop from here... should this trigger an error?
-        EXPR | CHANGED, // '*'
-        EXPR | CHANGED, // '+'
-        EXPR | CHANGED, // ','
-        EXPR | CHANGED, // '-'
-        EXPR | CHANGED, // '.'
-        SAW_SLASH | PUSH,//EXPR | CHANGED, // '/'
-        EXPR | CHANGED, // '0'-'9'
-        STMT | CHANGED, // ':'
+        STMT, // '\r' '\n'
+Chg     EXPR, // '!' '%' '?' '^' '|' '~'
+Chg     EXPR, // '"'
+Chg     PREPROC | PUSH, // '#'
+Chg     EXPR, // '&'
+Chg     EXPR, // '\''
+Chg     /*PAREN_*/EXPR | PUSH, // '('
+Chg     EXPR, // ')' // @NOTE(phil): can't (safely) pop from here... should this trigger an error?
+Chg     EXPR, // '*'
+Chg     EXPR, // '+'
+Chg     EXPR, // ','
+Chg     EXPR, // '-'
+Chg     EXPR, // '.'
+Chg     SAW_SLASH | PUSH,//EXPR, // '/'
+Chg     EXPR, // '0'-'9'
+        STMT, // ':'
         STMT, // ';'
-        EXPR | CHANGED, // '<'
-        EXPR | CHANGED, // '='
-        EXPR | CHANGED, // '>'
-        /*SQR_*/EXPR | PUSH, // '['
-        STMT, // '\\'
-        EXPR | CHANGED, // ']' // @NOTE(phil): can't pop from "none"... should this trigger an error?
+Chg     EXPR, // '<'
+Chg     EXPR, // '='
+Chg     EXPR, // '>'
+Chg     /*SQR_*/EXPR | PUSH, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+Chg     EXPR, // ']' // @NOTE(phil): can't pop from "none"... should this trigger an error?
         STMT, // '{' // @Temporary: need to nest this properly?
         STMT, // '}'
     },
     { // STMT_IN_TYPE
         STMT_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
-        STMT_GOT_TYPE | CHANGED, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        STMT_GOT_TYPE | CHANGED,//ON_NEW_LINE | PUSH,//STMT_GOT_TYPE | CHANGED, // '\r' '\n'
-        EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
-        EXPR | CHANGED, // '"'
-        EXPR | CHANGED, // '#'
-        STMT_GOT_TYPE | CHANGED, // '&'
-        EXPR | CHANGED, // '\''
-        STMT_GOT_TYPE | CHANGED, // '('
-        STMT_GOT_TYPE | CHANGED, // ')'
-        STMT_GOT_TYPE | CHANGED, // '*'
-        STMT_GOT_TYPE | CHANGED, // '+'
-        STMT_GOT_TYPE | CHANGED, // ','
-        STMT_GOT_TYPE | CHANGED, // '-'
-        STMT_GOT_TYPE | CHANGED, // '.'
-        SAW_SLASH | PUSH,//STMT_GOT_TYPE | CHANGED, // '/'
-        STMT_IN_TYPE, // '0'-'9'
-        STMT | CHANGED, // ':'
-        STMT | CHANGED, // ';'
-        STMT_GOT_TYPE | CHANGED, // '<'
-        EXPR | CHANGED, // '='
-        EXPR | CHANGED, // '>'
-        EXPR | CHANGED, // '[' // @Todo: nest
-        STMT_IN_TYPE, // '\\'
-        EXPR | CHANGED, // ']'
-        EXPR | CHANGED, // '{'
-        EXPR | CHANGED, // '}'
+Chg     STMT_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+Chg     STMT_GOT_TYPE, // '\r' '\n'
+Chg     EXPR, // '!' '%' '?' '^' '|' '~'
+Chg     EXPR, // '"'
+Chg     EXPR, // '#'
+Chg     STMT_GOT_TYPE, // '&'
+Chg     EXPR, // '\''
+Chg     STMT_GOT_TYPE, // '('
+Chg     STMT_GOT_TYPE, // ')'
+Chg     STMT_GOT_TYPE, // '*'
+Chg     STMT_GOT_TYPE, // '+'
+Chg     STMT_GOT_TYPE, // ','
+Chg     STMT_GOT_TYPE, // '-'
+Chg     STMT_GOT_TYPE, // '.'
+Chg     SAW_SLASH | PUSH,//STMT_GOT_TYPE, // '/'
+Chg     STMT_IN_TYPE, // '0'-'9'
+Chg     STMT, // ':'
+Chg     STMT, // ';'
+Chg     STMT_GOT_TYPE, // '<'
+Chg     EXPR, // '='
+Chg     EXPR, // '>'
+Chg     EXPR, // '[' // @Todo: nest
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+Chg     EXPR, // ']'
+Chg     EXPR, // '{'
+Chg     EXPR, // '}'
     },
     { // STMT_GOT_TYPE
         STMT_GOT_TYPE, // 0 '$' '@'-'Z' '_'-'z'
         STMT_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        ON_NEW_LINE | PUSH,//STMT_GOT_TYPE, // '\r' '\n'
-        EXPR | CHANGED, // '!' '%' '?' '^' '|' '~'
+        STMT_GOT_TYPE, // '\r' '\n'
+Chg     EXPR, // '!' '%' '?' '^' '|' '~'
         STMT_GOT_TYPE, // '"'
-        PREPROC | PUSH,//STMT_GOT_TYPE, // '#'
+Chg     PREPROC | PUSH,//STMT_GOT_TYPE, // '#'
         STMT_GOT_TYPE, // '&'
         STMT_GOT_TYPE, // '\''
-        EXPR | CHANGED, // '('
-        EXPR | CHANGED, // ')'
+Chg     EXPR, // '('
+Chg     EXPR, // ')'
         STMT_GOT_TYPE, // '*'
         STMT_GOT_TYPE, // '+'
         STMT_GOT_TYPE, // ','
-        EXPR | CHANGED, // '-'
+Chg     EXPR, // '-'
         STMT_GOT_TYPE, // '.'
-        SAW_SLASH | PUSH,//STMT_GOT_TYPE, // '/'
+Chg     SAW_SLASH | PUSH,//STMT_GOT_TYPE, // '/'
         STMT_GOT_TYPE, // '0'-'9'
-        STMT | CHANGED, // ':'
-        STMT | CHANGED, // ';'
-        EXPR | CHANGED, // '<'
-        EXPR | CHANGED, // '='
-        EXPR | CHANGED, // '>'
-        STMT_GOT_TYPE | CHANGED, // '['
-        STMT_GOT_TYPE, // '\\'
-        EXPR | CHANGED, // ']'
-        STMT | CHANGED, // '{'
-        STMT | CHANGED, // '}'
+Chg     STMT, // ':'
+Chg     STMT, // ';'
+Chg     EXPR, // '<'
+Chg     EXPR, // '='
+Chg     EXPR, // '>'
+        STMT_GOT_TYPE, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+Chg     EXPR, // ']'
+Chg     STMT, // '{'
+Chg     STMT, // '}'
     },
-    { // ON_NEW_LINE
-        POP, // 0 '$' '@'-'Z' '_'-'z'
-        ON_NEW_LINE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        ON_NEW_LINE, // '\r' '\n'
-        POP, // '!' '%' '?' '^' '|' '~'
-        POP, // '"'
-        PREPROC | CHANGED, // '#'
-        POP, // '&'
-        POP, // '\''
-        POP, // '('
-        POP, // ')'
-        POP, // '*'
-        POP, // '+'
-        POP, // ','
-        POP, // '-'
-        POP, // '.'
-        SAW_SLASH, // '/' // @Todo: does this need  | CHANGED ?
-        POP, // '0'-'9'
-        POP, // ':'
-        POP, // ';'
-        POP, // '<'
-        POP, // '='
-        POP, // '>'
-        POP, // '['
-        POP, // '\\'
-        POP, // ']'
-        POP, // '{'
-        POP, // '}'
+    { // ESCAPE_EXPECTING_NEWLINE
+Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
+Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+Chg     POP, // '\r' '\n'
+Chg     POP, // '!' '%' '?' '^' '|' '~'
+Chg     POP, // '"'
+Chg     POP, // '#'
+Chg     POP, // '&'
+Chg     POP, // '\''
+Chg     POP, // '('
+Chg     POP, // ')'
+Chg     POP, // '*'
+Chg     POP, // '+'
+Chg     POP, // ','
+Chg     POP, // '-'
+Chg     POP, // '.'
+Chg     POP, // '/'
+Chg     POP, // '0'-'9'
+Chg     POP, // ':'
+Chg     POP, // ';'
+Chg     POP, // '<'
+Chg     POP, // '='
+Chg     POP, // '>'
+Chg     POP, // '['
+        ESCAPE_EXPECTING_NEWLINE, // '\\'
+Chg     POP, // ']'
+Chg     POP, // '{'
+Chg     POP, // '}'
     },
+    /*{ // ESCAPED_NEWLINE
+Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
+Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+Chg     POP, // '\r' '\n'
+Chg     POP, // '!' '%' '?' '^' '|' '~'
+Chg     POP, // '"'
+Chg     POP, // '#'
+Chg     POP, // '&'
+Chg     POP, // '\''
+Chg     POP, // '('
+Chg     POP, // ')'
+Chg     POP, // '*'
+Chg     POP, // '+'
+Chg     POP, // ','
+Chg     POP, // '-'
+Chg     POP, // '.'
+Chg     POP, // '/'
+Chg     POP, // '0'-'9'
+Chg     POP, // ':'
+Chg     POP, // ';'
+Chg     POP, // '<'
+Chg     POP, // '='
+Chg     POP, // '>'
+Chg     POP, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE, // '\\'
+Chg     POP, // ']'
+Chg     POP, // '{'
+Chg     POP, // '}'
+    },*/
     { // SAW_SLASH
-        POP, // 0 '$' '@'-'Z' '_'-'z'
-        POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        POP, // '\r' '\n'
-        POP, // '!' '%' '?' '^' '|' '~'
-        POP, // '"'
-        POP, // '#'
-        POP, // '&'
-        POP, // '\''
-        POP, // '('
-        POP, // ')'
-        BLOCK_COMMENT | CHANGED, // '*'
-        POP, // '+'
-        POP, // ','
-        POP, // '-'
-        POP, // '.'
-        LINE_COMMENT | CHANGED, // '/'
-        POP, // '0'-'9'
-        POP, // ':'
-        POP, // ';'
-        POP, // '<'
-        POP, // '='
-        POP, // '>'
-        POP, // '['
-        POP, // '\\'
-        POP, // ']'
-        POP, // '{'
-        POP, // '}'
+Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
+Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+Chg     POP, // '\r' '\n'
+Chg     POP, // '!' '%' '?' '^' '|' '~'
+Chg     POP, // '"'
+Chg     POP, // '#'
+Chg     POP, // '&'
+Chg     POP, // '\''
+Chg     POP, // '('
+Chg     POP, // ')'
+Chg     BLOCK_COMMENT, // '*'
+Chg     POP, // '+'
+Chg     POP, // ','
+Chg     POP, // '-'
+Chg     POP, // '.'
+Chg     LINE_COMMENT, // '/'
+Chg     POP, // '0'-'9'
+Chg     POP, // ':'
+Chg     POP, // ';'
+Chg     POP, // '<'
+Chg     POP, // '='
+Chg     POP, // '>'
+Chg     POP, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+Chg     POP, // ']'
+Chg     POP, // '{'
+Chg     POP, // '}'
     },
     { // LINE_COMMENT
         LINE_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
         LINE_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        POP, // '\r' '\n'
+Chg     POP, // '\r' '\n'
         LINE_COMMENT, // '!' '%' '?' '^' '|' '~'
         LINE_COMMENT, // '"'
         LINE_COMMENT, // '#'
@@ -1271,36 +1345,7 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         LINE_COMMENT, // '='
         LINE_COMMENT, // '>'
         LINE_COMMENT, // '['
-        LINE_COMMENT_BS, // '\\'
-        LINE_COMMENT, // ']'
-        LINE_COMMENT, // '{'
-        LINE_COMMENT, // '}'
-    },
-    { // LINE_COMMENT_BS
-        LINE_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
-        LINE_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        LINE_COMMENT, // '\r' '\n'
-        LINE_COMMENT, // '!' '%' '?' '^' '|' '~'
-        LINE_COMMENT, // '"'
-        LINE_COMMENT, // '#'
-        LINE_COMMENT, // '&'
-        LINE_COMMENT, // '\''
-        LINE_COMMENT, // '('
-        LINE_COMMENT, // ')'
-        LINE_COMMENT, // '*'
-        LINE_COMMENT, // '+'
-        LINE_COMMENT, // ','
-        LINE_COMMENT, // '-'
-        LINE_COMMENT, // '.'
-        LINE_COMMENT, // '/'
-        LINE_COMMENT, // '0'-'9'
-        LINE_COMMENT, // ':'
-        LINE_COMMENT, // ';'
-        LINE_COMMENT, // '<'
-        LINE_COMMENT, // '='
-        LINE_COMMENT, // '>'
-        LINE_COMMENT, // '['
-        LINE_COMMENT_BS, // '\\'
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         LINE_COMMENT, // ']'
         LINE_COMMENT, // '{'
         LINE_COMMENT, // '}'
@@ -1316,7 +1361,7 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         BLOCK_COMMENT, // '\''
         BLOCK_COMMENT, // '('
         BLOCK_COMMENT, // ')'
-        BLOCK_COMMENT_STAR, // '*'
+Chg     BLOCK_COMMENT_STAR, // '*'
         BLOCK_COMMENT, // '+'
         BLOCK_COMMENT, // ','
         BLOCK_COMMENT, // '-'
@@ -1329,44 +1374,73 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         BLOCK_COMMENT, // '='
         BLOCK_COMMENT, // '>'
         BLOCK_COMMENT, // '['
-        BLOCK_COMMENT, // '\\'
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         BLOCK_COMMENT, // ']'
         BLOCK_COMMENT, // '{'
         BLOCK_COMMENT, // '}'
     },
     { // BLOCK_COMMENT_STAR
-        BLOCK_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
-        BLOCK_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        BLOCK_COMMENT, // '\r' '\n'
-        BLOCK_COMMENT, // '!' '%' '?' '^' '|' '~'
-        BLOCK_COMMENT, // '"'
-        BLOCK_COMMENT, // '#'
-        BLOCK_COMMENT, // '&'
-        BLOCK_COMMENT, // '\''
-        BLOCK_COMMENT, // '('
-        BLOCK_COMMENT, // ')'
+Chg     BLOCK_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
+Chg     BLOCK_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+Chg     BLOCK_COMMENT, // '\r' '\n'
+Chg     BLOCK_COMMENT, // '!' '%' '?' '^' '|' '~'
+Chg     BLOCK_COMMENT, // '"'
+Chg     BLOCK_COMMENT, // '#'
+Chg     BLOCK_COMMENT, // '&'
+Chg     BLOCK_COMMENT, // '\''
+Chg     BLOCK_COMMENT, // '('
+Chg     BLOCK_COMMENT, // ')'
         BLOCK_COMMENT_STAR, // '*'
-        BLOCK_COMMENT, // '+'
-        BLOCK_COMMENT, // ','
-        BLOCK_COMMENT, // '-'
-        BLOCK_COMMENT, // '.'
-        POP, // '/'
-        BLOCK_COMMENT, // '0'-'9'
-        BLOCK_COMMENT, // ':'
-        BLOCK_COMMENT, // ';'
-        BLOCK_COMMENT, // '<'
-        BLOCK_COMMENT, // '='
-        BLOCK_COMMENT, // '>'
-        BLOCK_COMMENT, // '['
-        BLOCK_COMMENT, // '\\'
-        BLOCK_COMMENT, // ']'
-        BLOCK_COMMENT, // '{'
-        BLOCK_COMMENT, // '}'
+Chg     BLOCK_COMMENT, // '+'
+Chg     BLOCK_COMMENT, // ','
+Chg     BLOCK_COMMENT, // '-'
+Chg     BLOCK_COMMENT, // '.'
+Chg     POP, // '/'
+Chg     BLOCK_COMMENT, // '0'-'9'
+Chg     BLOCK_COMMENT, // ':'
+Chg     BLOCK_COMMENT, // ';'
+Chg     BLOCK_COMMENT, // '<'
+Chg     BLOCK_COMMENT, // '='
+Chg     BLOCK_COMMENT, // '>'
+Chg     BLOCK_COMMENT, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+Chg     BLOCK_COMMENT, // ']'
+Chg     BLOCK_COMMENT, // '{'
+Chg     BLOCK_COMMENT, // '}'
+    },
+    { // BLOCK_COMMENT_DONE
+Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
+Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+Chg     POP, // '\r' '\n'
+Chg     POP, // '!' '%' '?' '^' '|' '~'
+Chg     POP, // '"'
+Chg     POP, // '#'
+Chg     POP, // '&'
+Chg     POP, // '\''
+Chg     POP, // '('
+Chg     POP, // ')'
+Chg     POP, // '*'
+Chg     POP, // '+'
+Chg     POP, // ','
+Chg     POP, // '-'
+Chg     POP, // '.'
+Chg     POP, // '/'
+Chg     POP, // '0'-'9'
+Chg     POP, // ':'
+Chg     POP, // ';'
+Chg     POP, // '<'
+Chg     POP, // '='
+Chg     POP, // '>'
+Chg     POP, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE, // '\\'
+Chg     POP, // ']'
+Chg     POP, // '{'
+Chg     POP, // '}'
     },
     { // PREPROC
         PREPROC, // 0 '$' '@'-'Z' '_'-'z'
         PREPROC, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        ON_NEW_LINE | CHANGED, // '\r' '\n'
+Chg     POP, // '\r' '\n'
         PREPROC, // '!' '%' '?' '^' '|' '~'
         PREPROC, // '"'
         PREPROC, // '#'
@@ -1379,7 +1453,7 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         PREPROC, // ','
         PREPROC, // '-'
         PREPROC, // '.'
-        SAW_SLASH | PUSH, // '/'
+Chg     SAW_SLASH | PUSH, // '/'
         PREPROC, // '0'-'9'
         PREPROC, // ':'
         PREPROC, // ';'
@@ -1387,118 +1461,104 @@ static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
         PREPROC, // '='
         PREPROC, // '>'
         PREPROC, // '['
-        PREPROC_BS, // '\\'
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         PREPROC, // ']'
         PREPROC, // '{'
         PREPROC, // '}'
     },
-    { // PREPROC_BS
-        PREPROC, // 0 '$' '@'-'Z' '_'-'z'
-        PREPROC, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        PREPROC, // '\r' '\n'
-        PREPROC, // '!' '%' '?' '^' '|' '~'
-        PREPROC, // '"'
-        PREPROC, // '#'
-        PREPROC, // '&'
-        PREPROC, // '\''
-        PREPROC, // '('
-        PREPROC, // ')'
-        PREPROC, // '*'
-        PREPROC, // '+'
-        PREPROC, // ','
-        PREPROC, // '-'
-        PREPROC, // '.'
-        SAW_SLASH | PUSH, // '/'
-        PREPROC, // '0'-'9'
-        PREPROC, // ':'
-        PREPROC, // ';'
-        PREPROC, // '<'
-        PREPROC, // '='
-        PREPROC, // '>'
-        PREPROC, // '['
-        PREPROC_BS, // '\\'
-        PREPROC, // ']'
-        PREPROC, // '{'
-        PREPROC, // '}'
-    },
+    /*{ // PREPROC_DONE
+Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
+Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+Chg     POP, // '\r' '\n'
+Chg     POP, // '!' '%' '?' '^' '|' '~'
+Chg     POP, // '"'
+Chg     PREPROC, // '#'
+Chg     POP, // '&'
+Chg     POP, // '\''
+Chg     POP, // '('
+Chg     POP, // ')'
+Chg     POP, // '*'
+Chg     POP, // '+'
+Chg     POP, // ','
+Chg     POP, // '-'
+Chg     POP, // '.'
+Chg     SAW_SLASH | PUSH, // '/'
+Chg     POP, // '0'-'9'
+Chg     POP, // ':'
+Chg     POP, // ';'
+Chg     POP, // '<'
+Chg     POP, // '='
+Chg     POP, // '>'
+Chg     POP, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+Chg     POP, // ']'
+Chg     POP, // '{'
+Chg     POP, // '}'
+    },*/
     { // EXPR
         EXPR, // 0 '$' '@'-'Z' '_'-'z'
         EXPR, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        ON_NEW_LINE | PUSH,//EXPR, // '\r' '\n'
+        EXPR, // '\r' '\n'
         EXPR, // '!' '%' '?' '^' '|' '~'
         EXPR, // '"'
         EXPR, // '#'
         EXPR, // '&'
         EXPR, // '\''
-        EXPR | CHANGED, // '('
-        EXPR | CHANGED, // ')'
+        EXPR, // '('
+        EXPR, // ')'
         EXPR, // '*'
         EXPR, // '+'
         EXPR, // ','
         EXPR, // '-'
         EXPR, // '.'
-        SAW_SLASH | PUSH,//EXPR, // '/'
+Chg     SAW_SLASH | PUSH, // '/'
         EXPR, // '0'-'9'
         EXPR, // ':'
-        STMT | CHANGED, // ';'
-        EXPR | CHANGED, // '<'
+Chg     STMT, // ';'
+        EXPR, // '<'
         EXPR, // '='
-        EXPR | CHANGED, // '>'
-        EXPR | CHANGED, // '['
-        EXPR, // '\\'
-        EXPR | CHANGED, // ']'
-        EXPR | CHANGED, // '{'
-        EXPR | CHANGED, // '}'
+        EXPR, // '>'
+        EXPR, // '['
+Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR, // ']'
+        EXPR, // '{'
+        EXPR, // '}'
     },
 };
 
-    u8* sp = &s.stack[s.sp];
+    u8* sp = s.stack + s.sp;
 
     while (p < pend) {
-        //if (p >= the_buffer_gap) {
-        //    if (static bool still_break = true)
-        //        __debugbreak();
-        //}
-
         const int raw = (int)*p;
         const int c = ((raw - 128) >> 31) & raw;
         const int raw_type = char_type[c];
         const int ch_type = raw_type;//& CHAR_TYPE_BIT_MASK;
-        const int new_state = state_table[s.dfa][ch_type];
-
-        int state_that_the_dfa_will_be_assigned = new_state & STATE_BIT_MASK;
-
-        if (new_state & CHANGE_BIT_MASK) {
-            *sp = (u8)s.dfa;
-            // branchlessly move stack ptr: POP -> -1, CHANGE -> 0, PUSH -> +1
-            const int bump_amount = new_state / STATE_BIT - 2;
-            if ((s.dfa == SAW_SLASH) && (bump_amount == -1)) { // special casing... can this go away?
-                p--;
+        int new_state = state_table[*sp][ch_type];
+        int changed = new_state & CHANGED;
+        
+        if (changed) {
+            const int bump_amount = (s8)new_state >> 6; // sign-extend top 2 bits (00, 01, 11)
+            if (bump_amount == -1) { // is a pop
+                if (*sp == SAW_SLASH) {
+                    p--;
+                }
+                new_state = sp[-1];
             }
             sp += bump_amount;
-            s.dfa = (Dfa)*sp;
-            if (bump_amount == -1) {
-                state_that_the_dfa_will_be_assigned = s.dfa;
-            }
 
-            (*sh)->type = (Syntax_Highlight_Type)(new_state & STATE_BIT_MASK);
-            (*sh)->where = p;
-            (*sh)++;
+            sh[0]->type = (Syntax_Highlight_Type)(new_state & STATE_BIT_MASK);
+            sh[0]->where = p;
+            sh[0]++;
 
             assert(sp >= s.stack);
             assert(sp < s.stack + sizeof(s.stack));
         }
 
-        s.dfa = (Dfa)state_that_the_dfa_will_be_assigned;
+        *sp = (new_state & STATE_BIT_MASK);
 
         p++;
     }
 
-    //Parse_State result = s;
-    //result.dfa = dfa;
-    //memcpy(result.stack, stack, sizeof(stack));
-    //result.sp = sp - &stack[0];
-    //return result;
     s.sp = sp - s.stack;
     return s;
 }
@@ -1519,12 +1579,8 @@ if (use_dfa_parser) {//#if DFA_PARSER
             if (gap_size) {
                 b.gap[0] = 0; // @Debug.
             }
-            the_buffer_gap = b.gap;
             Syntax_Highlight* dfa_sh = sh;
             Parse_State state = {};
-            state.dfa = ON_NEW_LINE;
-            state.stack[0] = STMT;
-            state.sp = 1;
             state = parse_dfa(state, b.data, b.gap, &dfa_sh);
             state = parse_dfa(state, buf_gap + gap_size, buf_end, &dfa_sh);
             this->sh = dfa_sh;

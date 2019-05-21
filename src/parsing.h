@@ -44,6 +44,7 @@ struct Syntax_Highlight {
 
 void parse_syntax(Buffer* buffer);
 Syntax_Highlight_Type get_color_type(const Syntax_Highlight* sh, const u32* p);
+const char* dbg_get_sh_str(const Syntax_Highlight* sh);
 struct Buf_String {
     size_t i;
     size_t size;
