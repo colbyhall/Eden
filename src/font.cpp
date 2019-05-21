@@ -92,7 +92,7 @@ void font_pack_atlas(Font& font) {
     font.atlas_h = atlas.height;
 
 	atlas.data = (u8*) c_alloc(atlas.width * atlas.height);
-    //defer(c_free(atlas.data));
+    defer(c_free(atlas.data));
 
     stbtt_pack_context pc;
 	stbtt_packedchar* pdata = (stbtt_packedchar*) c_alloc(font.num_glyphs * sizeof(stbtt_packedchar));
