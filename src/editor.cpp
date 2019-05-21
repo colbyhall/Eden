@@ -56,6 +56,27 @@ static void editor_mouse_wheel_scrolled(void* owner, Event* event) {
 
 	if (!view) return;
 
+    if (editor->input_state.ctrl_is_down) {
+
+        float current_scroll_lines = view->current_scroll_y / editor->loaded_font.size;
+        float target_scroll_lines = view->target_scroll_y / editor->loaded_font.size;
+
+        if (event->delta >= 0) {
+            editor->loaded_font.size += 2;
+        } else {
+            editor->loaded_font.size -= 2;
+        }
+
+        editor->loaded_font.size = floorf(editor->loaded_font.size);
+
+        font_pack_atlas(editor->loaded_font);
+
+        view->current_scroll_y = current_scroll_lines * editor->loaded_font.size;
+        view->target_scroll_y = target_scroll_lines * editor->loaded_font.size;
+
+        return;
+    }
+
 	Buffer* buffer = get_buffer(view);
 	assert(buffer);
 
@@ -63,7 +84,7 @@ static void editor_mouse_wheel_scrolled(void* owner, Event* event) {
 
 	if (view->target_scroll_y < 0.f) view->target_scroll_y = 0.f;
 
-	const float font_height = FONT_SIZE;
+	const float font_height = editor->loaded_font.size;
 	const float buffer_height = (buffer->eol_table.count * font_height);
 	const float max_scroll = buffer_height - font_height;
 	if (view->target_scroll_y > max_scroll) view->target_scroll_y = max_scroll;
@@ -81,6 +102,8 @@ static void on_left_mouse_down(void* owner, Event* event) {
     }
 }
 
+#define DEFAULT_FONT_SIZE 12.0f
+
 void editor_init(Editor_State* editor) {
 	// @NOTE(Colby): init systems here
 	gl_init();
@@ -91,6 +114,8 @@ void editor_init(Editor_State* editor) {
     bind_event_listener(&editor->input_state, make_event_listener(editor, on_left_mouse_down, ET_Mouse_Down));
 
 	editor->loaded_font = font_load_from_os("consola.ttf");
+    editor->loaded_font.size = DEFAULT_FONT_SIZE;
+    font_pack_atlas(editor->loaded_font);
 	
 	Buffer* buffer = editor_create_buffer(editor);
 	buffer_load_from_file(buffer, "src\\editor.cpp");

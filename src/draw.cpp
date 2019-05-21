@@ -248,7 +248,7 @@ void draw_rect(float x0, float y0, float x1, float y1, const Color& color) {
 }
 
 Vector2 immediate_string(const String& str, float x, float y, const Color& color, const Font& font) {
-	const float font_height = FONT_SIZE;
+	const float font_height = font.size;
 
 	const float original_x = x;
 	const float original_y = y;
@@ -325,7 +325,7 @@ const Font_Glyph* immediate_char(u32 c, float x, float y, const Color& color, co
             glyph = font_find_glyph(&font, ' ');
         }
         immediate_glyph(*glyph, x, y, UNKNOWN_GLYPH, font);
-        return nullptr;
+        return glyph;
 
     } else {
 	    immediate_glyph(*glyph, x, y, color, font);
@@ -342,7 +342,7 @@ void draw_string(const String& str, float x, float y, const Color& color, const 
 }
 
 Vector2 get_draw_string_size(const String& str, const Font& font) {
-	const float font_height = FONT_SIZE;
+	const float font_height = font.size;
 
 	float y = 0.f;
 	float x = 0.f;
@@ -455,7 +455,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
     y += font.ascent;
 
-	const float font_height = FONT_SIZE;
+	const float font_height = font.size;
 #if GAP_BUFFER_DEBUG
 	const size_t buffer_count = buffer->allocated;
 #else
@@ -604,7 +604,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
 	// @NOTE(Colby): Drawing info bar here
 	{
-		const float font_height = FONT_SIZE;
+		const float font_height = font.size;
 		const Vector2 padding = v2(font_height / 2.f);
 		const float bar_height = font_height + padding.y;
 		{
@@ -617,7 +617,12 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			const float x = x0 + padding.x / 2.f;
 			const float y = info_bar_y0 + (padding.y / 2.f) + font.ascent;
 			char output_string[1024];
-			sprintf(output_string, "%s      LN: %llu     COL: %llu   Lex @ %fms %f kloc/s (%f MB/s)",  buffer->title.data, view->current_line_number, view->current_column_number, buffer->s * 1000, buffer->loc_s/1000, buffer->chars_s * 4 / (1024 * 1024));
+			sprintf(output_string, "%s  %dpt  LN: %llu     COL: %llu   Lex @ %fms %f kloc/s (%f MB/s)",
+                    buffer->title.data,
+                    (int)font.size,
+                    view->current_line_number,
+                    view->current_column_number,
+                    buffer->s * 1000, buffer->loc_s/1000, buffer->chars_s * 4 / (1024 * 1024));
 			immediate_string(output_string, x, y, 0x052329, font);
 		}
 	}

@@ -26,7 +26,6 @@
 
 using Buffer_ID = size_t;
 
-extern struct Font font;
 struct Font_Glyph;
 
 struct Buffer {

@@ -399,7 +399,7 @@ size_t pick_index(Buffer_View* view, Vector2 pos) {
     float x = v_pos.x;
     float y = v_pos.y;
 
-    const float font_height = FONT_SIZE;
+    const float font_height = g_editor.loaded_font.size;
 
     Buffer* buffer = get_buffer(view);
 
@@ -471,7 +471,7 @@ static void remove_selection(Buffer_View* view) {
 }
 
 static void ensure_cursor_in_view(Buffer_View* view) {
-    const float font_height = FONT_SIZE;
+    const float font_height = g_editor.loaded_font.size;
     const float cursor_scroll_y = view->current_line_number * font_height;
 	const float view_inner_height = get_view_inner_size(*view).y;
 
@@ -619,7 +619,7 @@ static void key_pressed(void* owner, Event* event) {
 	} break;
 	case KEY_PAGEUP:
 	case KEY_PAGEDOWN: {
-		const float font_height = FONT_SIZE;
+		const float font_height = editor->loaded_font.size;
 		const size_t lines_in_view = (size_t)(get_view_inner_size(*view).y / font_height);
 		const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
 
@@ -702,7 +702,7 @@ void buffer_view_gained_focus(Buffer_View* view) {
 }
 
 Vector2 get_view_inner_size(const Buffer_View& view) {
-	const float font_height = FONT_SIZE;
+	const float font_height = g_editor.loaded_font.size;
 	const Vector2 padding = v2(font_height / 2.f);
 	const float bar_height = font_height + padding.y;
 	const float height = (float)os_window_height() - bar_height;
