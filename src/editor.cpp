@@ -102,7 +102,7 @@ static void on_left_mouse_down(void* owner, Event* event) {
     }
 }
 
-#define DEFAULT_FONT_SIZE 16.0f
+#define DEFAULT_FONT_SIZE 18.0f
 
 void editor_init(Editor_State* editor) {
 	// @NOTE(Colby): init systems here

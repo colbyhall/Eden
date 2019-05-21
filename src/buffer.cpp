@@ -575,11 +575,20 @@ static void key_pressed(void* owner, Event* event) {
 	} break;
 	case KEY_HOME:
 	case KEY_END: {
+        if (input->ctrl_is_down) {
+            if (key_code == KEY_HOME) {
+                view->cursor = 0;
+            } else {
+                view->cursor = get_count(*buffer) - 1;
+            }
+            refresh_cursor_info(view, true);
+        } else {
 		if (key_code == KEY_HOME) {
 			seek_line_start(view);
 		} else {
 			seek_line_end(view);
 		}
+        }
         if (!input->shift_is_down) {
             view->selection = view->cursor;
         }
