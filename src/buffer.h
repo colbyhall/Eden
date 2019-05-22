@@ -44,8 +44,6 @@ struct Buffer {
 
 	Array<size_t> eol_table;
 
-    Array<u8> as_ascii; // Used for lexing!!!
-
     Array<Syntax_Highlight> syntax;
     bool syntax_is_dirty;
 
@@ -81,10 +79,10 @@ struct Buffer_View {
 
 	u64 current_line_number = 0;
 	u64 current_column_number = 0;
-	u64 desired_column_number = 0;
+    float desired_column_distance = 0;
 };
 
-Buffer* get_buffer(Buffer_View* view);
+Buffer* get_buffer(const Buffer_View* view);
 
 void refresh_cursor_info(Buffer_View* view, bool update_desired = true);
 void move_cursor_vertical(Buffer_View* view, s64 delta);
@@ -100,3 +98,7 @@ void buffer_view_gained_focus(Buffer_View* view);
 Vector2 get_view_inner_size(const Buffer_View& view);
 Vector2 get_view_size(const Buffer_View& view);
 Vector2 get_view_position(const Buffer_View& view);
+
+float get_column_distance(const Buffer_View& view);
+
+size_t get_column_number_closest_to_distance(const Buffer * const buffer, size_t line, float distance);

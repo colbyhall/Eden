@@ -617,13 +617,15 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			const float x = x0 + padding.x / 2.f;
 			const float y = info_bar_y0 + (padding.y / 2.f) + font.ascent;
 			char output_string[1024];
-			sprintf(output_string, "%s  %dpt  LN: %llu     COL: %llu   Lex @ %dmb/s (%dms)",
+			sprintf(output_string, "%s  %dpt  LN: %llu     COL: %llu   Lex @ %dmb/s (%dms)  dist = %f  col = %llu",
                     buffer->title.data,
                     (int)font.size,
                     view->current_line_number,
                     view->current_column_number,
                     (int)(buffer->chars_s * 4 / (1024 * 1024)),
-                    (int)(buffer->s * 1000)
+                    (int)(buffer->s * 1000),
+                    get_column_distance(*view),
+                    get_column_number_closest_to_distance(buffer, view->current_line_number, 30)
             );
 			immediate_string(output_string, x, y, 0x052329, font);
 		}

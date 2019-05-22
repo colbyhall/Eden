@@ -272,9 +272,24 @@ size_t get_line_index(const Buffer& buffer, size_t index) {
 
 	return result;
 }
+size_t get_line_from_index(const Buffer& buffer, size_t buffer_index) {
+	assert(buffer_index < get_count(buffer));
+	
+    size_t line = 0;
 
+	size_t index = 0;
+	for (; line < buffer.eol_table.count; line++) {
+        size_t new_index = index + buffer.eol_table[line];
+        if (new_index > buffer_index) {
+            break;
+        }
+        index = new_index;
+	}
 
-Buffer* get_buffer(Buffer_View* view) {
+	return line;
+}
+
+Buffer* get_buffer(const Buffer_View* view) {
 	Buffer* result = editor_find_buffer(&g_editor, view->id);
 	assert(result);
 	return result;
@@ -291,21 +306,12 @@ void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
         view->cursor = buffer_count;
     }
 
-	view->current_line_number = 0;
-	view->current_column_number = 0;
-	for (size_t i = 0; i < view->cursor; i++) {
-		const u32 c = (*buffer)[i];
+	view->current_line_number = get_line_from_index(*buffer, view->cursor);
+	view->current_column_number = view->cursor - get_line_index(*buffer, view->current_line_number);
 
-		view->current_column_number += 1;
-
-		if (is_eol(c)) {
-			view->current_line_number += 1;
-			view->current_column_number = 0;
-		}
-	}
 
 	if (update_desired) {
-		view->desired_column_number = view->current_column_number;
+		view->desired_column_distance = get_column_distance(*view);
 	}
 }
 
@@ -320,7 +326,7 @@ void move_cursor_vertical(Buffer_View* view, s64 delta) {
 	}
 
 	size_t new_line = view->current_line_number + delta;
-	if (delta < 0 && view->current_line_number <= (u64)-delta) {
+	if (delta < 0 && (s64)view->current_line_number <= -delta) {
 		new_line = 0;
 	}
 	else if (new_line >= buffer->eol_table.count) {
@@ -329,12 +335,14 @@ void move_cursor_vertical(Buffer_View* view, s64 delta) {
 
 	const size_t line_index = get_line_index(*buffer, new_line);
 
+    size_t desired_column_number = get_column_number_closest_to_distance(buffer, new_line, view->desired_column_distance);
+
 	size_t new_cursor_index = line_index;
-	if (buffer->eol_table[new_line] <= view->desired_column_number) {
+	if (buffer->eol_table[new_line] <= desired_column_number) {
 		new_cursor_index += buffer->eol_table[new_line] - 1;
 	}
 	else {
-		new_cursor_index += view->desired_column_number;
+		new_cursor_index += desired_column_number;
 	}
 
 	view->cursor = new_cursor_index;
@@ -583,11 +591,11 @@ static void key_pressed(void* owner, Event* event) {
             }
             refresh_cursor_info(view, true);
         } else {
-		if (key_code == KEY_HOME) {
-			seek_line_start(view);
-		} else {
-			seek_line_end(view);
-		}
+		    if (key_code == KEY_HOME) {
+		    	seek_line_start(view);
+		    } else {
+		    	seek_line_end(view);
+		    }
         }
         if (!input->shift_is_down) {
             view->selection = view->cursor;
@@ -727,4 +735,71 @@ Vector2 get_view_position(const Buffer_View& view) {
 	const size_t view_index = &view - &g_editor.views[0];
 	const float width = get_view_size(view).x;
 	return v2(width * view_index, 0.f);
+}
+
+float get_column_distance(const Buffer_View & view) {
+    const Buffer* const buffer = get_buffer(&view);
+
+    const size_t n = view.current_column_number;
+
+    const Font* font = &g_editor.loaded_font;
+    const size_t line_begin = get_line_index(*buffer, view.current_line_number);
+    const size_t line_end = line_begin + buffer->eol_table[view.current_line_number]; 
+
+    const size_t buffer_count = get_count(*buffer);
+
+    float result = 0;
+
+    const Font_Glyph* space_glyph = font_find_glyph(font, ' ');
+    assert(space_glyph);
+
+    for (size_t i = 0; i < n; i++) {
+        const size_t index = line_begin + i;
+        assert(index < buffer_count);
+        if (index >= buffer_count || index >= line_end) {
+            break;
+        }
+        const u32 c = (*buffer)[index];
+        const Font_Glyph* glyph = font_find_glyph(font, c);
+        if (is_whitespace(c) || !glyph) {
+            glyph = space_glyph;
+        }
+        float advance = glyph->advance;
+        if (c == '\t') {
+            advance *= 4;
+        }
+        result += advance / font->size;
+    }
+    return result;
+}
+size_t get_column_number_closest_to_distance(const Buffer* const buffer, size_t line, float distance) {
+    const Font* font = &g_editor.loaded_font;
+    const size_t line_begin = get_line_index(*buffer, line);
+    const size_t line_end = line_begin + buffer->eol_table[line];
+
+    const size_t buffer_count = get_count(*buffer);
+
+    size_t result = 0;
+
+    const Font_Glyph* space_glyph = font_find_glyph(font, ' ');
+    assert(space_glyph);
+
+    for (float pointer = 0; pointer < distance;) {
+        const size_t index = line_begin + result;
+        if (index >= buffer_count || index >= line_end) {
+            break;
+        }
+        const u32 c = (*buffer)[index];
+        const Font_Glyph* glyph = font_find_glyph(font, c);
+        if (is_whitespace(c) || !glyph) {
+            glyph = space_glyph;
+        }
+        float advance = glyph->advance;
+        if (c == '\t') {
+            advance *= 4;
+        }
+        pointer += advance / font->size;
+        result++;
+    }
+    return result;
 }
