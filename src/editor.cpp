@@ -118,7 +118,7 @@ void editor_init(Editor_State* editor) {
     font_pack_atlas(editor->loaded_font);
 	
 	Buffer* buffer = editor_create_buffer(editor);
-	buffer_load_from_file(buffer, "src\\editor.cpp");
+	buffer_load_from_file(buffer, "..\\src\\editor.cpp");
 
 	editor_set_current_view(editor, 0);
 	editor->current_view->id = buffer->id;

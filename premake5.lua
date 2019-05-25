@@ -10,6 +10,7 @@ workspace "YEET"
 
 	targetdir ("bin")
     objdir ("bin")
+    debugdir ("bin")
 
 project "YEET"
     kind "WindowedApp"
