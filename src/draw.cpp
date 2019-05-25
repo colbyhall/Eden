@@ -319,13 +319,9 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& col
 const Font_Glyph* immediate_char(u32 c, float x, float y, const Color& color, const Font& font) {
 	const Font_Glyph* glyph = font_find_glyph(&font, c);
     if (!glyph) {
-        const Font_Glyph* qmark = font_find_glyph(&font, '?');
-        glyph = qmark;
-        if (!qmark) {
-            glyph = font_find_glyph(&font, ' ');
-        }
+        glyph = font_find_glyph(&font, '?');
         immediate_glyph(*glyph, x, y, UNKNOWN_GLYPH, font);
-        return glyph;
+        return nullptr;
 
     } else {
 	    immediate_glyph(*glyph, x, y, color, font);
@@ -531,7 +527,8 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
             (view->cursor < view->selection && i < view->selection && i >= view->cursor)) {
             const Font_Glyph* glyph = font_find_glyph(&font, c);
 
-            if (!glyph || is_whitespace(c)) {
+            if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
+            if (is_whitespace(c)) {
                 glyph = space_glyph;
             }
 
@@ -555,7 +552,8 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
         {
             const Font_Glyph* glyph = font_find_glyph(&font, c);
 
-			if (!glyph || is_whitespace(c)) {
+            if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
+			if (is_whitespace(c)) {
 				glyph = space_glyph;
 			}
 
@@ -592,7 +590,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			continue;
 		default:
 			const Font_Glyph* glyph = immediate_char(c, x, y, color, font);
-            if (!glyph) glyph = space_glyph;
+            if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
 			x += glyph->advance;
 		}
 

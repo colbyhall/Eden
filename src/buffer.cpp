@@ -428,6 +428,7 @@ size_t pick_index(Buffer_View* view, Vector2 pos) {
         const u32 c = (*buffer)[i];
 
         const Font_Glyph* glyph = font_find_glyph(&g_editor.loaded_font, c);
+        if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
         if (is_whitespace(c)) {
             glyph = font_find_glyph(&g_editor.loaded_font, ' ');
         }
@@ -761,7 +762,8 @@ float get_column_distance(const Buffer_View & view) {
         }
         const u32 c = (*buffer)[index];
         const Font_Glyph* glyph = font_find_glyph(font, c);
-        if (is_whitespace(c) || !glyph) {
+        if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
+        if (is_whitespace(c)) {
             glyph = space_glyph;
         }
         float advance = glyph->advance;
@@ -791,7 +793,8 @@ size_t get_column_number_closest_to_distance(const Buffer* const buffer, size_t 
         }
         const u32 c = (*buffer)[index];
         const Font_Glyph* glyph = font_find_glyph(font, c);
-        if (is_whitespace(c) || !glyph) {
+        if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
+        if (is_whitespace(c)) {
             glyph = space_glyph;
         }
         float advance = glyph->advance;
