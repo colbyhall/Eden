@@ -67,8 +67,6 @@ static void editor_mouse_wheel_scrolled(void* owner, Event* event) {
             editor->loaded_font.size -= 2;
         }
 
-        editor->loaded_font.size = floorf(editor->loaded_font.size);
-
         font_pack_atlas(editor->loaded_font);
 
         view->current_scroll_y = current_scroll_lines * editor->loaded_font.size;
@@ -113,7 +111,7 @@ void editor_init(Editor_State* editor) {
 	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_mouse_wheel_scrolled, ET_Mouse_Wheel_Scrolled));
     bind_event_listener(&editor->input_state, make_event_listener(editor, on_left_mouse_down, ET_Mouse_Down));
 
-	editor->loaded_font = font_load_from_os("arial.ttf");
+	editor->loaded_font = font_load_from_os("consola.ttf");
     editor->loaded_font.size = DEFAULT_FONT_SIZE;
     font_pack_atlas(editor->loaded_font);
 	

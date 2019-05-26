@@ -3,6 +3,7 @@
 #include "types.h"
 #include "opengl.h"
 
+#include <stb/stb_rect_pack.h>
 // @TODO(Colby): Replace desired font size with something that checks a script or something
 #include <stb/stb_truetype.h>
 
@@ -14,23 +15,29 @@ struct Font_Glyph {
 	u32 x0, y0, x1, y1;
 };
 
+struct Font_Atlas {
+    u32 w;
+    u32 h;
+    Font_Glyph* glyphs;
+};
+
 struct Font {
     struct stbtt_fontinfo info;
 
-    float size;
+    u16 size;
+
+    double atlas_area;
 
 	float ascent;
 	float descent;
 	float line_gap;
 
-	GLuint texture_id;
-    u32 atlas_w;
-    u32 atlas_h;
+	Font_Atlas atlases[129];
+    GLuint atlas_ids[ARRAYSIZE(Font::atlases)];
 
     int* codepoints;
 
     u32 num_glyphs;
-	Font_Glyph *glyphs;
 };
 
 Font font_load_from_os(const char* file_name);

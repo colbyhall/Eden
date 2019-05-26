@@ -9,7 +9,7 @@
 String os_load_file_into_memory(const char* path) {
 	FILE* f = fopen(path, "rb");
 	if (!f) {
-		return "";
+        return {};
 	}
 	fseek(f, 0, SEEK_END);
 	size_t size = ftell(f);

@@ -145,7 +145,7 @@ void bind_font(Font* font) {
 	refresh_transformation();
 	glUniform1i(global_shader.texture_loc, 0);
 
-	glBindTexture(GL_TEXTURE_2D, font->texture_id);
+	glBindTexture(GL_TEXTURE_2D, font->atlas_ids[font->size]);
 	glActiveTexture(GL_TEXTURE0);
 }
 
@@ -300,10 +300,13 @@ void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& col
 		return;
 	}
 
-	Vector2 bottom_right = v2(glyph.x1 / (float)font.atlas_w, glyph.y1 / (float)font.atlas_h);
-	Vector2 bottom_left = v2(glyph.x1 / (float)font.atlas_w, glyph.y0 / (float)font.atlas_h);
-	Vector2 top_right = v2(glyph.x0 / (float)font.atlas_w, glyph.y1 / (float)font.atlas_h);
-	Vector2 top_left = v2(glyph.x0 / (float)font.atlas_w, glyph.y0 / (float)font.atlas_h);
+    const float atlas_w = (float)font.atlases[font.size].w;
+    const float atlas_h = (float)font.atlases[font.size].h;
+
+	Vector2 bottom_right = v2(glyph.x1 / atlas_w, glyph.y1 / atlas_h);
+	Vector2 bottom_left = v2(glyph.x1 / atlas_w, glyph.y0 / atlas_h);
+	Vector2 top_right = v2(glyph.x0 / atlas_w, glyph.y1 / atlas_h);
+	Vector2 top_left = v2(glyph.x0 / atlas_w, glyph.y0 / atlas_h);
 
 	immediate_vertex(x0, y0, v4_color, top_left);
 	immediate_vertex(x0, y1, v4_color, top_right);
@@ -436,7 +439,7 @@ static Color highlight_to_color(Syntax_Highlight_Type type) {
 bool debug_show_sections = false;
 
 void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font) {
-	float x = x0;
+    float x = x0;
 	float y = y0;
 
 	const float starting_x = x;
