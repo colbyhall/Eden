@@ -41,7 +41,6 @@ project "YEET"
         "user32",
         "kernel32",
 		"shlwapi",
-		"bin/lua-lib.lib"
     }
 
 	dependson

@@ -17,6 +17,7 @@ struct Vertex {
 	Vector2 position;
 	Color color;
 	Vector2 uv;
+	float z_index;
 };
 
 struct Shader {
@@ -28,6 +29,7 @@ struct Shader {
 	GLint position_loc;
 	GLint color_loc;
 	GLint uv_loc;
+	GLint z_index_loc;
 
 	GLuint texture_loc;
 };
@@ -76,6 +78,7 @@ const GLchar* vert_shader = R"foo(
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec2 uv;
+layout(location = 3) in float z_index;
 
 uniform mat4 view_to_projection;
 uniform mat4 world_to_view;
@@ -84,7 +87,7 @@ out vec4 out_color;
 out vec2 out_uv;
 
 void main() {
-    gl_Position =  view_to_projection * world_to_view * vec4(position, 0.0, 1.0);
+    gl_Position =  view_to_projection * world_to_view * vec4(position, -z_index, 1.0);
 	out_color = color;
 	out_uv = uv;
 }
@@ -137,6 +140,7 @@ Shader load_global_shader() {
 	result.position_loc = 0;
 	result.color_loc = 1;
 	result.uv_loc = 2;
+	result.z_index_loc = 3;
 
 	return result;
 }
@@ -163,6 +167,9 @@ void draw_init() {
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 	glEnable(GL_MULTISAMPLE);
+	glEnable(GL_DEPTH);
+	glClearDepth(1.f);
+	glDepthFunc(GL_LEQUAL);
 
 	global_shader = load_global_shader();
 	glUseProgram(global_shader.program_id);
@@ -187,6 +194,7 @@ void immediate_flush() {
     GLuint position_loc = current_shader->position_loc;
     GLuint color_loc = current_shader->color_loc;
     GLuint uv_loc = current_shader->uv_loc;
+	GLuint z_index_loc = current_shader->z_index_loc;
     
     glVertexAttribPointer(position_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
     glEnableVertexAttribArray(position_loc);
@@ -196,6 +204,9 @@ void immediate_flush() {
     
     glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(Vector2) + sizeof(Color)));
     glEnableVertexAttribArray(uv_loc);
+
+	glVertexAttribPointer(z_index_loc, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(Vector2) + sizeof(Color) + sizeof(Vector2)));
+	glEnableVertexAttribArray(z_index_loc);
     
     glDrawArrays(GL_TRIANGLES, 0, imm_vertex_count);
 	draw_calls += 1;
@@ -203,8 +214,9 @@ void immediate_flush() {
     
     glDisableVertexAttribArray(position_loc);
     glDisableVertexAttribArray(color_loc);
-    glDisableVertexAttribArray(uv_loc);
-    
+	glDisableVertexAttribArray(uv_loc);
+	glDisableVertexAttribArray(z_index_loc);
+
     glBindVertexArray(0);
 
 }
@@ -214,7 +226,7 @@ Vertex* get_next_vertex_ptr() {
     return (Vertex*)&imm_vertices + imm_vertex_count;
 }
 
-void immediate_vertex(float x, float y, const Color& color, Vector2 uv) {
+void immediate_vertex(float x, float y, const Color& color, Vector2 uv, float z_index = 0.f) {
 	if (imm_vertex_count >= MAX_VERTICES) {
 		immediate_flush();
 		immediate_begin();
@@ -226,18 +238,19 @@ void immediate_vertex(float x, float y, const Color& color, Vector2 uv) {
     vertex->position.y = -y;
     vertex->color      = color;
     vertex->uv         = uv;
+	vertex->z_index    = z_index;
     
     imm_vertex_count += 1;
 }
 
-void immediate_quad(float x0, float y0, float x1, float y1, const Color& color) {
-    immediate_vertex(x0, y0, color, v2(-1.f, -1.f));
-    immediate_vertex(x0, y1, color, v2(-1.f, -1.f));
-    immediate_vertex(x1, y0, color, v2(-1.f, -1.f));
-    
-    immediate_vertex(x0, y1, color, v2(-1.f, -1.f));
-    immediate_vertex(x1, y1, color, v2(-1.f, -1.f));
-    immediate_vertex(x1, y0, color, v2(-1.f, -1.f));
+void immediate_quad(float x0, float y0, float x1, float y1, const Color& color, float z_index) {
+    immediate_vertex(x0, y0, color, v2(-1.f, -1.f), z_index);
+    immediate_vertex(x0, y1, color, v2(-1.f, -1.f), z_index);
+    immediate_vertex(x1, y0, color, v2(-1.f, -1.f), z_index);
+
+	immediate_vertex(x0, y1, color, v2(-1.f, -1.f), z_index);
+    immediate_vertex(x1, y1, color, v2(-1.f, -1.f), z_index);
+    immediate_vertex(x1, y0, color, v2(-1.f, -1.f), z_index);
 }
 
 
@@ -391,8 +404,8 @@ void render_right_handed() {
     
     const float aspect_ratio = width / height;
     
-    const float f = 1.f;
-    const float n = -1.f;
+    const float f = 100.f;
+    const float n = 0.f;
     
     const float ortho_size = height / 2.f;
     
@@ -406,9 +419,9 @@ void render_frame_begin() {
 	draw_calls = 0;
 	verts_drawn = 0;
 	verts_culled = 0;
-	glClear(GL_COLOR_BUFFER_BIT);
 	glViewport(0, 0, os_window_width(), os_window_height());
 	render_right_handed();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void render_frame_end() {

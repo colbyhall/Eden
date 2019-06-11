@@ -112,7 +112,7 @@ void editor_init(Editor_State* editor) {
     bind_event_listener(&editor->input_state, make_event_listener(editor, on_left_mouse_down, ET_Mouse_Down));
 
 	editor->loaded_font = font_load_from_os("consola.ttf");
-    editor->loaded_font.size = DEFAULT_FONT_SIZE;
+    editor->loaded_font.size = (u16)DEFAULT_FONT_SIZE;
     font_pack_atlas(editor->loaded_font);
 	
 	Buffer* buffer = editor_create_buffer(editor);
@@ -195,6 +195,14 @@ void editor_draw(Editor_State* editor) {
 			draw_buffer_view(&editor->views[i], x0, y0, x1, y1, editor->loaded_font);
 		}
 	}
+
+#if 0
+	immediate_begin();
+	immediate_quad(0.f, 0.f, 100.f, 100.f, 0x00FF00, 2.f);
+	immediate_quad(50.f, 0.f, 150.f, 100.f, 0xFF00FF, 1.f);
+	immediate_flush();
+#endif
+
 	render_frame_end();
 }
 
