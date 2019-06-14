@@ -219,6 +219,8 @@ Buffer* editor_find_buffer(Editor_State* editor, Buffer_ID id) {
 bool editor_destroy_buffer(Editor_State* editor, Buffer_ID id) {
 	for (size_t i = 0; i < editor->loaded_buffers.count; i++) {
 		if (editor->loaded_buffers[i].id == id) {
+            Buffer* it = &editor->loaded_buffers[i];
+            destroy_buffer(it);
 			array_remove_index(&editor->loaded_buffers, i);
 			return true;
 		}

@@ -42,6 +42,12 @@ Buffer make_buffer(Buffer_ID id) {
 	return result;
 }
 
+void destroy_buffer(Buffer* buffer) {
+    array_destroy(&buffer->eol_table);
+    array_destroy(&buffer->syntax);
+    c_free(buffer->data);
+}
+
 bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	FILE* file = fopen(path, "rb");
 	if (!file) {

@@ -56,6 +56,7 @@ struct Buffer {
 };
 
 Buffer make_buffer(Buffer_ID id);
+void destroy_buffer(Buffer* buffer);
 
 bool buffer_load_from_file(Buffer* buffer, const char* path);
 void buffer_init_from_size(Buffer* buffer, size_t size);
