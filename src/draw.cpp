@@ -167,7 +167,7 @@ void draw_init() {
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
 	glEnable(GL_MULTISAMPLE);
-	glEnable(GL_DEPTH);
+	glEnable(GL_DEPTH_TEST);
 	glClearDepth(1.f);
 	glDepthFunc(GL_LEQUAL);
 
@@ -226,7 +226,7 @@ Vertex* get_next_vertex_ptr() {
     return (Vertex*)&imm_vertices + imm_vertex_count;
 }
 
-void immediate_vertex(float x, float y, const Color& color, Vector2 uv, float z_index = 0.f) {
+void immediate_vertex(float x, float y, const Color& color, Vector2 uv, float z_index = 9.f) {
 	if (imm_vertex_count >= MAX_VERTICES) {
 		immediate_flush();
 		immediate_begin();
@@ -404,8 +404,8 @@ void render_right_handed() {
     
     const float aspect_ratio = width / height;
     
-    const float f = 100.f;
-    const float n = 0.f;
+    const float f = 10.f;
+    const float n = 1.f;
     
     const float ortho_size = height / 2.f;
     

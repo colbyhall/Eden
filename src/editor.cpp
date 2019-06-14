@@ -196,13 +196,6 @@ void editor_draw(Editor_State* editor) {
 		}
 	}
 
-#if 0
-	immediate_begin();
-	immediate_quad(0.f, 0.f, 100.f, 100.f, 0x00FF00, 2.f);
-	immediate_quad(50.f, 0.f, 150.f, 100.f, 0xFF00FF, 1.f);
-	immediate_flush();
-#endif
-
 	render_frame_end();
 }
 

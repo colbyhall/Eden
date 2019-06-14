@@ -32,7 +32,7 @@ void draw_string(const String& str, float x, float y, const Color& color, const 
 void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font);
 Vector2 get_draw_string_size(const String& str, const Font& font);
 
-void immediate_quad(float x0, float y0, float x1, float y1, const Color& color, float z_index = 0.f);
+void immediate_quad(float x0, float y0, float x1, float y1, const Color& color, float z_index = 9.f);
 void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color, const Font& font);
 const Font_Glyph* immediate_char(u32 c, float x, float y, const Color& color, const Font& font);
 
