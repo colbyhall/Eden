@@ -1,8 +1,12 @@
 #pragma once
 
-#include "types.h"
+#include <ch_stl/ch_types.h>
+#include <ch_stl/ch_array.h>
+#include <ch_stl/ch_string.h>
+
+using namespace ch;
+
 #include "string.h"
-#include "array.h"
 #include "math.h"
 #include "parsing.h"
 
@@ -24,59 +28,67 @@
 	How many woodchucks|             ] would
 */
 
-using Buffer_ID = size_t;
+using Buffer_ID = usize;
 
 struct Font_Glyph;
+
+struct Buffer_History {
+    bool removed;
+    usize location;
+    ch::String changes;
+};
 
 struct Buffer {
 	Buffer_ID id;
 
-	String path;
-	String title;
+    ch::String path;
+    ch::String title;
 
-	String language;
+    ch::String language;
 
 	u32* data;
-	size_t allocated;
+	usize allocated;
 
 	u32* gap;
-	size_t gap_size;
+	usize gap_size;
 
-	Array<size_t> eol_table;
+	Array<usize> eol_table;
 
     Array<Syntax_Highlight> syntax;
     bool syntax_is_dirty;
+
+    Array<Buffer_History> history;
 
     double s;
     double loc_s;
     double chars_s;
 
-	u32& operator[](size_t index);
-	u32 operator[](size_t index) const;
+	u32& operator[](usize index);
+	u32 operator[](usize index) const;
 };
 
 Buffer make_buffer(Buffer_ID id);
 void destroy_buffer(Buffer* buffer);
 
 bool buffer_load_from_file(Buffer* buffer, const char* path);
-void buffer_init_from_size(Buffer* buffer, size_t size);
-void buffer_resize(Buffer* buffer, size_t new_gap_size);
+void buffer_init_from_size(Buffer* buffer, usize size);
+void buffer_resize(Buffer* buffer, usize new_gap_size);
 
-void add_char(Buffer* buffer, u32 c, size_t index);
-void remove_at_index(Buffer* buffer, size_t index);
-void remove_between(Buffer* buffer, size_t first, size_t last);
+void add_char(Buffer* buffer, u32 c, usize index);
+void remove_at_index(Buffer* buffer, usize index);
+void remove_between(Buffer* buffer, usize first, usize last);
 
-u32* get_index_as_cursor(Buffer* buffer, size_t index);
-size_t get_count(const Buffer& buffer);
-size_t get_line_index(const Buffer& buffer, size_t index);
+u32* get_index_as_cursor(Buffer* buffer, usize index);
+usize get_count(const Buffer& buffer);
+usize get_line_index(const Buffer& buffer, usize index);
 
 struct Buffer_View {
 	Buffer_ID id;
 	float current_scroll_y = 0.f;
 	float target_scroll_y = 0.f;
 
-	size_t cursor = 0;
-	size_t selection = 0;
+	usize cursor = 0;
+	usize selection = 0;
 
 	u64 current_line_number = 0;
 	u64 current_column_number = 0;
@@ -91,7 +103,7 @@ void seek_line_start(Buffer_View* view);
 void seek_line_end(Buffer_View* view);
 void seek_horizontal(Buffer_View* view, bool right);
 
-size_t pick_index(Buffer_View* view, Vector2 pos);
+usize pick_index(Buffer_View* view, Vector2 pos);
 
 void buffer_view_lost_focus(Buffer_View* view);
 void buffer_view_gained_focus(Buffer_View* view);
@@ -102,4 +114,4 @@ Vector2 get_view_position(const Buffer_View& view);
 
 float get_column_distance(const Buffer_View& view);
 
-size_t get_column_number_closest_to_distance(const Buffer * const buffer, size_t line, float distance);
+usize get_column_number_closest_to_distance(const Buffer * const buffer, usize line, float distance);

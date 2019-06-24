@@ -1,7 +1,5 @@
 #include "math.h"
 
-#include <stdlib.h>
-
 #define SMALL_NUMBER		(1.e-8f)
 
 float finterpto(float current, float target, float delta_time, float speed) {

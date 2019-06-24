@@ -5,11 +5,9 @@
 #include "editor.h"
 #include "string.h"
 #include "buffer.h"
-#include "memory.h"
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
+#include <ch_stl/ch_stl.h>
 
 #define MAX_VERTICES 3 * 1024
 
@@ -44,8 +42,8 @@ Matrix4 world_to_view;
 Shader global_shader;
 
 u32 draw_calls;
-size_t verts_drawn;
-size_t verts_culled;
+usize verts_drawn;
+usize verts_culled;
 
 Shader* current_shader = nullptr;
 
@@ -124,8 +122,6 @@ Shader load_global_shader() {
 		glGetShaderInfoLog(vertex_id, sizeof(vert_errors), &ignored, vert_errors);
 		glGetShaderInfoLog(frag_id, sizeof(frag_errors), &ignored, frag_errors);
 		glGetProgramInfoLog(program_id, sizeof(program_errors), &ignored, program_errors);
-
-		printf("%s\n%s\n%s\n", vert_errors, frag_errors, program_errors);
 		assert(!"Shader validation failed");
 	}
 
@@ -153,7 +149,17 @@ void bind_font(Font* font) {
 	glActiveTexture(GL_TEXTURE0);
 }
 
+static void gl_error_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
+    char buffer[1024];
+
+    if (severity != GL_DEBUG_SEVERITY_NOTIFICATION) {
+        sprintf(buffer, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
+        OutputDebugString(buffer);
+    }
+}
+
 void draw_init() {
+    assert(ch::is_gl_loaded());
     glGenVertexArrays(1, &imm_vao);
     glBindVertexArray(imm_vao);
     
@@ -170,6 +176,10 @@ void draw_init() {
 	glEnable(GL_DEPTH_TEST);
 	glClearDepth(1.f);
 	glDepthFunc(GL_LEQUAL);
+#if BUILD_DEBUG
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(gl_error_callback, 0);
+#endif
 
 	global_shader = load_global_shader();
 	glUseProgram(global_shader.program_id);
@@ -260,7 +270,7 @@ void draw_rect(float x0, float y0, float x1, float y1, const Color& color) {
     immediate_flush();
 }
 
-Vector2 immediate_string(const String& str, float x, float y, const Color& color, const Font& font) {
+Vector2 immediate_string(const tchar* str, float x, float y, const Color& color, const Font& font) {
 	const float font_height = font.size;
 
 	const float original_x = x;
@@ -269,15 +279,17 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 	float largest_x = 0.f;
 	float largest_y = 0.f;
 
-	for (size_t i = 0; i < str.count; i++) {
-		if (is_eol(str.data[i])) {
+    const usize count = ch::strlen(str);
+
+	for (usize i = 0; i < count; i++) {
+		if (str[i] == ch::eol) {
 			y += font_height;
 			x = original_x;
 			verts_culled += 6;
 			continue;
 		}
 
-		if (str.data[i] == '\t') {
+		if (str[i] == '\t') {
 			const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
             assert(space_glyph);
 			x += space_glyph->advance  * 4.f;
@@ -285,7 +297,7 @@ Vector2 immediate_string(const String& str, float x, float y, const Color& color
 			continue;
 		}
 
-		const Font_Glyph* glyph = font_find_glyph(&font, str.data[i]);
+		const Font_Glyph* glyph = font_find_glyph(&font, str[i]);
 
         if (glyph) {
             immediate_glyph(*glyph, x, y, color, font);
@@ -345,7 +357,7 @@ const Font_Glyph* immediate_char(u32 c, float x, float y, const Color& color, co
     }
 }
 
-void draw_string(const String& str, float x, float y, const Color& color, const Font& font) {
+void draw_string(const ch::String& str, float x, float y, const Color& color, const Font& font) {
 	y += font.ascent;
 
 	immediate_begin();
@@ -353,7 +365,7 @@ void draw_string(const String& str, float x, float y, const Color& color, const 
 	immediate_flush();
 }
 
-Vector2 get_draw_string_size(const String& str, const Font& font) {
+Vector2 get_draw_string_size(const ch::String& str, const Font& font) {
 	const float font_height = font.size;
 
 	float y = 0.f;
@@ -364,7 +376,7 @@ Vector2 get_draw_string_size(const String& str, const Font& font) {
 	const float original_x = x;
 	y += font.ascent;
 
-	for (size_t i = 0; i < str.count; i++) {
+	for (usize i = 0; i < str.count; i++) {
 		const Font_Glyph* glyph = font_find_glyph(&font, str[i]);
 
 		if (str.data[i] == '\n') {
@@ -425,7 +437,7 @@ void render_frame_begin() {
 }
 
 void render_frame_end() {
-	gl_swap_buffers();
+	ch::swap_buffers(os_get_window_handle());
 }
 
 static Color highlight_to_color(Syntax_Highlight_Type type) {
@@ -469,18 +481,18 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
 	const float font_height = font.size;
 #if GAP_BUFFER_DEBUG
-	const size_t buffer_count = buffer->allocated;
+	const usize buffer_count = buffer->allocated;
 #else
-	const size_t buffer_count = get_count(*buffer);
+	const usize buffer_count = get_count(*buffer);
 #endif
 	const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
     assert(space_glyph);
 
-	size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+	usize lines_scrolled = (usize)(view->current_scroll_y / font_height);
     if (lines_scrolled >= buffer->eol_table.count) {
         lines_scrolled = buffer->eol_table.count - 1;
     }
-	const size_t starting_index = buffer->eol_table.count ? get_line_index(*buffer, lines_scrolled) : 0;
+	const usize starting_index = buffer->eol_table.count ? get_line_index(*buffer, lines_scrolled) : 0;
 
 	if (buffer_count) y -= view->current_scroll_y;
 
@@ -490,9 +502,9 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
     
 	immediate_begin();
 
-	for (size_t i = starting_index; i < buffer_count; i++) {
+	for (usize i = starting_index; i < buffer_count; i++) {
 #if LINE_COUNT_DEBUG
-	size_t line_index = lines_scrolled;
+	usize line_index = lines_scrolled;
 	const char* format = "%llu: LS: %llu |";
 	char out_line_size[20];
 	sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
@@ -544,7 +556,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
             const Font_Glyph* glyph = font_find_glyph(&font, c);
 
             if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-            if (is_whitespace(c)) {
+            if (ch::is_whitespace(c)) {
                 glyph = space_glyph;
             }
 
@@ -569,7 +581,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
             const Font_Glyph* glyph = font_find_glyph(&font, c);
 
             if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-			if (is_whitespace(c)) {
+			if (ch::is_whitespace(c)) {
 				glyph = space_glyph;
 			}
 
@@ -630,7 +642,7 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 
 			const float x = x0 + padding.x / 2.f;
 			const float y = info_bar_y0 + (padding.y / 2.f) + font.ascent;
-			char output_string[1024];
+			tchar output_string[1024];
 			sprintf(output_string, "%s  %dpt  LN: %llu     COL: %llu   Lex @ %dmb/s (%dms)  dist = %f  col = %llu",
                     buffer->title.data,
                     (int)font.size,

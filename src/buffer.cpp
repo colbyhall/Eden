@@ -1,20 +1,18 @@
 #include "buffer.h"
 #include "parsing.h"
-#include "string.h"
 #include "os.h"
-#include "memory.h"
 #include "draw.h"
 #include "font.h"
 #include "keys.h"
 #include "editor.h"
 #include "input.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
+#include <ch_stl/ch_defer.h>
 
-u32& Buffer::operator[](size_t index) {
+#include <stdio.h>
+#include <ch_stl/ch_stl.h>
+
+u32& Buffer::operator[](usize index) {
 	assert(index < get_count(*this));
 
 	if (data + index < gap) {
@@ -25,7 +23,7 @@ u32& Buffer::operator[](size_t index) {
 	}
 }
 
-u32 Buffer::operator[](size_t index) const {
+u32 Buffer::operator[](usize index) const {
 	assert(index < get_count(*this));
 
 	if (data + index < gap) {
@@ -43,9 +41,9 @@ Buffer make_buffer(Buffer_ID id) {
 }
 
 void destroy_buffer(Buffer* buffer) {
-    array_destroy(&buffer->eol_table);
-    array_destroy(&buffer->syntax);
-    c_free(buffer->data);
+    buffer->eol_table.destroy();
+    buffer->syntax.destroy();
+    ch::free(buffer->data);
 }
 
 bool buffer_load_from_file(Buffer* buffer, const char* path) {
@@ -56,17 +54,17 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	
 	buffer->path = path;
 	fseek(file, 0, SEEK_END);
-	const size_t file_size = ftell(file);
+	const usize file_size = ftell(file);
 	fseek(file, 0, SEEK_SET);
 
 	buffer->allocated = file_size + DEFAULT_GAP_SIZE;
-	buffer->data = (u32*)c_alloc(buffer->allocated * sizeof(u32));
+	buffer->data = (u32*)ch::malloc(buffer->allocated * sizeof(u32));
 
-    size_t chars_read = 0;
+    usize chars_read = 0;
 
-	size_t extra = 0;
+	usize extra = 0;
 	u32* current_char = buffer->data;
-	size_t line_size = 0;
+	usize line_size = 0;
 	while (current_char != buffer->data + file_size) {
 		const int c_ = fgetc(file);
         if (c_ == EOF) break; // Failure.
@@ -82,7 +80,7 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 		current_char += 1;
 		line_size += 1;
 		if (c == '\n'){
-			array_add(&buffer->eol_table, line_size);
+			buffer->eol_table.push(line_size);
 			line_size = 0;
 		}
 	}
@@ -94,7 +92,7 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	buffer->gap_size = DEFAULT_GAP_SIZE + extra;
 
 	// @NOTE(Colby): Basic file name parsing
-	for (size_t i = buffer->path.count - 1; i >= 0; i--) {
+	for (usize i = buffer->path.count - 1; i >= 0; i--) {
 		if (buffer->path[i] == '.') {
 			buffer->language.data = buffer->path.data + i + 1;
 			buffer->language.count = buffer->path.count - i - 1;
@@ -112,20 +110,20 @@ bool buffer_load_from_file(Buffer* buffer, const char* path) {
 	return true;
 }
 
-void buffer_init_from_size(Buffer* buffer, size_t size) {
+void buffer_init_from_size(Buffer* buffer, usize size) {
 	if (size < DEFAULT_GAP_SIZE) size = DEFAULT_GAP_SIZE;
 
 	buffer->allocated = size;
-	buffer->data = (u32*)c_alloc(size * sizeof(u32));
+	buffer->data = (u32*)ch::malloc(size * sizeof(u32));
 
 	buffer->gap = buffer->data;
 	buffer->gap_size = size;
-	array_add(&buffer->eol_table, (size_t)0);
+	buffer->eol_table.push((usize)0);
 
 	buffer->language = "cpp";
 }
 
-void buffer_resize(Buffer* buffer, size_t new_gap_size) {
+void buffer_resize(Buffer* buffer, usize new_gap_size) {
 	// @NOTE(Colby): Check if we have been initialized
     if (!buffer->data) {
         buffer_init_from_size(buffer, new_gap_size);
@@ -134,11 +132,11 @@ void buffer_resize(Buffer* buffer, size_t new_gap_size) {
 	assert(buffer->data);
 	assert(buffer->gap_size == 0);
 
-	const size_t old_size = buffer->allocated;
-	const size_t new_size = old_size + new_gap_size;
+	const usize old_size = buffer->allocated;
+	const usize new_size = old_size + new_gap_size;
 
 	u32 *old_data = buffer->data;
-	u32 *new_data = (u32 *)c_realloc(old_data, new_size * sizeof(u32));
+	u32 *new_data = (u32 *)ch::realloc(old_data, new_size * sizeof(u32));
 	if (!new_data) {
 		assert(false);
 	}
@@ -149,28 +147,28 @@ void buffer_resize(Buffer* buffer, size_t new_gap_size) {
 	buffer->gap_size = new_gap_size;
 }
 
-static void move_gap_to_index(Buffer* buffer, size_t index) {
-	const size_t buffer_count = get_count(*buffer);
+static void move_gap_to_index(Buffer* buffer, usize index) {
+	const usize buffer_count = get_count(*buffer);
 	assert(index < buffer_count);
 
 	u32* index_ptr = &(*buffer)[index];
 
 	if (index_ptr < buffer->gap) {
-		const size_t amount_to_move = buffer->gap - index_ptr;
+		const usize amount_to_move = buffer->gap - index_ptr;
 
-		memcpy(buffer->gap + buffer->gap_size - amount_to_move, index_ptr, amount_to_move * sizeof(u32));
+		ch::mem_copy(buffer->gap + buffer->gap_size - amount_to_move, index_ptr, amount_to_move * sizeof(u32));
 
 		buffer->gap = index_ptr;
 	} else {
-		const size_t amount_to_move = index_ptr - (buffer->gap + buffer->gap_size);
+		const usize amount_to_move = index_ptr - (buffer->gap + buffer->gap_size);
 
-		memcpy(buffer->gap, buffer->gap + buffer->gap_size, amount_to_move * sizeof(u32));
+		ch::mem_copy(buffer->gap, buffer->gap + buffer->gap_size, amount_to_move * sizeof(u32));
 
 		buffer->gap += amount_to_move;
 	}
 }
 
-u32* get_index_as_cursor(Buffer* buffer, size_t index) {
+u32* get_index_as_cursor(Buffer* buffer, usize index) {
 	if (buffer->data + index <= buffer->gap) {
 		return buffer->data + index;
 	} 
@@ -178,7 +176,7 @@ u32* get_index_as_cursor(Buffer* buffer, size_t index) {
 	return buffer->data + buffer->gap_size + index;
 }
 
-void add_char(Buffer* buffer, u32 c, size_t index) {
+void add_char(Buffer* buffer, u32 c, usize index) {
 	if (buffer->gap_size <= 0) {
 		buffer_resize(buffer, DEFAULT_GAP_SIZE);
 	}
@@ -192,12 +190,12 @@ void add_char(Buffer* buffer, u32 c, size_t index) {
 	buffer->gap += 1;
 	buffer->gap_size -= 1;
 
-    size_t index_line = 0;
-	size_t index_column = 0;
+    usize index_line = 0;
+	usize index_column = 0;
 
-	size_t current_index = 0;
-	for (size_t i = 0; i < buffer->eol_table.count; i++) {
-		size_t line_size = buffer->eol_table[i];
+	usize current_index = 0;
+	for (usize i = 0; i < buffer->eol_table.count; i++) {
+		usize line_size = buffer->eol_table[i];
 
 		if (index < current_index + line_size) {
 			index_column = index - current_index;
@@ -208,9 +206,9 @@ void add_char(Buffer* buffer, u32 c, size_t index) {
 		index_line += 1;
 	}
 	if (is_eol(c)) {
-        const size_t line_size = buffer->eol_table[index_line];
+        const usize line_size = buffer->eol_table[index_line];
 		buffer->eol_table[index_line] = index_column + 1;
-		array_add_at_index(&buffer->eol_table, line_size - index_column, index_line + 1);
+		buffer->eol_table.insert(line_size - index_column, index_line + 1);
 	} else if (index_line < buffer->eol_table.count) { // @Hack
         buffer->eol_table[index_line] += 1;
     }
@@ -218,8 +216,8 @@ void add_char(Buffer* buffer, u32 c, size_t index) {
     buffer->syntax_is_dirty = true;
 }
 
-void remove_at_index(Buffer* buffer, size_t index) {
-	const size_t buffer_count = get_count(*buffer);
+void remove_at_index(Buffer* buffer, usize index) {
+	const usize buffer_count = get_count(*buffer);
 	assert(index < buffer_count);
 
 	u32* cursor = get_index_as_cursor(buffer, index);
@@ -229,10 +227,10 @@ void remove_at_index(Buffer* buffer, size_t index) {
 
 	move_gap_to_index(buffer, index);
 
-	size_t index_line = 0;
-	size_t current_index = 0;
-	for (size_t i = 0; i < buffer->eol_table.count; i++) {
-		size_t line_size = buffer->eol_table[i];
+	usize index_line = 0;
+	usize current_index = 0;
+	for (usize i = 0; i < buffer->eol_table.count; i++) {
+		usize line_size = buffer->eol_table[i];
 
 		if (index < current_index + line_size) {
 			break;
@@ -246,8 +244,8 @@ void remove_at_index(Buffer* buffer, size_t index) {
 	
     const u32 c = (*buffer)[index - 1];
 	if (is_eol(c)) {
-		const size_t amount_on_line = buffer->eol_table[index_line];
-		array_remove_index(&buffer->eol_table, index_line);
+		const usize amount_on_line = buffer->eol_table[index_line];
+		buffer->eol_table.remove(index_line);
 		buffer->eol_table[index_line - 1] += amount_on_line;
     }
 
@@ -257,35 +255,35 @@ void remove_at_index(Buffer* buffer, size_t index) {
     buffer->syntax_is_dirty = true;
 }
 
-void remove_between(Buffer* buffer, size_t first, size_t last) {
+void remove_between(Buffer* buffer, usize first, usize last) {
     // @SLOW(Colby): This is slow as shit
-    for (size_t i = first; i < last; i++) {
+    for (usize i = first; i < last; i++) {
         remove_at_index(buffer, i);
     }
 }
 
-size_t get_count(const Buffer& buffer) {
+usize get_count(const Buffer& buffer) {
 	return buffer.allocated - buffer.gap_size;
 }
 
-size_t get_line_index(const Buffer& buffer, size_t index) {
+usize get_line_index(const Buffer& buffer, usize index) {
 	assert(index < buffer.eol_table.count);
 	
-	size_t result = 0;
-	for (size_t i = 0; i < index; i++) {
+	usize result = 0;
+	for (usize i = 0; i < index; i++) {
 		result += buffer.eol_table[i];
 	}
 
 	return result;
 }
-size_t get_line_from_index(const Buffer& buffer, size_t buffer_index) {
+usize get_line_from_index(const Buffer& buffer, usize buffer_index) {
 	assert(buffer_index < get_count(buffer));
 	
-    size_t line = 0;
+    usize line = 0;
 
-	size_t index = 0;
+	usize index = 0;
 	for (; line < buffer.eol_table.count; line++) {
-        size_t new_index = index + buffer.eol_table[line];
+        usize new_index = index + buffer.eol_table[line];
         if (new_index > buffer_index) {
             break;
         }
@@ -304,7 +302,7 @@ Buffer* get_buffer(const Buffer_View* view) {
 void refresh_cursor_info(Buffer_View* view, bool update_desired /*=true*/) {
 	Buffer* buffer = get_buffer(view);
 
-    size_t buffer_count = get_count(*buffer);
+    usize buffer_count = get_count(*buffer);
     if (view->cursor < 0) {
         view->cursor = 0;
     }
@@ -326,12 +324,12 @@ void move_cursor_vertical(Buffer_View* view, s64 delta) {
 
 	if (delta == 0) return;
 
-	const size_t buffer_count = get_count(*buffer);
+	const usize buffer_count = get_count(*buffer);
 	if (buffer_count == 0) {
 		return;
 	}
 
-	size_t new_line = view->current_line_number + delta;
+	usize new_line = view->current_line_number + delta;
 	if (delta < 0 && (s64)view->current_line_number <= -delta) {
 		new_line = 0;
 	}
@@ -339,11 +337,11 @@ void move_cursor_vertical(Buffer_View* view, s64 delta) {
 		new_line = buffer->eol_table.count - 1;
 	}
 
-	const size_t line_index = get_line_index(*buffer, new_line);
+	const usize line_index = get_line_index(*buffer, new_line);
 
-    size_t desired_column_number = get_column_number_closest_to_distance(buffer, new_line, view->desired_column_distance);
+    usize desired_column_number = get_column_number_closest_to_distance(buffer, new_line, view->desired_column_distance);
 
-	size_t new_cursor_index = line_index;
+	usize new_cursor_index = line_index;
 	if (buffer->eol_table[new_line] <= desired_column_number) {
 		new_cursor_index += buffer->eol_table[new_line] - 1;
 	}
@@ -364,7 +362,7 @@ void seek_line_start(Buffer_View* view) {
 void seek_line_end(Buffer_View* view) {
 	Buffer* buffer = get_buffer(view);
 	if (buffer->eol_table.count) {
-		const size_t line_length = buffer->eol_table[view->current_line_number];
+		const usize line_length = buffer->eol_table[view->current_line_number];
 		if (!line_length) {
 			assert(view->current_column_number == 0);
 		}
@@ -377,7 +375,7 @@ void seek_line_end(Buffer_View* view) {
 
 void seek_horizontal(Buffer_View* view, bool right) {
 	Buffer* buffer = get_buffer(view);
-	const size_t buffer_count = get_count(*buffer);
+	const usize buffer_count = get_count(*buffer);
 
 	if (right) {
 		if (view->cursor == buffer_count) {
@@ -395,7 +393,7 @@ void seek_horizontal(Buffer_View* view, bool right) {
 	while (view->cursor > 0 && view->cursor < buffer_count) {
 		const u32 c = (*buffer)[view->cursor];
 
-		if (is_whitespace(c) || is_symbol(c)) break;
+		if (ch::is_whitespace(c) || ch::is_symbol(c)) break;
 
 		if (right) {
 			view->cursor += 1;
@@ -408,7 +406,7 @@ void seek_horizontal(Buffer_View* view, bool right) {
 	refresh_cursor_info(view);
 }
 
-size_t pick_index(Buffer_View* view, Vector2 pos) {
+usize pick_index(Buffer_View* view, Vector2 pos) {
 	const Vector2 v_pos = get_view_position(*view);
     float x = v_pos.x;
     float y = v_pos.y;
@@ -417,7 +415,7 @@ size_t pick_index(Buffer_View* view, Vector2 pos) {
 
     Buffer* buffer = get_buffer(view);
 
-    size_t line_offset = (size_t)((view->current_scroll_y + pos.y) / font_height);
+    usize line_offset = (usize)((view->current_scroll_y + pos.y) / font_height);
     if (line_offset >= buffer->eol_table.count) {
         line_offset = buffer->eol_table.count - 1;
     }
@@ -428,14 +426,14 @@ size_t pick_index(Buffer_View* view, Vector2 pos) {
         line_offset = buffer->eol_table.count - 1;
     }
 
-    const size_t start_index = get_line_index(*buffer, line_offset);
-    const size_t buffer_count = get_count(*buffer);
-    for (size_t i = start_index; i < buffer_count; i++) {
+    const usize start_index = get_line_index(*buffer, line_offset);
+    const usize buffer_count = get_count(*buffer);
+    for (usize i = start_index; i < buffer_count; i++) {
         const u32 c = (*buffer)[i];
 
         const Font_Glyph* glyph = font_find_glyph(&g_editor.loaded_font, c);
         if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-        if (is_whitespace(c)) {
+        if (ch::is_whitespace(c)) {
             glyph = font_find_glyph(&g_editor.loaded_font, ' ');
         }
 
@@ -473,12 +471,12 @@ static void remove_selection(Buffer_View* view) {
 	Buffer* buffer = get_buffer(view);
 
 	if (view->cursor > view->selection) {
-		for (size_t i = view->cursor; i > view->selection; i--) {
+		for (usize i = view->cursor; i > view->selection; i--) {
 			remove_at_index(buffer, i);
 		}
 		view->cursor = view->selection;
 	} else {
-		for (size_t i = view->selection; i > view->cursor; i--) {
+		for (usize i = view->selection; i > view->cursor; i--) {
 			remove_at_index(buffer, i);
 		}
 		view->selection = view->cursor;
@@ -527,7 +525,7 @@ static void key_pressed(void* owner, Event* event) {
 	Editor_State* editor = &g_editor;
 	Input_State* input = &editor->input_state;
 	Buffer* buffer = get_buffer(view);
-	const size_t buffer_count = get_count(*buffer);
+	const usize buffer_count = get_count(*buffer);
 
 	const u32 key_code = event->key_code;
 
@@ -568,13 +566,13 @@ static void key_pressed(void* owner, Event* event) {
 		add_char_from_view(view, '\n');
 
         // @NOTE(Colby): Auto tabbing
-        const size_t prev_line = view->current_line_number - 1;
+        const usize prev_line = view->current_line_number - 1;
         assert(prev_line >= 0);
-        const size_t line_length = buffer->eol_table[prev_line];
-        const size_t prev_line_index = get_line_index(*buffer, view->current_line_number - 1);
-        for (size_t i = 0; i < line_length; i++) {
+        const usize line_length = buffer->eol_table[prev_line];
+        const usize prev_line_index = get_line_index(*buffer, view->current_line_number - 1);
+        for (usize i = 0; i < line_length; i++) {
             const u32 c = (*buffer)[i + prev_line_index];
-            if (!is_whitespace(c) || is_eol(c)) {
+            if (!ch::is_whitespace(c) || c == ch::eol) {
                 break;
             }
             add_char_from_view(view, c);
@@ -644,16 +642,16 @@ static void key_pressed(void* owner, Event* event) {
 	case KEY_PAGEUP:
 	case KEY_PAGEDOWN: {
 		const float font_height = editor->loaded_font.size;
-		const size_t lines_in_view = (size_t)(get_view_inner_size(*view).y / font_height);
-		const size_t lines_scrolled = (size_t)(view->current_scroll_y / font_height);
+		const usize lines_in_view = (usize)(get_view_inner_size(*view).y / font_height);
+		const usize lines_scrolled = (usize)(view->current_scroll_y / font_height);
 
 
 		if (input->ctrl_is_down) {
 			move_cursor_vertical(view, key_code == KEY_PAGEUP ? lines_scrolled - view->current_line_number : (lines_in_view + lines_scrolled) - view->current_line_number);
 		} else {
-            size_t lines_to_scroll = lines_in_view;
+            usize lines_to_scroll = lines_in_view;
             if (lines_to_scroll > 3) lines_to_scroll -= 3;
-			move_cursor_vertical(view, key_code == KEY_PAGEUP ? (size_t)-(s64)lines_to_scroll : lines_to_scroll);
+			move_cursor_vertical(view, key_code == KEY_PAGEUP ? (usize)-(s64)lines_to_scroll : lines_to_scroll);
 		}
 		if (!input->shift_is_down) {
 			view->selection = view->cursor;
@@ -671,26 +669,26 @@ static void key_pressed(void* owner, Event* event) {
     } break;
 	case 'V':
 		if (editor->input_state.ctrl_is_down) {
-			String results;
+			ch::String results;
 			if (os_copy_out_of_clipboard(&results)) {
-				for (size_t i = 0; i < results.count; i++) {
-					u8 c = results[i];
+				for (usize i = 0; i < results.count; i++) {
+					tchar c = results[i];
 					if (c == '\r') continue;
 					add_char_from_view(view, c);
 				}
-				c_free(results.data);
+				ch::free(results.data);
 			}
 		}
 		break;
 	case 'C':
 		if (editor->input_state.ctrl_is_down && has_valid_selection(*view)) {
-			const size_t buffer_count = get_count(*buffer);
-			const size_t index = (view->cursor > view->selection) ? view->selection : view->cursor;
-			const size_t size = (view->cursor > view->selection) ? (view->cursor - view->selection) : (view->selection - view->cursor);
-			u8* out_buffer = (u8*)c_alloc(size + 1);
-			defer(c_free(out_buffer));
-			for (size_t i = 0; i < size; i++) {
-				out_buffer[i] = (u8)(*buffer)[index + i];
+			const usize buffer_count = get_count(*buffer);
+			const usize index = (view->cursor > view->selection) ? view->selection : view->cursor;
+			const usize size = (view->cursor > view->selection) ? (view->cursor - view->selection) : (view->selection - view->cursor);
+			tchar* out_buffer = (tchar*)ch::malloc(size + 1);
+			defer(ch::free(out_buffer));
+			for (usize i = 0; i < size; i++) {
+				out_buffer[i] = (tchar)(*buffer)[index + i];
 			}
 			out_buffer[size] = 0;
 			os_copy_to_clipboard(out_buffer, size + 1);
@@ -698,13 +696,13 @@ static void key_pressed(void* owner, Event* event) {
 		break;
     case 'X':
         if (editor->input_state.ctrl_is_down && has_valid_selection(*view)) {
-            const size_t buffer_count = get_count(*buffer);
-            const size_t index = (view->cursor > view->selection) ? view->selection : view->cursor;
-            const size_t size = (view->cursor > view->selection) ? (view->cursor - view->selection) : (view->selection - view->cursor);
-            u8* out_buffer = (u8*)c_alloc(size + 1);
-			defer(c_free(out_buffer));
-			for (size_t i = 0; i < size; i++) {
-				out_buffer[i] = (u8)(*buffer)[index + i];
+            const usize buffer_count = get_count(*buffer);
+            const usize index = (view->cursor > view->selection) ? view->selection : view->cursor;
+            const usize size = (view->cursor > view->selection) ? (view->cursor - view->selection) : (view->selection - view->cursor);
+            tchar* out_buffer = (tchar*)ch::malloc(size + 1);
+			defer(ch::free(out_buffer));
+			for (usize i = 0; i < size; i++) {
+				out_buffer[i] = (tchar)(*buffer)[index + i];
 			}
 			out_buffer[size] = 0;
 			os_copy_to_clipboard(out_buffer, size + 1);
@@ -739,7 +737,7 @@ Vector2 get_view_size(const Buffer_View& view) {
 }
 
 Vector2 get_view_position(const Buffer_View& view) {
-	const size_t view_index = &view - &g_editor.views[0];
+	const usize view_index = &view - &g_editor.views[0];
 	const float width = get_view_size(view).x;
 	return v2(width * view_index, 0.f);
 }
@@ -747,21 +745,21 @@ Vector2 get_view_position(const Buffer_View& view) {
 float get_column_distance(const Buffer_View & view) {
     const Buffer* const buffer = get_buffer(&view);
 
-    const size_t n = view.current_column_number;
+    const usize n = view.current_column_number;
 
     const Font* font = &g_editor.loaded_font;
-    const size_t line_begin = get_line_index(*buffer, view.current_line_number);
-    const size_t line_end = line_begin + buffer->eol_table[view.current_line_number]; 
+    const usize line_begin = get_line_index(*buffer, view.current_line_number);
+    const usize line_end = line_begin + buffer->eol_table[view.current_line_number]; 
 
-    const size_t buffer_count = get_count(*buffer);
+    const usize buffer_count = get_count(*buffer);
 
     float result = 0;
 
     const Font_Glyph* space_glyph = font_find_glyph(font, ' ');
     assert(space_glyph);
 
-    for (size_t i = 0; i < n; i++) {
-        const size_t index = line_begin + i;
+    for (usize i = 0; i < n; i++) {
+        const usize index = line_begin + i;
         assert(index < buffer_count);
         if (index >= buffer_count || index >= line_end) {
             break;
@@ -769,7 +767,7 @@ float get_column_distance(const Buffer_View & view) {
         const u32 c = (*buffer)[index];
         const Font_Glyph* glyph = font_find_glyph(font, c);
         if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-        if (is_whitespace(c)) {
+        if (ch::is_whitespace(c)) {
             glyph = space_glyph;
         }
         float advance = glyph->advance;
@@ -780,27 +778,27 @@ float get_column_distance(const Buffer_View & view) {
     }
     return result;
 }
-size_t get_column_number_closest_to_distance(const Buffer* const buffer, size_t line, float distance) {
+usize get_column_number_closest_to_distance(const Buffer* const buffer, usize line, float distance) {
     const Font* font = &g_editor.loaded_font;
-    const size_t line_begin = get_line_index(*buffer, line);
-    const size_t line_end = line_begin + buffer->eol_table[line];
+    const usize line_begin = get_line_index(*buffer, line);
+    const usize line_end = line_begin + buffer->eol_table[line];
 
-    const size_t buffer_count = get_count(*buffer);
+    const usize buffer_count = get_count(*buffer);
 
-    size_t result = 0;
+    usize result = 0;
 
     const Font_Glyph* space_glyph = font_find_glyph(font, ' ');
     assert(space_glyph);
 
     for (float pointer = 0; pointer < distance;) {
-        const size_t index = line_begin + result;
+        const usize index = line_begin + result;
         if (index >= buffer_count || index >= line_end) {
             break;
         }
         const u32 c = (*buffer)[index];
         const Font_Glyph* glyph = font_find_glyph(font, c);
         if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-        if (is_whitespace(c)) {
+        if (ch::is_whitespace(c)) {
             glyph = space_glyph;
         }
         float advance = glyph->advance;

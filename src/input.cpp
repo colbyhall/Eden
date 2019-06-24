@@ -106,19 +106,27 @@ void process_input_event(Input_State* input, Event* event) {
 }
 
 bool bind_event_listener(Input_State* input, const Event_Listener& event_listener) {
-	if (array_contains(&input->event_listeners, event_listener)) {
+	if (input->event_listeners.contains(event_listener)) {
 		return false;
 	}
 
 	assert(event_listener);
-	array_add(&input->event_listeners, event_listener);
+	input->event_listeners.push(event_listener);
 	return true;
 }
 
 bool unbind_event_listener(Input_State* input, const Event_Listener& event_listener) {
-	return array_remove(&input->event_listeners, event_listener);
+    for (usize i = 0; i < input->event_listeners.count; i++) {
+        const Event_Listener& el = input->event_listeners[i];
+        if (el == event_listener) {
+            input->event_listeners.remove(i);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 Input_State::Input_State() {
-	array_reserve(&event_listeners, 1024);
+    event_listeners.reserve(1024);
 }

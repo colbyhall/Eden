@@ -164,7 +164,7 @@
     X(uint_fast64_t) \
     X(intmax_t) \
     X(uintmax_t) \
-    X(size_t) \
+    X(usize) \
     X(ptrdiff_t) \
     X(intptr_t) \
 

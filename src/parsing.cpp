@@ -14,7 +14,7 @@
 // -Idenfitier (36,64-90,95-122)
 
 bool is_eof(u32 c) {
-	return c == EOF;
+	return c == 0;
 }
 
 bool is_eol(u32 c) {
@@ -239,7 +239,7 @@ enum Char_Type { // ascending from min ascii value per category:
 };
 struct Parse_State {
     u8 stack[4096];
-    size_t sp;
+    usize sp;
 };
 
 #define MAIN(state) (((state) >> 0) & 0xff)
@@ -271,7 +271,7 @@ if (use_dfa_parser) {//#if DFA_PARSER
 }//#endif
 }
 
-const char* dbg_get_sh_str(const Syntax_Highlight* sh) {
+const tchar* dbg_get_sh_str(const Syntax_Highlight* sh) {
 if (use_dfa_parser) {
     switch (sh->type) {
     case STMT                     : return "St";
@@ -324,7 +324,7 @@ enum C_Keyword {
 struct C_Ident {
     //const u32* p = nullptr;
     const u32* p = nullptr;
-    size_t n = 0;
+    usize n = 0;
     union {
         char check_keyword[16];
         u64 chunk[2];
@@ -411,7 +411,7 @@ struct C_Lexer {
     const u32* buf_gap = nullptr;
     const u32* buf_end = nullptr;
     Syntax_Highlight *sh = nullptr;
-    size_t gap_size = 0;
+    usize gap_size = 0;
 
     Syntax_Highlight* push(Syntax_Highlight_Type new_type) {
         sh->type = new_type;
@@ -598,8 +598,8 @@ struct C_Lexer {
     }
 
     // Returns the number of identifier characters skipped.
-    size_t skip_ident() {
-        size_t n = 0;
+    usize skip_ident() {
+        usize n = 0;
         while (next()) {
             if (skip_escaped_newline()) continue;
             if (!c_is_ident(p[0])) break;
@@ -1625,7 +1625,7 @@ void parse_syntax(Buffer* buffer) {
 
     if (buffer->syntax.count < get_count(*buffer)) {
         auto old_cap = buffer->syntax.allocated;
-        array_resize(&buffer->syntax, get_count(*buffer));
+        buffer->syntax.reserve(get_count(*buffer));
         //array_resize(&buffer->as_ascii, get_count(*buffer));
         //if (buffer->syntax.allocated != old_cap)
         //    OutputDebugStringA("Reserving!!\n");

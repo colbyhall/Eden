@@ -1,13 +1,12 @@
 #pragma once
-#include "types.h"
-#include "array.h"
+#include <ch_stl/ch_types.h>
 #include "buffer.h"
 #include "font.h"
 #include "math.h"
 #include "input.h"
 
 #define WINDOW_TITLE "YEET"
-const size_t views_allocated = 5;
+const usize views_allocated = 5;
 
 struct Editor_State {
 	bool is_running;
@@ -19,7 +18,7 @@ struct Editor_State {
 	float dt;
 
 	Buffer_View views[views_allocated];
-	size_t views_count = 1;
+	usize views_count = 1;
 	Buffer_View* current_view = nullptr;
 
 	Array<Buffer> loaded_buffers;
@@ -40,6 +39,6 @@ Buffer* editor_create_buffer(Editor_State* editor);
 Buffer* editor_find_buffer(Editor_State* editor, Buffer_ID id);
 bool editor_destroy_buffer(Editor_State* editor, Buffer_ID id);
 
-void editor_set_current_view(Editor_State* editor, size_t view_index);
+void editor_set_current_view(Editor_State* editor, usize view_index);
 
 

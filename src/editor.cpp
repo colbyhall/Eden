@@ -3,16 +3,15 @@
 #include "os.h"
 #include "buffer.h"
 #include "math.h"
-#include "opengl.h"
+#include <ch_stl/ch_opengl.h>
 #include "draw.h"
-#include "memory.h"
-#include "string.h"
+#include <ch_stl/ch_memory.h>
 #include "parsing.h"
 #include "font.h"
 #include "keys.h"
 #include "ui.h"
 
-#include <assert.h>
+#include <ch_stl/ch_stl.h>
 #include <stdio.h>
 
 const float scroll_speed = 10.f;
@@ -31,8 +30,8 @@ static Buffer_View* get_hovered_view(Editor_State* editor) {
 	float x = 0.f;
 	float y = 0.f;
 
-	const size_t views_count = editor->views_count;
-	for (size_t i = 0; i < views_count; i++) {
+	const usize views_count = editor->views_count;
+	for (usize i = 0; i < views_count; i++) {
 		const float width = window_width / (float)views_count;
 
 		const float x0 = x;
@@ -93,7 +92,7 @@ static void on_left_mouse_down(void* owner, Event* event) {
     Buffer_View* view = get_hovered_view(editor);
 
     if (view) {
-        const size_t picked_index = pick_index(view, event->mouse_position);
+        const usize picked_index = pick_index(view, event->mouse_position);
         view->cursor = picked_index;
         view->selection = picked_index;
 	    refresh_cursor_info(view, true);
@@ -104,7 +103,7 @@ static void on_left_mouse_down(void* owner, Event* event) {
 
 void editor_init(Editor_State* editor) {
 	// @NOTE(Colby): init systems here
-	gl_init();
+    assert(ch::make_current(os_get_window_handle()));
 	draw_init();
 
 	bind_event_listener(&editor->input_state, make_event_listener(editor, editor_exit_requested, ET_Exit_Requested));
@@ -157,7 +156,7 @@ void editor_tick(Editor_State* editor, float dt) {
 	}
 
     if (editor->input_state.left_mouse_button_down) {
-        const size_t picked_index = pick_index(editor->current_view, editor->input_state.current_mouse_position);
+        const usize picked_index = pick_index(editor->current_view, editor->input_state.current_mouse_position);
         editor->current_view->cursor = picked_index;
 		refresh_cursor_info(editor->current_view, true);
     }
@@ -180,10 +179,10 @@ void editor_draw(Editor_State* editor) {
 	}
 
 	{
-		const size_t views_count = editor->views_count;
+		const usize views_count = editor->views_count;
 		float x = 0.f;
 		float y = 0.f;
-		for (size_t i = 0; i < views_count; i++) {
+		for (usize i = 0; i < views_count; i++) {
 			const float width = window_width / (float)views_count;
 			
 			const float x0 = x;
@@ -202,7 +201,7 @@ void editor_draw(Editor_State* editor) {
 Buffer* editor_create_buffer(Editor_State* editor) {
 	Buffer new_buffer = make_buffer(editor->last_buffer_id);
 	editor->last_buffer_id += 1;
-	size_t index = array_add(&editor->loaded_buffers, new_buffer);
+	usize index = editor->loaded_buffers.push(new_buffer);
 	return &editor->loaded_buffers[index];
 }
 
@@ -217,11 +216,11 @@ Buffer* editor_find_buffer(Editor_State* editor, Buffer_ID id) {
 }
 
 bool editor_destroy_buffer(Editor_State* editor, Buffer_ID id) {
-	for (size_t i = 0; i < editor->loaded_buffers.count; i++) {
+	for (usize i = 0; i < editor->loaded_buffers.count; i++) {
 		if (editor->loaded_buffers[i].id == id) {
             Buffer* it = &editor->loaded_buffers[i];
             destroy_buffer(it);
-			array_remove_index(&editor->loaded_buffers, i);
+			editor->loaded_buffers.remove(i);
 			return true;
 		}
 	}
@@ -229,7 +228,7 @@ bool editor_destroy_buffer(Editor_State* editor, Buffer_ID id) {
 	return false;
 }
 
-void editor_set_current_view(Editor_State* editor, size_t view_index) {
+void editor_set_current_view(Editor_State* editor, usize view_index) {
 	assert(view_index < editor->views_count);
 
 	if (editor->current_view)

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "types.h"
-#include "opengl.h"
+#include <ch_stl/ch_types.h>
+#include <ch_stl/ch_opengl.h>
 
 #include <stb/stb_rect_pack.h>
 // @TODO(Colby): Replace desired font size with something that checks a script or something

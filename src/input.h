@@ -1,8 +1,8 @@
 #pragma once
 
-#include "types.h"
+#include <ch_stl/ch_types.h>
+#include <ch_stl/ch_array.h>
 #include "math.h"
-#include "array.h"
 
 enum Event_Type {
 	ET_None,
@@ -72,7 +72,7 @@ struct Input_State {
 	bool alt_is_down = false;
     bool shift_is_down = false;
 
-	Array<Event_Listener> event_listeners;
+	ch::Array<Event_Listener> event_listeners;
 
 	Input_State();
 };

@@ -1,10 +1,10 @@
 #include "font.h"
 #include "os.h"
-#include "memory.h"
+#include <ch_stl/ch_memory.h>
+#include <ch_stl/ch_defer.h>
 #include "draw.h"
 
-#include <assert.h>
-#include <stdlib.h>
+#include <ch_stl/ch_stl.h>
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <stb/stb_rect_pack.h>
@@ -32,9 +32,9 @@ u64 round_up_pow2(u64 x) {
 
 Font font_load_from_os(const char* file_name) {
     
-    String font_data = {};
+    ch::String font_data = {};
     {
-        const String current_path = os_get_path();
+        const ch::String current_path = os_get_path();
 	    os_set_path_to_fonts(); 
 
         font_data = os_load_file_into_memory(file_name);
@@ -44,11 +44,11 @@ Font font_load_from_os(const char* file_name) {
     }
 
     Font font = {};
-	stbtt_InitFont(&font.info, font_data.data, stbtt_GetFontOffsetForIndex(font_data.data, 0));
+	stbtt_InitFont(&font.info, (const unsigned char*)font_data.data, stbtt_GetFontOffsetForIndex((const unsigned char*)font_data.data, 0));
     
     font.num_glyphs = font.info.numGlyphs;// @Temporary: info is opaque, but we are peeking :)
     
-    font.codepoints = (int*) c_alloc(font.num_glyphs * sizeof(int));
+    font.codepoints = (int*) ch::malloc(font.num_glyphs * sizeof(int));
     memset(font.codepoints, 0, font.num_glyphs * sizeof(int));
     {
         u32 glyphs_found = 0;
@@ -93,7 +93,7 @@ Font font_load_from_os(const char* file_name) {
 
 void font_free(Font& font) {
     
-    c_free(font.codepoints);
+    ch::free(font.codepoints);
 
 }
 
@@ -145,11 +145,11 @@ void font_pack_atlas(Font& font) {
         font.atlases[font.size].w = atlas.width;
         font.atlases[font.size].h = atlas.height;
 
-	    atlas.data = (u8*) c_alloc(atlas.width * atlas.height);
-        defer(c_free(atlas.data));
+	    atlas.data = (u8*) ch::malloc(atlas.width * atlas.height);
+        defer(ch::free(atlas.data));
 
         stbtt_pack_context pc;
-	    stbtt_packedchar* pdata = (stbtt_packedchar*) c_alloc(font.num_glyphs * sizeof(stbtt_packedchar));
+	    stbtt_packedchar* pdata = (stbtt_packedchar*) ch::malloc(font.num_glyphs * sizeof(stbtt_packedchar));
         stbtt_pack_range pr;
 
 	    stbtt_PackBegin(&pc, atlas.data, atlas.width, atlas.height, 0, 1, NULL);
@@ -169,7 +169,7 @@ void font_pack_atlas(Font& font) {
 	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlas.width, atlas.height, 0, GL_RED, GL_UNSIGNED_BYTE, atlas.data);
 
-        font.atlases[font.size].glyphs = (Font_Glyph*) c_alloc(font.num_glyphs * sizeof(Font_Glyph));
+        font.atlases[font.size].glyphs = (Font_Glyph*) ch::malloc(font.num_glyphs * sizeof(Font_Glyph));
 	    for (u32 i = 0; i < font.num_glyphs; i++) {
 	    	Font_Glyph* glyph = &font.atlases[font.size].glyphs[i];
 
@@ -185,7 +185,7 @@ void font_pack_atlas(Font& font) {
 	    	glyph->advance = pdata[i].xadvance;
 	    }
 
-        c_free(pdata);
+        ch::free(pdata);
 
 	    glBindTexture(GL_TEXTURE_2D, 0);
     }

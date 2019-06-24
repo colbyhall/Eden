@@ -19,6 +19,7 @@ workspace "YEET"
 project "YEET"
     kind "WindowedApp"
     language "C++"
+	dependson "ch_stl"
 
 	defines
 	{
@@ -43,12 +44,8 @@ project "YEET"
         "user32",
         "kernel32",
 		"shlwapi",
-    }
-
-	dependson
-	{
 		"bin/ch_stl"
-	}
+    }
 
     filter "configurations:Debug"
 		defines 

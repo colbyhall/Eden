@@ -1,8 +1,8 @@
 #include "../os.h"
 #include "../editor.h"
 #include "../parsing.h"
-#include "../opengl.h"
-#include "../memory.h"
+
+#include <ch_stl/ch_defer.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -189,6 +189,31 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
 	SetWindowLongPtr(window_handle, GWLP_USERDATA, (LONG_PTR)&g_editor);
 
+    assert(ch::load_gl());
+
+    HDC window_context = GetDC((HWND)window_handle);
+
+    if (wglChoosePixelFormatARB) {
+        const s32 attrib_list[] =
+        {
+            WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
+            WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
+            WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+            WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
+            WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+            WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB, GL_TRUE,
+            0,
+        };
+
+        s32 spf_index = 0;
+        u32 num_formats;
+        wglChoosePixelFormatARB(window_context, attrib_list, 0, 1, &spf_index, &num_formats);
+
+        PIXELFORMATDESCRIPTOR spf;
+        DescribePixelFormat(window_context, spf_index, sizeof(spf), &spf);
+        SetPixelFormat(window_context, spf_index, &spf);
+    }
+
 	editor_init(&g_editor);
 	ShowWindow(window_handle, SW_SHOW);
 #if BUILD_DEBUG
@@ -236,10 +261,10 @@ Vector2 os_get_mouse_position() {
 	return v2(0.f);
 }
 
-void *os_virtual_reserve(size_t reserved_size) {
+void *os_virtual_reserve(usize reserved_size) {
     return VirtualAlloc(nullptr, reserved_size, MEM_RESERVE, 0);
 }
-void os_virtual_commit(void *reserved_range, size_t committed_size) {
+void os_virtual_commit(void *reserved_range, usize committed_size) {
     VirtualAlloc(reserved_range, committed_size, MEM_RESERVE | MEM_COMMIT, 0);
 }
 void os_virtual_release(void *reserved_range) {
@@ -256,13 +281,13 @@ void os_set_path_to_fonts() {
 }
 
 String os_get_path() {
-	u8* buffer = (u8*)c_alloc(MAX_PATH);
-	GetCurrentDirectory(MAX_PATH, (char*)buffer);
+	tchar* buffer = (tchar*)ch::malloc(MAX_PATH);
+	GetCurrentDirectory(MAX_PATH, buffer);
 	
 	String result;
 	result.data = buffer;
 	result.allocated = MAX_PATH;
-	result.count = strlen((const char*)buffer);
+	result.count = ch::strlen(buffer);
 
 	return result;
 }
@@ -271,9 +296,9 @@ bool os_set_path(const String& string) {
 	return SetCurrentDirectory(string);
 }
 
-bool os_copy_to_clipboard(const void* buffer, size_t size) {
+bool os_copy_to_clipboard(const void* buffer, usize size) {
 	HGLOBAL g_mem = GlobalAlloc(GMEM_MOVEABLE, size);
-	memcpy(GlobalLock(g_mem), buffer, size);
+	ch::mem_copy(GlobalLock(g_mem), buffer, size);
 	GlobalUnlock(g_mem);
 	if (!OpenClipboard(window_handle)) {
 		GlobalFree(g_mem);
@@ -298,12 +323,12 @@ bool os_copy_out_of_clipboard(String* out_string) {
 	char* out_data = (char*)GlobalLock(c_data);
 	if (!out_data) return false;
 
-	const size_t str_size = strlen(out_data);
+	const usize str_size = strlen(out_data);
 	out_string->count = str_size;
 	out_string->allocated = str_size + 1;
-	out_string->data = (u8*)c_alloc(str_size + 1);
+	out_string->data = (tchar*)ch::malloc(str_size + 1);
 
-	memcpy(out_string->data, out_data, str_size);
+	ch::mem_copy(out_string->data, out_data, str_size);
 	out_string->data[str_size] = 0;
 
 	GlobalUnlock(c_data);
