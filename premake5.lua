@@ -11,12 +11,14 @@ workspace "YEET"
 	targetdir ("bin")
     objdir ("bin")
     debugdir ("bin")
+	characterset("ASCII")
+
+	include "libs/ch_stl"
+
 
 project "YEET"
     kind "WindowedApp"
     language "C++"
-
-	characterset("ASCII")
 
 	defines
 	{
@@ -45,7 +47,7 @@ project "YEET"
 
 	dependson
 	{
-		"lua-lib"
+		"bin/ch_stl"
 	}
 
     filter "configurations:Debug"
