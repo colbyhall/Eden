@@ -1,38 +1,23 @@
 #pragma once
 
-#include <ch_stl/ch_opengl.h>
-#include "math.h"
-#include "font.h"
+#include <ch_stl/opengl.h>
+#include <ch_stl/math.h>
 
-struct Buffer;
-struct Buffer_View;
-struct String;
-struct Editor_State;
+bool draw_init();
+void draw_begin();
+void draw_end();
 
-void draw_init();
-
-void bind_font(Font* font);
-
-extern u32 draw_calls;
-extern usize verts_drawn;
-extern usize verts_culled;
-
-void render_frame_begin();
-void render_frame_end();
+void refresh_shader_transform();
+void render_right_handed();
 
 void immediate_begin();
 void immediate_flush();
 
-void refresh_transformation();
-void render_right_handed();
+void immediate_vertex(f32 x, f32 y, const ch::Color& color, ch::Vector2 uv = 0.f, f32 z_index = 9.f);
 
-void draw_rect(float x0, float y0, float x1, float y1, const Color& color);
-void draw_string(const ch::String& str, float x, float y, const Color& color, const Font& font);
-void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font);
-Vector2 get_draw_string_size(const ch::String& str, const Font& font);
-
-void immediate_quad(float x0, float y0, float x1, float y1, const Color& color, float z_index = 9.f);
-void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color, const Font& font);
-const Font_Glyph* immediate_char(u32 c, float x, float y, const Color& color, const Font& font);
-
-Vector2 immediate_string(const tchar* str, float x, float y, const Color& color, const Font& font);
+void immediate_quad(f32 x0, f32 y0, f32 x1, f32 y1, const ch::Color& color, f32 z_index = 9.f);
+CH_FORCEINLINE void draw_quad(f32 x0, f32 y0, f32 x1, f32 y1, const ch::Color& color, f32 z_index = 9.f) {
+	immediate_begin();
+	immediate_quad(x0, y0, x1, y1, color, z_index);
+	immediate_flush();
+}

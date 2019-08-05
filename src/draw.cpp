@@ -1,28 +1,20 @@
 #include "draw.h"
-
-#include "os.h"
-#include "parsing.h"
 #include "editor.h"
-#include "string.h"
-#include "buffer.h"
 
 #include <stdio.h>
-#include <ch_stl/ch_stl.h>
-
-#define MAX_VERTICES 3 * 1024
 
 struct Vertex {
-	Vector2 position;
-	Color color;
-	Vector2 uv;
-	float z_index;
+	ch::Vector2 position;
+	ch::Color color;
+	ch::Vector2 uv;
+	f32 z_index;
 };
 
 struct Shader {
 	GLuint program_id;
 
-	GLint view_to_projection_loc;
-	GLint world_to_view_loc;
+	GLint projection_loc;
+	GLint view_loc;
 
 	GLint position_loc;
 	GLint color_loc;
@@ -32,74 +24,59 @@ struct Shader {
 	GLuint texture_loc;
 };
 
+#define MAX_VERTICES (3 * 1024)
+
 GLuint imm_vao;
 GLuint imm_vbo;
 Vertex imm_vertices[MAX_VERTICES];
 u32 imm_vertex_count;
-Matrix4 view_to_projection;
-Matrix4 world_to_view;
+ch::Matrix4 projection_matrix;
+ch::Matrix4 view_matrix;
 
 Shader global_shader;
 
-u32 draw_calls;
-usize verts_drawn;
-usize verts_culled;
-
-Shader* current_shader = nullptr;
-
-const GLchar* frag_shader = R"foo(
-#version 330 core
-
-out vec4 frag_color;
-
-in vec4 out_color;
-in vec2 out_uv;
-
-uniform sampler2D ftex;
-
-void main() {
-	if (out_uv.x < 0 || out_uv.y < 0) {
-		frag_color = out_color;
-	} else {
-		vec4 result = texture(ftex, out_uv);
-
-		result.w = 1.0;
-
-		frag_color = vec4(out_color.xyz, texture(ftex, out_uv).r);
-	}
-}
-)foo";
-
-const GLchar* vert_shader = R"foo(
-#version 330 core
-
+const GLchar* global_shader_source = R"foo(
+#ifdef VERTEX
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec2 uv;
 layout(location = 3) in float z_index;
-
-uniform mat4 view_to_projection;
-uniform mat4 world_to_view;
-
+uniform mat4 projection;
+uniform mat4 view;
 out vec4 out_color;
 out vec2 out_uv;
-
 void main() {
-    gl_Position =  view_to_projection * world_to_view * vec4(position, -z_index, 1.0);
+    gl_Position = projection * view * vec4(position, -z_index, 1.0);
 	out_color = color;
 	out_uv = uv;
 }
+
+#endif
+#ifdef FRAGMENT
+out vec4 frag_color;
+in vec4 out_color;
+in vec2 out_uv;
+uniform sampler2D ftex;
+void main() {
+	frag_color = out_color;
+}
+#endif
 )foo";
 
-Shader load_global_shader() {
+static bool load_shader_from_source(const GLchar* source, Shader* out_shader) {
 	Shader result;
 	GLuint program_id = glCreateProgram();
 
 	GLuint vertex_id = glCreateShader(GL_VERTEX_SHADER);
 	GLuint frag_id = glCreateShader(GL_FRAGMENT_SHADER);
 
-	glShaderSource(vertex_id, 1, &vert_shader, 0);
-	glShaderSource(frag_id, 1, &frag_shader, 0);
+	const GLchar* shader_header = "#version 330 core\n#extension GL_ARB_separate_shader_objects: enable\n";
+
+	const GLchar* vert_shader[3] = { shader_header, "#define VERTEX 1\n", source };
+	const GLchar* frag_shader[3] = { shader_header, "#define FRAGMENT 1\n", source };
+
+	glShaderSource(vertex_id, 3, vert_shader, 0);
+	glShaderSource(frag_id, 3, frag_shader, 0);
 
 	glCompileShader(vertex_id);
 	glCompileShader(frag_id);
@@ -122,53 +99,46 @@ Shader load_global_shader() {
 		glGetShaderInfoLog(vertex_id, sizeof(vert_errors), &ignored, vert_errors);
 		glGetShaderInfoLog(frag_id, sizeof(frag_errors), &ignored, frag_errors);
 		glGetProgramInfoLog(program_id, sizeof(program_errors), &ignored, program_errors);
-		assert(!"Shader validation failed");
+		return false;
 	}
 
 	glDeleteShader(vertex_id);
 	glDeleteShader(frag_id);
 
 	result.program_id = program_id;
-
-	result.view_to_projection_loc = glGetUniformLocation(program_id, "view_to_projection");
-	result.world_to_view_loc = glGetUniformLocation(program_id, "world_to_view");
+	result.projection_loc = glGetUniformLocation(program_id, "projection");
+	result.view_loc = glGetUniformLocation(program_id, "view");
 	result.texture_loc = glGetUniformLocation(program_id, "ftex");
 	result.position_loc = 0;
 	result.color_loc = 1;
 	result.uv_loc = 2;
 	result.z_index_loc = 3;
 
-	return result;
-}
+	*out_shader = result;
 
-void bind_font(Font* font) {
-	refresh_transformation();
-	glUniform1i(global_shader.texture_loc, 0);
-
-	glBindTexture(GL_TEXTURE_2D, font->atlas_ids[font->size]);
-	glActiveTexture(GL_TEXTURE0);
+	return true;
 }
 
 static void gl_error_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
-    char buffer[1024];
+	char buffer[1024];
 
-    if (severity != GL_DEBUG_SEVERITY_NOTIFICATION) {
-        sprintf(buffer, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
-        OutputDebugString(buffer);
-    }
+	if (severity != GL_DEBUG_SEVERITY_NOTIFICATION) {
+		sprintf(buffer, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
+		OutputDebugString(buffer);
+	}
 }
 
-void draw_init() {
-    assert(ch::is_gl_loaded());
-    glGenVertexArrays(1, &imm_vao);
-    glBindVertexArray(imm_vao);
-    
-    glGenBuffers(1, &imm_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, imm_vbo);
-    
-    glBindVertexArray(0);
+bool draw_init() {
+	assert(ch::is_gl_loaded());
 
-	render_right_handed();
+	glGenVertexArrays(1, &imm_vao);
+	glBindVertexArray(imm_vao);
+
+	glGenBuffers(1, &imm_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, imm_vbo);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
@@ -176,485 +146,122 @@ void draw_init() {
 	glEnable(GL_DEPTH_TEST);
 	glClearDepth(1.f);
 	glDepthFunc(GL_LEQUAL);
+	glClearColor(ch::green);
+
 #if BUILD_DEBUG
-    glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(gl_error_callback, 0);
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(gl_error_callback, 0);
 #endif
 
-	global_shader = load_global_shader();
+	const bool global_shader_loaded = load_shader_from_source(global_shader_source, &global_shader);
+	assert(global_shader_loaded);
 	glUseProgram(global_shader.program_id);
-	current_shader = &global_shader;
+
+	return true;
+}
+
+void draw_begin() {
+	const ch::Vector2 viewport_size = the_window.get_viewport_size();
+
+	glClear(GL_COLOR_BUFFER_BIT);
+	glViewport(0, 0, viewport_size.ux, viewport_size.uy);
+	render_right_handed();
+}
+
+void draw_end() {
+	ch::swap_buffers(the_window);
+}
+
+void refresh_shader_transform() {
+	glUniformMatrix4fv(global_shader.view_loc, 1, GL_FALSE, view_matrix.elems);
+	glUniformMatrix4fv(global_shader.projection_loc, 1, GL_FALSE, projection_matrix.elems);
+}
+
+void render_right_handed() {
+	const ch::Vector2 viewport_size = the_window.get_viewport_size();
+
+	const f32 width = (f32)viewport_size.ux;
+	const f32 height = (f32)viewport_size.uy;
+
+	const f32 aspect_ratio = width / height;
+
+	const f32 f = 10.f;
+	const f32 n = 1.f;
+
+	const f32 ortho_size = height / 2.f;
+
+	projection_matrix = ch::ortho(ortho_size, aspect_ratio, f, n);
+	view_matrix       = ch::translate(ch::Vector2(-width / 2.f, ortho_size));
+
+	refresh_shader_transform();
 }
 
 void immediate_begin() {
-    imm_vertex_count = 0;
+	imm_vertex_count = 0;
 }
 
 void immediate_flush() {
-    if (!current_shader)
-    {
-        assert(!"We should have a shader set");
-        return;
-    }
-    
-    glBindVertexArray(imm_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, imm_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(imm_vertices[0]) * imm_vertex_count, imm_vertices, GL_STREAM_DRAW);
-    
-    GLuint position_loc = current_shader->position_loc;
-    GLuint color_loc = current_shader->color_loc;
-    GLuint uv_loc = current_shader->uv_loc;
-	GLuint z_index_loc = current_shader->z_index_loc;
-    
-    glVertexAttribPointer(position_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glEnableVertexAttribArray(position_loc);
+	if (imm_vertex_count == 0) return;
 
-    glVertexAttribPointer(color_loc, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)sizeof(Vector2));
-    glEnableVertexAttribArray(color_loc);
-    
-    glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(Vector2) + sizeof(Color)));
-    glEnableVertexAttribArray(uv_loc);
+	glBindVertexArray(imm_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, imm_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(imm_vertices[0]) * imm_vertex_count, imm_vertices, GL_STREAM_DRAW);
 
-	glVertexAttribPointer(z_index_loc, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(Vector2) + sizeof(Color) + sizeof(Vector2)));
+	const GLuint position_loc = global_shader.position_loc;
+	const GLuint color_loc = global_shader.color_loc;
+	const GLuint uv_loc = global_shader.uv_loc;
+	const GLuint z_index_loc = global_shader.z_index_loc;
+
+	glVertexAttribPointer(position_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+	glEnableVertexAttribArray(position_loc);
+
+	glVertexAttribPointer(color_loc, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)sizeof(ch::Vector2));
+	glEnableVertexAttribArray(color_loc);
+
+	glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(ch::Vector2) + sizeof(ch::Vector4)));
+	glEnableVertexAttribArray(uv_loc);
+
+	glVertexAttribPointer(z_index_loc, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(ch::Vector2) + sizeof(ch::Vector4) + sizeof(ch::Vector2)));
 	glEnableVertexAttribArray(z_index_loc);
-    
-    glDrawArrays(GL_TRIANGLES, 0, imm_vertex_count);
-	draw_calls += 1;
-	verts_drawn += imm_vertex_count;
-    
-    glDisableVertexAttribArray(position_loc);
-    glDisableVertexAttribArray(color_loc);
+
+	glDrawArrays(GL_TRIANGLES, 0, imm_vertex_count);
+
+	glDisableVertexAttribArray(position_loc);
+	glDisableVertexAttribArray(color_loc);
 	glDisableVertexAttribArray(uv_loc);
 	glDisableVertexAttribArray(z_index_loc);
 
-    glBindVertexArray(0);
-
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-static
-Vertex* get_next_vertex_ptr() {
-    return (Vertex*)&imm_vertices + imm_vertex_count;
+static Vertex* get_next_vertex_ptr() {
+	return (Vertex*)&imm_vertices + imm_vertex_count;
 }
 
-void immediate_vertex(float x, float y, const Color& color, Vector2 uv, float z_index = 9.f) {
+void immediate_vertex(f32 x, f32 y, const ch::Color& color, ch::Vector2 uv, f32 z_index) {
 	if (imm_vertex_count >= MAX_VERTICES) {
 		immediate_flush();
 		immediate_begin();
 	}
-    
-    Vertex* vertex = get_next_vertex_ptr();
-    
-    vertex->position.x = x;
-    vertex->position.y = -y;
-    vertex->color      = color;
-    vertex->uv         = uv;
-	vertex->z_index    = z_index;
-    
-    imm_vertex_count += 1;
+
+	Vertex* vertex = get_next_vertex_ptr();
+
+	vertex->position.x = x;
+	vertex->position.y = -y;
+	vertex->color = color;
+	vertex->uv = uv;
+	vertex->z_index = z_index;
+
+	imm_vertex_count += 1;
 }
 
-void immediate_quad(float x0, float y0, float x1, float y1, const Color& color, float z_index) {
-    immediate_vertex(x0, y0, color, v2(-1.f, -1.f), z_index);
-    immediate_vertex(x0, y1, color, v2(-1.f, -1.f), z_index);
-    immediate_vertex(x1, y0, color, v2(-1.f, -1.f), z_index);
-
-	immediate_vertex(x0, y1, color, v2(-1.f, -1.f), z_index);
-    immediate_vertex(x1, y1, color, v2(-1.f, -1.f), z_index);
-    immediate_vertex(x1, y0, color, v2(-1.f, -1.f), z_index);
-}
-
-
-void draw_rect(float x0, float y0, float x1, float y1, const Color& color) {    
-    immediate_begin();
-    immediate_quad(x0, y0, x1, y1, color);
-    immediate_flush();
-}
-
-Vector2 immediate_string(const tchar* str, float x, float y, const Color& color, const Font& font) {
-	const float font_height = font.size;
-
-	const float original_x = x;
-	const float original_y = y;
-
-	float largest_x = 0.f;
-	float largest_y = 0.f;
-
-    const usize count = ch::strlen(str);
-
-	for (usize i = 0; i < count; i++) {
-		if (str[i] == ch::eol) {
-			y += font_height;
-			x = original_x;
-			verts_culled += 6;
-			continue;
-		}
-
-		if (str[i] == '\t') {
-			const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
-            assert(space_glyph);
-			x += space_glyph->advance  * 4.f;
-			verts_culled += 6 * 4;
-			continue;
-		}
-
-		const Font_Glyph* glyph = font_find_glyph(&font, str[i]);
-
-        if (glyph) {
-            immediate_glyph(*glyph, x, y, color, font);
-
-		    x += glyph->advance ;
-        }
-
-		if (x - original_x > largest_x) largest_x = x - original_x;
-		if (y - original_y > largest_y) largest_y = x - original_y;
-	}
-
-	return v2(largest_x, largest_y);
-}
-
-void immediate_glyph(const Font_Glyph& glyph, float x, float y, const Color& color, const Font& font) {
-	const Color v4_color = color;
-
-	const float x0 = x + glyph.bearing_x;
-	const float y0 = y + glyph.bearing_y;
-	const float x1 = x0 + glyph.width;
-	const float y1 = y0 + glyph.height;
-
-	if (x1 < 0.f || x0 > os_window_width() || y1 < 0.f || y0 > os_window_height()) {
-		verts_culled += 6;
-		return;
-	}
-
-    const float atlas_w = (float)font.atlases[font.size].w;
-    const float atlas_h = (float)font.atlases[font.size].h;
-
-	Vector2 bottom_right = v2(glyph.x1 / atlas_w, glyph.y1 / atlas_h);
-	Vector2 bottom_left = v2(glyph.x1 / atlas_w, glyph.y0 / atlas_h);
-	Vector2 top_right = v2(glyph.x0 / atlas_w, glyph.y1 / atlas_h);
-	Vector2 top_left = v2(glyph.x0 / atlas_w, glyph.y0 / atlas_h);
-
-	immediate_vertex(x0, y0, v4_color, top_left);
-	immediate_vertex(x0, y1, v4_color, top_right);
-	immediate_vertex(x1, y0, v4_color, bottom_left);
-
-	immediate_vertex(x0, y1, v4_color, top_right);
-	immediate_vertex(x1, y1, v4_color, bottom_right);
-	immediate_vertex(x1, y0, v4_color, bottom_left);
-}
-
-#define UNKNOWN_GLYPH 0xff0000
-
-const Font_Glyph* immediate_char(u32 c, float x, float y, const Color& color, const Font& font) {
-	const Font_Glyph* glyph = font_find_glyph(&font, c);
-    if (!glyph) {
-        glyph = font_find_glyph(&font, '?');
-        immediate_glyph(*glyph, x, y, UNKNOWN_GLYPH, font);
-        return nullptr;
-
-    } else {
-	    immediate_glyph(*glyph, x, y, color, font);
-	    return glyph;
-    }
-}
-
-void draw_string(const ch::String& str, float x, float y, const Color& color, const Font& font) {
-	y += font.ascent;
-
-	immediate_begin();
-	immediate_string(str, x, y, color, font);
-	immediate_flush();
-}
-
-Vector2 get_draw_string_size(const ch::String& str, const Font& font) {
-	const float font_height = font.size;
-
-	float y = 0.f;
-	float x = 0.f;
-
-	float largest_x = x;
-	float largest_y = y;
-	const float original_x = x;
-	y += font.ascent;
-
-	for (usize i = 0; i < str.count; i++) {
-		const Font_Glyph* glyph = font_find_glyph(&font, str[i]);
-
-		if (str.data[i] == '\n') {
-			y += font_height;
-			x = original_x;
-		} else if (str.data[i] == '\t') {
-			const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
-			x += space_glyph->advance  * 4.f;
-		} else if (glyph) {
-			float x0 = x + glyph->bearing_x ;
-			float y0 = y + glyph->bearing_y ;
-			float x1 = x0 + glyph->width ;
-			float y1 = y0 + glyph->height ;
-			x += glyph->advance ;
-			    if (y1 > largest_y) largest_y = y1;
-		} else {
-            // @Todo: Advance by space width
-        }
-
-
-		if (x > largest_x) largest_x = x;
-	}
-
-	return v2(largest_x, largest_y);
-}
-
-void refresh_transformation() {
-    if (!current_shader) return;
-    
-    glUniformMatrix4fv(current_shader->world_to_view_loc, 1, GL_FALSE, world_to_view.elems);
-    glUniformMatrix4fv(current_shader->view_to_projection_loc, 1, GL_FALSE, view_to_projection.elems);
-}
-
-void render_right_handed() {
-    const float width = (f32)os_window_width();
-    const float height = (f32)os_window_height();
-    
-    const float aspect_ratio = width / height;
-    
-    const float f = 10.f;
-    const float n = 1.f;
-    
-    const float ortho_size = height / 2.f;
-    
-    view_to_projection = m4_ortho(ortho_size, aspect_ratio, f, n);
-    world_to_view      = m4_translate(v2(-width / 2.f, ortho_size));
-    
-    refresh_transformation();
-}
-
-void render_frame_begin() {
-	draw_calls = 0;
-	verts_drawn = 0;
-	verts_culled = 0;
-	glViewport(0, 0, os_window_width(), os_window_height());
-	render_right_handed();
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
-
-void render_frame_end() {
-	ch::swap_buffers(os_get_window_handle());
-}
-
-static Color highlight_to_color(Syntax_Highlight_Type type) {
-    switch (type) {
-	case SHT_COMMENT: return 0x40c040;
-    case SHT_IDENT: return 0xd6b58d;
-    case SHT_KEYWORD: return 0xffffff;
-    case SHT_OPERATOR: return 0xcccccc; // @Temporary
-    case SHT_TYPE: return 0x66d9ef; // @Temporary
-    case SHT_FUNCTION: return 0x77f777; // @Temporary
-    //SHT_GENERIC_TYPE,
-    //SHT_GENERIC_FUNCTION,
-    case SHT_MACRO: return 0x7777f7; // @Temporary?
-    case SHT_NUMERIC_LITERAL: return 0x80f0e0;
-    case SHT_STRING_LITERAL: return 0x40b0a0;
-    case SHT_DIRECTIVE: return 0xb0ffb0;
-    case SHT_ANNOTATION: return 0xb0ffb0;
-    case SHT_PARAMETER: return 0xff8844;
-    default: assert(0);
-    }
-    return 0; // shut up compiler
-}
-
-bool debug_show_sections = false;
-
-void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1, const Font& font) {
-    float x = x0;
-	float y = y0;
-
-	const float starting_x = x;
-	const float starting_y = y;
-
-	Buffer* buffer = editor_find_buffer(&g_editor, view->id);
-	assert(buffer);
-
-    if (buffer->syntax_is_dirty) {
-        parse_syntax(buffer);
-    }
-
-    y += font.ascent;
-
-	const float font_height = font.size;
-#if GAP_BUFFER_DEBUG
-	const usize buffer_count = buffer->allocated;
-#else
-	const usize buffer_count = get_count(*buffer);
-#endif
-	const Font_Glyph* space_glyph = font_find_glyph(&font, ' ');
-    assert(space_glyph);
-
-	usize lines_scrolled = (usize)(view->current_scroll_y / font_height);
-    if (lines_scrolled >= buffer->eol_table.count) {
-        lines_scrolled = buffer->eol_table.count - 1;
-    }
-	const usize starting_index = buffer->eol_table.count ? get_line_index(*buffer, lines_scrolled) : 0;
-
-	if (buffer_count) y -= view->current_scroll_y;
-
-	y += lines_scrolled * font_height;
-
-    const Syntax_Highlight *current_highlight = buffer->syntax.data;
-    
-	immediate_begin();
-
-	for (usize i = starting_index; i < buffer_count; i++) {
-#if LINE_COUNT_DEBUG
-	usize line_index = lines_scrolled;
-	const char* format = "%llu: LS: %llu |";
-	char out_line_size[20];
-	sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
-
-	x += immediate_string(out_line_size, x, y, 0xFFFF00, font).x;
-#endif
-
-#if GAP_BUFFER_DEBUG
-		Color color = 0xd6b58d; //  get_color((Syntax_Highlight_Type)current_highlight->type);
-
-		u32* current_point = buffer->data + i;
-		u32 c = *current_point;
-
-		if (current_point >= buffer->gap && current_point < buffer->gap + buffer->gap_size)
-		{
-			color = 0xFF00FF;
-			c = '*';
-			if (current_point == buffer->gap) {
-				c = '[';
-				color = 0xFFFF00;
-			} else if (current_point == buffer->gap + buffer->gap_size - 1) {
-				c = ']';
-				color = 0xFFFF00;
-			}
-
-		}
-#else
-		const u32 c = (*buffer)[i];
-
-        u32* where = buffer->data + i;
-        if (where >= buffer->gap) where += buffer->gap_size;
-
-        //bool highlight_changed = false;
-        while (where >= current_highlight[1].where) {
-            //highlight_changed = true;
-            current_highlight += 1;
-            assert(current_highlight + 1 < buffer->syntax.cend());
-            // @Debug
-            extern bool debug_show_sections;
-            if (debug_show_sections)
-                /*if (highlight_changed)*/ x += immediate_string(dbg_get_sh_str(current_highlight), x, y, 0xff00ff, font).x;
-        }
-        
-        Color color = highlight_to_color(get_color_type(current_highlight, where));
-#endif
-
-        if ((view->cursor > view->selection && i >= view->selection && i < view->cursor) ||
-            (view->cursor < view->selection && i < view->selection && i >= view->cursor)) {
-            const Font_Glyph* glyph = font_find_glyph(&font, c);
-
-            if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-            if (ch::is_whitespace(c)) {
-                glyph = space_glyph;
-            }
-
-            float width = glyph->advance;
-            if (c == '\t') {
-                width *= 4.f;
-            }
-
-            const float selection_x0 = x;
-            const float selection_y0 = y - font.ascent;
-            const float selection_x1 = selection_x0 + width;
-            const float selection_y1 = y - font.descent;
-            immediate_quad(selection_x0, selection_y0, selection_x1, selection_y1, 0x000EFF);
-    }
-
-#if GAP_BUFFER_DEBUG
-		if (current_point == get_index_as_cursor(buffer, view->cursor))
-#else
-		if (i == view->cursor)
-#endif
-        {
-            const Font_Glyph* glyph = font_find_glyph(&font, c);
-
-            if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-			if (ch::is_whitespace(c)) {
-				glyph = space_glyph;
-			}
-
-			const float cursor_x0 = x;
-			const float cursor_y0 = y - font.ascent;
-			const float cursor_x1 = cursor_x0 + glyph->advance;
-			const float cursor_y1 = y - font.descent;
-			immediate_quad(cursor_x0, cursor_y0, cursor_x1, cursor_y1, 0x81E38E);
-			color = 0x052329;
-		}
-
-		switch (c) {
-		case ' ':
-			x += space_glyph->advance;
-			continue;
-		case '\t':
-			x += space_glyph->advance * 4.f;
-			continue;
-		case '\n':
-			x = starting_x;
-			y += font_height;
-
-#if LINE_COUNT_DEBUG
-			line_index += 1;
-
-			if (buffer->eol_table.count > line_index)
-			{
-				char out_line_size[20];
-				sprintf_s(out_line_size, 20, format, line_index, buffer->eol_table[line_index]);
-
-				x += immediate_string(out_line_size, x, y, 0xFFFF00, font).x;
-			}
-#endif
-			continue;
-		default:
-			const Font_Glyph* glyph = immediate_char(c, x, y, color, font);
-            if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
-			x += glyph->advance;
-		}
-
-		if (y - font.ascent > y1) {
-			verts_culled += (buffer_count - i) * 6;
-			break;
-		}
-	}
-
-	// @NOTE(Colby): Drawing info bar here
-	{
-		const float font_height = font.size;
-		const Vector2 padding = v2(font_height / 2.f);
-		const float bar_height = font_height + padding.y;
-		{
-			const float info_bar_x0 = x0;
-			const float info_bar_y0 = y1 - bar_height;
-			const float info_bar_x1 = info_bar_x0 + x1;
-			const float info_bar_y1 = info_bar_y0 + bar_height;
-			immediate_quad(info_bar_x0, info_bar_y0, info_bar_x1, info_bar_y1, 0xd6b58d);
-
-			const float x = x0 + padding.x / 2.f;
-			const float y = info_bar_y0 + (padding.y / 2.f) + font.ascent;
-			tchar output_string[1024];
-			sprintf(output_string, "%s  %dpt  LN: %llu     COL: %llu   Lex @ %dmb/s (%dms)  dist = %f  col = %llu",
-                    buffer->title.data,
-                    (int)font.size,
-                    view->current_line_number,
-                    view->current_column_number,
-                    (int)(buffer->chars_s * 4 / (1024 * 1024)),
-                    (int)(buffer->s * 1000),
-                    get_column_distance(*view),
-                    get_column_number_closest_to_distance(buffer, view->current_line_number, 30)
-            );
-			immediate_string(output_string, x, y, 0x052329, font);
-		}
-	}
-	immediate_flush();
+void immediate_quad(f32 x0, f32 y0, f32 x1, f32 y1, const ch::Color& color, f32 z_index) {
+	immediate_vertex(x0, y0, color, ch::Vector2(-1.f, -1.f), z_index);
+	immediate_vertex(x0, y1, color, ch::Vector2(-1.f, -1.f), z_index);
+	immediate_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
+
+	immediate_vertex(x0, y1, color, ch::Vector2(-1.f, -1.f), z_index);
+	immediate_vertex(x1, y1, color, ch::Vector2(-1.f, -1.f), z_index);
+	immediate_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
 }

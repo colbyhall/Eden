@@ -51,7 +51,8 @@ project "YEET"
 		defines 
 		{
 			"BUILD_DEBUG#1",
-			"BUILD_RELEASE#0"
+			"BUILD_RELEASE#0",
+			"CH_BUILD_DEBUG#1"
 		}
 		runtime "Debug"
 		symbols "On"
