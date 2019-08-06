@@ -1,7 +1,169 @@
 #include "draw.h"
 #include "editor.h"
 
+#define STB_RECT_PACK_IMPLEMENTATION
+#include <stb/stb_rect_pack.h>
+#define STB_TRUETYPE_IMPLEMENTATION
+#include <stb/stb_truetype.h>
+
 #include <stdio.h>
+
+struct Bitmap {
+	s32 width, height;
+	u8* data;
+};
+
+Font* bound_font;
+
+bool load_font_from_path(const ch::Path& path, Font* out_font) {
+	ch::File_Data fd;
+	if (!ch::load_file_into_memory(path, &fd)) return false;
+
+	Font font = {};
+	stbtt_InitFont(&font.info, (const u8*)fd.data, stbtt_GetFontOffsetForIndex((const u8*)fd.data, 0));
+
+	font.num_glyphs = font.info.numGlyphs;// @Temporary: info is opaque, but we are peeking :)
+
+	font.codepoints = ch_new int[font.num_glyphs];
+	memset(font.codepoints, 0, font.num_glyphs * sizeof(s32));
+	{
+		u32 glyphs_found = 0;
+		// Ask STBTT for the glyph indices.
+		// @Temporary: linearly search the codepoint space because STBTT doesn't expose CP->glyph idx;
+		//             later we will parse the ttf file in a similar way to STBTT.
+		//             Linear search is exactly 17 times slower than parsing for 65536 glyphs.
+		for (s32 codepoint = 0; codepoint < 0x110000; codepoint++) {
+			const s32 idx = stbtt_FindGlyphIndex(&font.info, codepoint);
+			if (idx <= 0) continue;
+			glyphs_found += 1;
+			font.codepoints[idx] = codepoint;
+		}
+	}
+
+	f64 atlas_area = 0;
+	{
+		s32 x0 = 0;
+		s32 x1 = 0;
+		s32 y0 = 0;
+		s32 y1 = 0;
+
+
+		for (u32 i = 0; (u32)i < font.num_glyphs; i++) {
+			stbtt_GetGlyphBox(&font.info, i, &x0, &y0, &x1, &y1);
+
+			f64 w = (x1 - x0);
+			f64 h = (y1 - y0);
+
+			atlas_area += w * h;
+		}
+	}
+	font.atlas_area = atlas_area;
+
+	glGenTextures(ARRAYSIZE(font.atlas_ids), font.atlas_ids);
+	return false;
+}
+
+const Font_Glyph* Font::operator[](u32 c) const {
+	const s32 idx = stbtt_FindGlyphIndex(&info, c);
+	if (idx > 0) {
+		assert((u32)idx < num_glyphs);
+		return &atlases[size].glyphs[idx];
+	}
+
+	return nullptr;
+}
+
+void Font::pack_atlas() {
+	if (size < 2) size = 2;
+	if (size > 128) size = 128;
+
+	const float font_scale = stbtt_ScaleForPixelHeight(&info, size);
+
+	if (!atlases[size].w) {
+
+		u32 h_oversample = 1; // @NOTE(Phillip): On a low DPI display this looks almost as good to me.
+		u32 v_oversample = 1; //                 The jump from 1x to 4x is way bigger than 4x to 64x.
+
+		if (size <= 36) {
+			h_oversample = 2;
+			v_oversample = 2;
+		}
+		if (size <= 12) {
+			h_oversample = 4;
+			v_oversample = 4;
+		}
+		if (size <= 8) {
+			h_oversample = 8;
+			v_oversample = 8;
+		}
+
+		Bitmap atlas;
+
+		if (size <= 12) {
+			atlas.width = 512 * h_oversample;
+			atlas.height = 512 * v_oversample;
+		}
+		else {
+			f64 area = atlas_area * h_oversample * v_oversample;
+			area *= 1.0 + 1 / (ch::sqrt(size)); // fudge factor for small sizes
+
+			area *= font_scale * font_scale;
+
+			const f32 root = ch::sqrt((f32)area);
+
+			u32 atlas_dimension = (u32)root;
+			atlas_dimension = (atlas_dimension + 127) & ~127;
+
+			atlas.width = atlas_dimension;
+			atlas.height = atlas_dimension;
+		}
+		atlases[size].w = atlas.width;
+		atlases[size].h = atlas.height;
+
+		atlas.data = ch_new u8[atlas.width * atlas.height];
+		defer(ch_delete[] atlas.data);
+
+		stbtt_pack_context pc;
+		stbtt_packedchar* pdata = ch_new stbtt_packedchar[num_glyphs];
+		defer(ch_delete[] pdata);
+		stbtt_pack_range pr;
+
+		stbtt_PackBegin(&pc, atlas.data, atlas.width, atlas.height, 0, 1, NULL);
+		pr.chardata_for_range = pdata;
+		pr.array_of_unicode_codepoints = codepoints;
+		pr.first_unicode_codepoint_in_range = 0;
+		pr.num_chars = num_glyphs;
+		pr.font_size = size;
+
+		stbtt_PackSetSkipMissingCodepoints(&pc, 1);
+		stbtt_PackSetOversampling(&pc, h_oversample, v_oversample);
+		stbtt_PackFontRanges(&pc, info.data, 0, &pr, 1);
+		stbtt_PackEnd(&pc);
+
+		glBindTexture(GL_TEXTURE_2D, atlas_ids[size]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlas.width, atlas.height, 0, GL_RED, GL_UNSIGNED_BYTE, atlas.data);
+
+		atlases[size].glyphs = ch_new Font_Glyph[num_glyphs];
+		for (u32 i = 0; i < num_glyphs; i++) {
+			Font_Glyph* glyph = &atlases[size].glyphs[i];
+
+			glyph->x0 = pdata[i].x0;
+			glyph->x1 = pdata[i].x1;
+			glyph->y0 = pdata[i].y0;
+			glyph->y1 = pdata[i].y1;
+
+			glyph->width = ((f32)pdata[i].x1 - pdata[i].x0) / (f32)h_oversample;
+			glyph->height = ((f32)pdata[i].y1 - pdata[i].y0) / (f32)v_oversample;
+			glyph->bearing_x = pdata[i].xoff;
+			glyph->bearing_y = pdata[i].yoff;
+			glyph->advance = pdata[i].xadvance;
+		}
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+}
 
 struct Vertex {
 	ch::Vector2 position;
@@ -264,4 +426,49 @@ void immediate_quad(f32 x0, f32 y0, f32 x1, f32 y1, const ch::Color& color, f32 
 	immediate_vertex(x0, y1, color, ch::Vector2(-1.f, -1.f), z_index);
 	immediate_vertex(x1, y1, color, ch::Vector2(-1.f, -1.f), z_index);
 	immediate_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
+}
+
+void Font::bind() {
+	refresh_shader_transform();
+	glUniform1i(global_shader.texture_loc, 0);
+
+	glBindTexture(GL_TEXTURE_2D, atlas_ids[size]);
+	glActiveTexture(GL_TEXTURE0);
+}
+
+
+void immediate_glyph(const Font_Glyph& glyph, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
+	const f32 x0 = x + glyph.bearing_x;
+	const f32 y0 = y + glyph.bearing_y;
+	const f32 x1 = x0 + glyph.width;
+	const f32 y1 = y0 + glyph.height;
+
+	const f32 atlas_w = (f32)font.atlases[font.size].w;
+	const f32 atlas_h = (f32)font.atlases[font.size].h;
+
+	const ch::Vector2 bottom_right = ch::Vector2(glyph.x1 / atlas_w, glyph.y1 / atlas_h);
+	const ch::Vector2 bottom_left = ch::Vector2(glyph.x1 / atlas_w, glyph.y0 / atlas_h);
+	const ch::Vector2 top_right = ch::Vector2(glyph.x0 / atlas_w, glyph.y1 / atlas_h);
+	const ch::Vector2 top_left = ch::Vector2(glyph.x0 / atlas_w, glyph.y0 / atlas_h);
+
+	immediate_vertex(x0, y0, color, top_left, z_index);
+	immediate_vertex(x0, y1, color, top_right, z_index);
+	immediate_vertex(x1, y0, color, bottom_left, z_index);
+
+	immediate_vertex(x0, y1, color, top_right, z_index);
+	immediate_vertex(x1, y1, color, bottom_right, z_index);
+	immediate_vertex(x1, y0, color, bottom_left, z_index);
+}
+
+const Font_Glyph* immediate_char(const u32 c, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
+	const Font_Glyph* g = font[c];
+	if (!g) {
+		g = font['?'];
+		assert(g);
+		immediate_glyph(*g, font, x, y, ch::magenta, z_index);
+		return nullptr;
+	}
+
+	immediate_glyph(*g, font, x, y, color, z_index);
+	return g;
 }
