@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "draw.h"
+#include "buffer.h"
 
 #include <ch_stl/opengl.h>
 #include <ch_stl/time.h>
@@ -21,7 +22,7 @@ static void editor_draw() {
 
 	draw_quad(0.f, 0.f, 100.f, 100.f, ch::magenta);
 
-	draw_string(CH_TEXT("FUCK MY LIFE"), font, 0.f, 0.f, ch::white);
+	draw_string(CH_TEXT("FUCK MY LIFE"), font, 0.f, 20.f, ch::white);
 
 	draw_end();
 }
@@ -60,6 +61,14 @@ int WinMain(HINSTANCE, HINSTANCE, LPTSTR, int) {
 	font.pack_atlas();
 
 	the_window.set_visibility(true);
+
+	Buffer b;
+	p = ch::get_app_path();
+	p.remove_until_directory();
+	p.remove_until_directory();
+	p.append(CH_TEXT("src"));
+	p.append(CH_TEXT("buffer.cpp"));
+	b.load_from_path(p);
 
 	f64 last_frame_time = ch::get_time_in_seconds();
 	while (!exit_requested) {

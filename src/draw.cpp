@@ -25,7 +25,7 @@ bool load_font_from_path(const ch::Path& path, Font* out_font) {
 	font.num_glyphs = font.info.numGlyphs;// @Temporary: info is opaque, but we are peeking :)
 
 	font.codepoints = ch_new int[font.num_glyphs];
-	memset(font.codepoints, 0, font.num_glyphs * sizeof(s32));
+	ch::mem_zero(font.codepoints, font.num_glyphs * sizeof(s32));
 	{
 		u32 glyphs_found = 0;
 		// Ask STBTT for the glyph indices.
@@ -60,7 +60,10 @@ bool load_font_from_path(const ch::Path& path, Font* out_font) {
 	font.atlas_area = atlas_area;
 
 	glGenTextures(ARRAYSIZE(font.atlas_ids), font.atlas_ids);
-	return false;
+	
+	*out_font = font;
+
+	return true;
 }
 
 const Font_Glyph* Font::operator[](u32 c) const {
@@ -220,7 +223,11 @@ in vec4 out_color;
 in vec2 out_uv;
 uniform sampler2D ftex;
 void main() {
-	frag_color = out_color;
+	if (out_uv.x < 0 && out_uv.y < 0) frag_color = out_color;
+	else {
+		vec4 sample = texture(ftex, out_uv);
+		frag_color = vec4(out_color.xyz, sample.r);
+	}
 }
 #endif
 )foo";
