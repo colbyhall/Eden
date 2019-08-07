@@ -6,8 +6,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb/stb_truetype.h>
 
-#include <stdio.h>
-
 struct Bitmap {
 	s32 width, height;
 	u8* data;
@@ -289,11 +287,8 @@ static bool load_shader_from_source(const GLchar* source, Shader* out_shader) {
 }
 
 static void gl_error_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
-	char buffer[1024];
-
 	if (severity != GL_DEBUG_SEVERITY_NOTIFICATION) {
-		sprintf(buffer, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
-		OutputDebugString(buffer);
+		ch::std_out << CH_TEXT("GL CALLBACK: ") << message << ch::eol;
 	}
 }
 

@@ -27,8 +27,10 @@ static void editor_draw() {
 	draw_end();
 }
 
-#if CH_PLATFORM_WINDOWS
-int WinMain(HINSTANCE, HINSTANCE, LPTSTR, int) {
+#if CH_PLATFORM_WINDOWS && !CH_BUILD_DEBUG
+int WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+#else
+int main() {
 #endif
 	const bool gl_loaded = ch::load_gl();
 	assert(gl_loaded);

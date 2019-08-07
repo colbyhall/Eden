@@ -11,13 +11,12 @@ workspace "YEET"
 	targetdir ("bin")
     objdir ("bin")
     debugdir ("bin")
-	characterset("ANSI")
+	characterset("ASCII")
 
 	include "libs/ch_stl"
 
 
 project "YEET"
-    kind "WindowedApp"
     language "C++"
 	dependson "ch_stl"
 
@@ -54,6 +53,7 @@ project "YEET"
 			"BUILD_RELEASE#0",
 			"CH_BUILD_DEBUG#1"
 		}
+		kind "ConsoleApp"
 		runtime "Debug"
 		symbols "On"
 
@@ -64,6 +64,7 @@ project "YEET"
 			"BUILD_DEBUG#0",
 			"NDEBUG"
 		}
+		kind "WindowedApp"
 		runtime "Release"
         optimize "On"
         
