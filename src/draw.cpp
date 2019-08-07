@@ -428,7 +428,7 @@ void immediate_quad(f32 x0, f32 y0, f32 x1, f32 y1, const ch::Color& color, f32 
 	immediate_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
 }
 
-void Font::bind() {
+void Font::bind() const {
 	refresh_shader_transform();
 	glUniform1i(global_shader.texture_loc, 0);
 
@@ -471,4 +471,42 @@ const Font_Glyph* immediate_char(const u32 c, const Font& font, f32 x, f32 y, co
 
 	immediate_glyph(*g, font, x, y, color, z_index);
 	return g;
+}
+
+ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
+	const f32 font_height = font.size;
+
+	const f32 original_x = x;
+	const f32 original_y = y;
+
+	f32 largest_x = 0.f;
+	f32 largest_y = 0.f;
+
+	for (usize i = 0; i < s.count; i++) {
+		if (s[i] == ch::eol) {
+			y += font_height;
+			x = original_x;
+			continue;
+		}
+
+		if (s[i] == '\t') {
+			const Font_Glyph* space_glyph = font[' '];
+			assert(space_glyph);
+			x += space_glyph->advance  * 4.f;
+			continue;
+		}
+
+		const Font_Glyph* glyph = font[s[i]];
+
+		if (glyph) {
+			immediate_glyph(*glyph, font, x, y, color, z_index);
+
+			x += glyph->advance;
+		}
+
+		if (x - original_x > largest_x) largest_x = x - original_x;
+		if (y - original_y > largest_y) largest_y = x - original_y;
+	}
+
+	return ch::Vector2(largest_x, largest_y);
 }

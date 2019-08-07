@@ -10,6 +10,8 @@ static bool exit_requested = false;
 
 const tchar* window_title = CH_TEXT("YEET");
 
+Font font;
+
 static void editor_tick(f32 dt) {
 
 }
@@ -18,6 +20,8 @@ static void editor_draw() {
 	draw_begin();
 
 	draw_quad(0.f, 0.f, 100.f, 100.f, ch::magenta);
+
+	draw_string(CH_TEXT("FUCK MY LIFE"), font, 0.f, 0.f, ch::white);
 
 	draw_end();
 }
@@ -46,6 +50,14 @@ int WinMain(HINSTANCE, HINSTANCE, LPTSTR, int) {
 
 	const bool draw_inited = draw_init();
 	assert(draw_inited);
+
+
+	ch::Path p = ch::get_os_font_path();
+	p.append(CH_TEXT("consola.ttf"));
+	const bool loaded_font = load_font_from_path(p, &font);
+	assert(loaded_font);
+	font.size = 24;
+	font.pack_atlas();
 
 	the_window.set_visibility(true);
 

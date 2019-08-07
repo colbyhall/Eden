@@ -11,7 +11,7 @@ workspace "YEET"
 	targetdir ("bin")
     objdir ("bin")
     debugdir ("bin")
-	characterset("ASCII")
+	characterset("ANSI")
 
 	include "libs/ch_stl"
 

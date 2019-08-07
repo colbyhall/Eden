@@ -45,7 +45,7 @@ struct Font {
 	const Font_Glyph* operator[](u32 c) const;
 
 	void pack_atlas();
-	void bind();
+	void bind() const;
 };
 
 bool load_font_from_path(const ch::Path& path, Font* out_font);
@@ -81,4 +81,27 @@ CH_FORCEINLINE void draw_char(const u32 c, const Font& font, f32 x, f32 y, const
 	immediate_begin();
 	immediate_char(c, font, x, y, color, z_index);
 	immediate_flush();
+}
+
+ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f);
+CH_FORCEINLINE ch::Vector2 draw_string(const ch::String& s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
+	font.bind();
+	immediate_begin();
+	const ch::Vector2 result = immediate_string(s, font, x, y, color, z_index);
+	immediate_flush();
+	return result;
+}
+
+CH_FORCEINLINE ch::Vector2 immediate_string(const tchar* s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
+	ch::String new_s;
+	new_s.data = (tchar*)s; // I'm psure this is undefined behavior and bad but oh well
+	new_s.count = ch::strlen(s);
+	return immediate_string(new_s, font, x, y, color, z_index);
+}
+CH_FORCEINLINE ch::Vector2 draw_string(const tchar* s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
+	font.bind();
+	immediate_begin();
+	const ch::Vector2 result = immediate_string(s, font, x, y, color, z_index);
+	immediate_flush();
+	return result;
 }
