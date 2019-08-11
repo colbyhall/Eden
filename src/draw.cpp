@@ -327,7 +327,7 @@ bool draw_init() {
 void draw_begin() {
 	const ch::Vector2 viewport_size = the_window.get_viewport_size();
 
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, viewport_size.ux, viewport_size.uy);
 	render_right_handed();
 }
