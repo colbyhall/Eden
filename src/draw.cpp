@@ -514,3 +514,38 @@ ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y
 
 	return ch::Vector2(largest_x, largest_y);
 }
+
+void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index /*= 9.f*/)
+{
+	{
+		const f32 _x0 = x0;
+		const f32 _y0 = y0;
+		const f32 _x1 = _x0 + thickness;
+		const f32 _y1 = y1;
+		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+	}
+
+	{
+		const f32 _x0 = x1 - thickness;
+		const f32 _y0 = y0;
+		const f32 _x1 = _x0 + thickness;
+		const f32 _y1 = y1;
+		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+	}
+
+	{
+		const f32 _x0 = x0;
+		const f32 _y0 = y0;
+		const f32 _x1 = x1;
+		const f32 _y1 = _y0 + thickness;
+		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+	}
+
+	{
+		const f32 _x0 = x0;
+		const f32 _y0 = y1 - thickness;
+		const f32 _x1 = x1;
+		const f32 _y1 = _y0 + thickness;
+		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+	}
+}

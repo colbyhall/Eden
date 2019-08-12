@@ -103,3 +103,10 @@ CH_FORCEINLINE ch::Vector2 draw_string(const tchar* s, const Font& font, f32 x, 
 	immediate_flush();
 	return result;
 }
+
+void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index = 9.f);
+CH_FORCEINLINE void draw_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index = 9.f) {
+	immediate_begin();
+	immediate_border_quad(x0, y0, x1, y1, thickness, color, z_index);
+	immediate_flush();
+}

@@ -1,20 +1,16 @@
 #include "editor.h"
 #include "draw.h"
 #include "buffer.h"
+#include "gui.h"
+#include "input.h"
 
 #include <ch_stl/opengl.h>
 #include <ch_stl/time.h>
 
 ch::Window the_window;
 
-static bool exit_requested = false;
-
 const tchar* window_title = CH_TEXT("YEET");
-
 Font font;
-
-Buffer b;
-
 
 static void editor_tick(f32 dt) {
 
@@ -23,7 +19,9 @@ static void editor_tick(f32 dt) {
 static void editor_draw() {
 	draw_begin();
 
-	draw_buffer(b, font, 0.f, 0.f, ch::white);
+	if (gui_button(GUI_ID(&the_window), CH_TEXT("FUCK"), 0.f, 0.f, 200.f, 100.f)) {
+		ch::std_out << "wow" << ch::eol;
+	}
 
 	draw_end();
 }
@@ -44,42 +42,30 @@ int main() {
 	const bool is_gl_current = ch::make_current(the_window);
 	assert(is_gl_current);
 
-	the_window.on_exit_requested = [](const ch::Window& window) {
-		exit_requested = true;
-	};
-
-	the_window.on_resize = [](const ch::Window& window) {
-		editor_draw();
-	};
+	the_input_state.init();
 
 	const bool draw_inited = draw_init();
 	assert(draw_inited);
 
-
-	ch::Path p = ch::get_os_font_path();
-	p.append(CH_TEXT("consola.ttf"));
-	const bool loaded_font = load_font_from_path(p, &font);
-	assert(loaded_font);
-	font.size = 16;
-	font.pack_atlas();
+	// @TEMP(CHall): Load font and get size
+	{
+		ch::Path p = ch::get_os_font_path();
+		p.append(CH_TEXT("consola.ttf"));
+		const bool loaded_font = load_font_from_path(p, &font);
+		assert(loaded_font);
+		font.size = 16;
+		font.pack_atlas();
+	}
 
 	the_window.set_visibility(true);
 
-	p = ch::get_app_path();
-	p.remove_until_directory();
-	p.remove_until_directory();
-	p.append(CH_TEXT("src"));
-	p.append(CH_TEXT("buffer.cpp"));
-	b.load_from_path(p);
-
 	f64 last_frame_time = ch::get_time_in_seconds();
-	while (!exit_requested) {
+	while (!the_input_state.exit_requested) {
 		const f64 current_time = ch::get_time_in_seconds();
 		const f32 dt = (f32)(current_time - last_frame_time);
 		last_frame_time = current_time;
 
-		ch::poll_events();
-
+		the_input_state.process_input();
 		editor_tick(dt);
 		editor_draw();
 	}
