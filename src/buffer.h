@@ -2,6 +2,7 @@
 
 #include <ch_stl/types.h>
 #include <ch_stl/filesystem.h>
+#include "draw.h"
 
 #define DEFAULT_GAP_SIZE 1024
 
@@ -23,13 +24,13 @@ struct Buffer {
 	Buffer_ID id;
 	ch::Path full_path;
 	u32* data;
-	u32 allocated;
+	usize allocated;
 	u32* gap;
 	usize gap_size;
 	ch::Array<usize> eol_table;
 
-	Buffer() = default;
-	Buffer(Buffer_ID _id) : id(_id) {}
+	Buffer();
+	Buffer(Buffer_ID _id);
 	Buffer copy() const;
 	void free();
 	CH_FORCEINLINE usize count() const { return allocated - gap_size; }
@@ -38,4 +39,18 @@ struct Buffer {
 	u32 operator[](usize index) const;
 
 	bool load_from_path(const ch::Path& path);
+	bool init_from_size(usize size);
+
+	void resize(usize new_gap_size);
+	void move_gap_to_index(usize index);
+	u32* get_index_as_cursor(usize index);
+	void add_char(u32 c, usize index);
+	void remove_at_index(usize index);
+	void remove_between(usize index, usize count);
+
+	usize get_line_index(usize index) const;
+	usize get_line_from_index(usize index) const;
 };
+
+// @NOTE(CHall): This is generally for debug purposes 
+void draw_buffer(const Buffer& buffer, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f);

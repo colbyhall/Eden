@@ -310,7 +310,7 @@ bool draw_init() {
 	glEnable(GL_DEPTH_TEST);
 	glClearDepth(1.f);
 	glDepthFunc(GL_LEQUAL);
-	glClearColor(ch::green);
+	glClearColor(ch::black);
 
 #if BUILD_DEBUG
 	glEnable(GL_DEBUG_OUTPUT);
@@ -440,6 +440,8 @@ void Font::bind() const {
 
 
 void immediate_glyph(const Font_Glyph& glyph, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
+	y += font.size - font.line_gap;
+
 	const f32 x0 = x + glyph.bearing_x;
 	const f32 y0 = y + glyph.bearing_y;
 	const f32 x1 = x0 + glyph.width;
