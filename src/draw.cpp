@@ -1,5 +1,7 @@
 #include "draw.h"
 #include "editor.h"
+#include "gui.h"
+#include "buffer_view.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <stb/stb_rect_pack.h>
@@ -78,7 +80,13 @@ void Font::pack_atlas() {
 	if (size < 2) size = 2;
 	if (size > 128) size = 128;
 
-	const float font_scale = stbtt_ScaleForPixelHeight(&info, size);
+	s32 _ascent, _descent, _line_gap;
+	stbtt_GetFontVMetrics(&info, &_ascent, &_descent, &_line_gap);
+
+	const f32 font_scale = stbtt_ScaleForPixelHeight(&info, size);
+	ascent = (f32)_ascent * font_scale;
+	descent = (f32)_descent * font_scale;
+	line_gap = (f32)_line_gap * font_scale;
 
 	if (!atlases[size].w) {
 
@@ -340,8 +348,8 @@ static void frame_end() {
 
 void draw_editor() {
 	frame_begin();
-
-
+		
+	draw_views();
 
 	frame_end();
 }

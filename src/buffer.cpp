@@ -3,43 +3,67 @@
 Buffer::Buffer() {
 	eol_table.allocator = ch::get_heap_allocator();
 	gap_buffer.allocator = ch::get_heap_allocator();
+
+	eol_table.push(0);
 }
 
 Buffer::Buffer(Buffer_ID _id) : id(_id) {
-	Buffer();
+	eol_table.allocator = ch::get_heap_allocator();
+	gap_buffer.allocator = ch::get_heap_allocator();
+
+	eol_table.push(0);
 }
 
-void draw_buffer(const Buffer& buffer, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index) {
-	font.bind();
-	immediate_begin();
-	const f32 font_height = font.size;
+void Buffer::add_char(u32 c, usize index) {
+	gap_buffer.insert(c, index);
 
-	const ch::Gap_Buffer<u32>& gap_buffer = buffer.gap_buffer;
+	ssize index_line = -1;
+	usize index_column = 0;
 
-	const f32 original_x = x;
-	const f32 original_y = y;
+	usize current_index = 0;
+	for (usize i = 0; i < eol_table.count; i++) {
+		usize line_size = eol_table[i];
 
-	for (usize i = 0; i < gap_buffer.count(); i++) {
-		if (gap_buffer[i] == ch::eol) {
-			y += font_height;
-			x = original_x;
-			continue;
+		if (index < current_index + line_size) {
+			index_column = index - current_index;
+			break;
 		}
 
-		if (gap_buffer[i] == '\t') {
-			const Font_Glyph* space_glyph = font[' '];
-			assert(space_glyph);
-			x += space_glyph->advance  * 4.f;
-			continue;
-		}
-
-		const Font_Glyph* glyph = font[gap_buffer[i]];
-
-		if (glyph) {
-			immediate_glyph(*glyph, font, x, y, color, z_index);
-
-			x += glyph->advance;
-		}
+		current_index += line_size;
+		index_line += 1;
 	}
-	immediate_flush();
+
+	if (c == ch::eol) {
+		const usize line_size = eol_table[index_line];
+		eol_table[index_line] = index_column + 1;
+		eol_table.insert(line_size - index_column, index_line + 1);
+	} else if (index_line < eol_table.count) { // @Hack
+		eol_table[index_line] += 1;
+	}
+}
+
+void Buffer::remove_char(usize index) {
+	usize index_line = 0;
+	usize current_index = 0;
+	for (usize i = 0; i < eol_table.count; i++) {
+		usize line_size = eol_table[i];
+
+		if (index < current_index + line_size) {
+			break;
+		}
+
+		current_index += line_size;
+		index_line += 1;
+	}
+
+	eol_table[index_line] -= 1;
+
+	const u32 c = gap_buffer[index];
+	if (c == ch::eol) {
+		const size_t amount_on_line = eol_table[index_line];
+		eol_table.remove(index_line);
+		eol_table[index_line - 1] += amount_on_line;
+	}
+
+	gap_buffer.remove_at_index(index);
 }

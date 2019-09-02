@@ -18,14 +18,18 @@ void set_active_id(GUI_ID id) {
 
 bool gui_button(GUI_ID id, const ch::String& s, f32 x0, f32 y0, f32 x1, f32 y1) {
 	bool result = false;
+
+	const bool lmb_went_down = did_mb_go_down(CH_MOUSE_LEFT);
+	const bool lmb_down = is_mb_down(CH_MOUSE_LEFT);
+
 	if (active_id == id) {
-		if (!lmb_down && lmb_was_down) {
+		if (!lmb_down && lmb_went_down) {
 			if (hovered_id == id) {
 				result = true;
 			}
 			active_id = zero_id;
 		}
-	} else if (hovered_id == id && lmb_down && !lmb_was_down) {
+	} else if (hovered_id == id && lmb_down && !lmb_went_down) {
 		set_active_id(id);
 	}
 
