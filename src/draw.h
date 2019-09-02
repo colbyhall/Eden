@@ -48,9 +48,8 @@ struct Font {
 
 bool load_font_from_path(const ch::Path& path, Font* out_font);
 
-bool draw_init();
-void draw_begin();
-void draw_end();
+void init_draw();
+void draw_editor();
 
 void refresh_shader_transform();
 void render_right_handed();

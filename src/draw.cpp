@@ -292,7 +292,7 @@ static void gl_error_callback(GLenum source, GLenum type, GLuint id, GLenum seve
 	}
 }
 
-bool draw_init() {
+void init_draw() {
 	assert(ch::is_gl_loaded());
 
 	glGenVertexArrays(1, &imm_vao);
@@ -321,10 +321,12 @@ bool draw_init() {
 	assert(global_shader_loaded);
 	glUseProgram(global_shader.program_id);
 
-	return true;
+	the_window.on_resize = [](const ch::Window& window) {
+		draw_editor();
+	};
 }
 
-void draw_begin() {
+static void frame_begin() {
 	const ch::Vector2 viewport_size = the_window.get_viewport_size();
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -332,8 +334,16 @@ void draw_begin() {
 	render_right_handed();
 }
 
-void draw_end() {
+static void frame_end() {
 	ch::swap_buffers(the_window);
+}
+
+void draw_editor() {
+	frame_begin();
+
+
+
+	frame_end();
 }
 
 void refresh_shader_transform() {
