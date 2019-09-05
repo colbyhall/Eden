@@ -10,23 +10,6 @@
     X(_Pragma) \
     X(_Static_assert) \
     X(_Thread_local) \
-\
-    X(restrict) \
-\
-    X(__pragma)  \
-    X(__int8)  \
-    X(__int16)  \
-    X(__int32)  \
-    X(__int64)  \
-    X(__asm)\
-    X(__declspec)  \
-    X(__restrict) \
-    X(__cdecl)\
-    X(__fastcall)\
-    X(__stdcall)\
-\
-    X(__attribute__)  \
-\
     X(alignas) \
     X(alignof) \
     X(and) \
@@ -125,16 +108,6 @@
     X(xor_eq) \
 
 #define C_TYPE_KEYWORDS(X)    \
-    X(__int8)  \
-    X(__int16)  \
-    X(__int32)  \
-    X(__int64)  \
-    X(__declspec)  \
-    X(__restrict) \
-    X(__cdecl)\
-    X(__fastcall)\
-    X(__stdcall)\
-\
     X(auto) \
     X(bool) \
     X(char) \
@@ -153,12 +126,6 @@
     X(wchar_t) \
 
 #define C_TYPE_QUALIFIERS(X) \
-    X(__declspec)  \
-    X(__restrict) \
-    X(__cdecl)\
-    X(__fastcall)\
-    X(__stdcall)\
-\
     X(class) \
     X(const) \
     X(decltype) \
