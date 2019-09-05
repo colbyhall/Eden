@@ -574,7 +574,11 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 			continue;
 		case '\t':
 			x += space_glyph->advance * 4.f;
-			continue;
+			continue;                       
+		case '\r':
+            if ((*buffer)[i + 1] == '\n') {
+                continue;
+            }
 		case '\n':
 			x = starting_x;
 			y += font_height;
@@ -592,6 +596,10 @@ void draw_buffer_view(Buffer_View* view, float x0, float y0, float x1, float y1,
 #endif
 			continue;
 		default:
+            if (x > os_window_width() - space_glyph->advance) {
+		    	x = starting_x;
+		    	y += font_height;
+            }
 			const Font_Glyph* glyph = immediate_char(c, x, y, color, font);
             if (!glyph) glyph = font_find_glyph(&g_editor.loaded_font, '?');
 			x += glyph->advance;

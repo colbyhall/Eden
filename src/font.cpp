@@ -44,9 +44,10 @@ Font font_load_from_os(const char* file_name) {
     }
 
     Font font = {};
-	stbtt_InitFont(&font.info, font_data.data, stbtt_GetFontOffsetForIndex(font_data.data, 0));
+    font.info = (struct stbtt_fontinfo*) c_alloc(sizeof(struct stbtt_fontinfo));
+	stbtt_InitFont(font.info, font_data.data, stbtt_GetFontOffsetForIndex(font_data.data, 0));
     
-    font.num_glyphs = font.info.numGlyphs;// @Temporary: info is opaque, but we are peeking :)
+    font.num_glyphs = font.info->numGlyphs;// @Temporary: info is opaque, but we are peeking :)
     
     font.codepoints = (int*) c_alloc(font.num_glyphs * sizeof(int));
     memset(font.codepoints, 0, font.num_glyphs * sizeof(int));
@@ -57,7 +58,7 @@ Font font_load_from_os(const char* file_name) {
         //             later we will parse the ttf file in a similar way to STBTT.
         //             Linear search is exactly 17 times slower than parsing for 65536 glyphs.
         for (int codepoint = 0; codepoint < 0x110000; codepoint++) {
-            int idx = stbtt_FindGlyphIndex(&font.info, codepoint);
+            int idx = stbtt_FindGlyphIndex(font.info, codepoint);
             if (idx <= 0) continue;
             glyphs_found++;
             font.codepoints[idx] = codepoint;
@@ -76,7 +77,7 @@ Font font_load_from_os(const char* file_name) {
 
 
         for (int i = 0; (u32)i < font.num_glyphs; i++) {
-            stbtt_GetGlyphBox(&font.info, i, &x0, &y0, &x1, &y1);
+            stbtt_GetGlyphBox(font.info, i, &x0, &y0, &x1, &y1);
 
             double w = (x1 - x0);
             double h = (y1 - y0);
@@ -102,7 +103,7 @@ void font_pack_atlas(Font& font) {
     if (font.size < 2) font.size = 2;
     if (font.size > 128) font.size = 128;
 
-    const float font_scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
+    const float font_scale = stbtt_ScaleForPixelHeight(font.info, font.size);
 
     if (!font.atlases[font.size].w) {
 
@@ -161,7 +162,7 @@ void font_pack_atlas(Font& font) {
 
         stbtt_PackSetSkipMissingCodepoints(&pc, 1);
 	    stbtt_PackSetOversampling(&pc, h_oversample, v_oversample);
-	    stbtt_PackFontRanges(&pc, font.info.data, 0, &pr, 1);
+	    stbtt_PackFontRanges(&pc, font.info->data, 0, &pr, 1);
 	    stbtt_PackEnd(&pc);
 
 	    glBindTexture(GL_TEXTURE_2D, font.atlas_ids[font.size]);
@@ -191,7 +192,7 @@ void font_pack_atlas(Font& font) {
     }
 
 	int ascent, descent, line_gap;
-	stbtt_GetFontVMetrics(&font.info, &ascent, &descent, &line_gap);
+	stbtt_GetFontVMetrics(font.info, &ascent, &descent, &line_gap);
 
 	font.ascent = (float)ascent * font_scale;
 	font.descent = (float)descent * font_scale;
@@ -203,7 +204,7 @@ void font_pack_atlas(Font& font) {
 }
 
 const Font_Glyph* font_find_glyph(const Font* font, u32 c) {
-    int idx = stbtt_FindGlyphIndex(&font->info, c);
+    int idx = stbtt_FindGlyphIndex(font->info, c);
     if (idx > 0) {
         assert((u32)idx < font->num_glyphs);
         return &font->atlases[font->size].glyphs[idx];

@@ -3,9 +3,7 @@
 #include "types.h"
 #include "opengl.h"
 
-#include <stb/stb_rect_pack.h>
 // @TODO(Colby): Replace desired font size with something that checks a script or something
-#include <stb/stb_truetype.h>
 
 struct Font_Glyph {
 	float width, height;
@@ -22,7 +20,7 @@ struct Font_Atlas {
 };
 
 struct Font {
-    struct stbtt_fontinfo info;
+    struct stbtt_fontinfo* info;
 
     u16 size;
 

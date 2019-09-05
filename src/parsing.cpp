@@ -154,57 +154,65 @@ static bool c_ends_expression(u32 c) { return c == ')' || c_ends_statement(c); }
 
 #include "cpp_syntax.h"
 
-enum Dfa {
+enum Dfa : u8 {
     STMT,
     STMT_IN_TYPE,
     STMT_GOT_TYPE,
+    STMT_IN_VAR,
+    STMT_IN_PAREN,
+    STMT_GOT_VAR,
 
     ESCAPE_EXPECTING_NEWLINE,
-    //ESCAPED_NEWLINE,
 
     SAW_SLASH,
     LINE_COMMENT,
     BLOCK_COMMENT,
     BLOCK_COMMENT_STAR,
-    BLOCK_COMMENT_DONE,
+    EXPECT_PREPROC,
     PREPROC,
-    //PREPROC_DONE,
     EXPR,
     //PAREN_EXPR,
     //SQR_EXPR,
-    //STRINGLIT,
-    //CHARLIT,
+    STRINGLIT,
+    CHARLIT,
+    STRINGLIT_BS,
     //NUMLIT,
     //STMT_EXPR, // E.g. array len in decl parens; pops if paren nesting's 0.
     //FUNC_DECL, // Saw '{' after `a b()` or `a(b)()` or `a(b)(c d)` etc.
-    //PARAM,
-    //PARAM_GOT_TYPE,
+    PARAM,
+    PARAM_IN_TYPE,
+    PARAM_GOT_TYPE,
+    //PARAM_IN_VAR,
+    //PARAM_IN_PAREN,
+    //PARAM_GOT_VAR,
     //PARAM_EXPR,
 
     NUM_STATES,
 #define NEXT_POW2(x) ((((x) - 1) | \
-                   ((x) - 1) >> 1 | \
-                   ((x) - 1) >> 2 | \
-                   ((x) - 1) >> 4 | \
-                   ((x) - 1) >> 8 | \
-                   ((x) - 1) >> 16) + 1)
-    STATE_BIT_MASK = NEXT_POW2(NUM_STATES) - 1,
+                       ((x) - 1) >> 1 | \
+                       ((x) - 1) >> 2 | \
+                       ((x) - 1) >> 4 | \
+                       ((x) - 1) >> 8 | \
+                       ((x) - 1) >> 16) + 1)
+    STATE_BIT_MASK = 0x3f,//STATE_BIT_MASK = NEXT_POW2(NUM_STATES) - 1,
     STATE_BIT,
 };
-enum Dfa_Change {
+enum Dfa_Change : u8 {
     NO_CHANGE = 0x00,
-    CHANGED = 0x20,
+    //CHANGED = 0x20,
 
-    PUSH = 0x40 | CHANGED,
-    POP = 0xc0 | CHANGED,
+    PUSH = 0x40,// | CHANGED,
+    POP = 0xc0,// | CHANGED,
 
-    _iMPL_NEXT_,
-    CHANGE_BIT_MASK = (NEXT_POW2(_iMPL_NEXT_) - 1) & ~STATE_BIT_MASK,
+    CONSUME = 0x3f,
+
+    //_iMPL_NEXT_,
+    //CHANGE_BIT_MASK = (NEXT_POW2(_iMPL_NEXT_) - 1) & ~STATE_BIT_MASK,
     //CHANGE_BIT,
 
 };
 
-enum Char_Type { // ascending from min ascii value per category:
+enum Char_Type : u8 { // ascending from min ascii value per category:
     IDENT, // 0 '$' '@'-'Z' '_'-'z'
     WHITE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
     NEWLINE, // '\r' '\n'
@@ -240,6 +248,8 @@ enum Char_Type { // ascending from min ascii value per category:
 struct Parse_State {
     u8 stack[4096];
     size_t sp;
+    Syntax_Highlight* maybe_func_name;
+    Syntax_Highlight* maybe_template_arg_start;
 };
 
 #define MAIN(state) (((state) >> 0) & 0xff)
@@ -249,63 +259,96 @@ struct Parse_State {
 bool use_dfa_parser;
 
 Syntax_Highlight_Type get_color_type(const Syntax_Highlight* sh, const u32* p) {
-if (use_dfa_parser) {//#if DFA_PARSER
+if (0){//if (use_dfa_parser) {//#if DFA_PARSER
+    //if (sh[-1].type == CONSUME && sh[-2].type == BLOCK_COMMENT_STAR) { // @Hack
+    //    return SHT_COMMENT;
+    //}
     switch ((Dfa)sh->type) {
-    case STMT: /*if (c_is_op(*p)) return SHT_OPERATOR; */return SHT_IDENT;
-    case ESCAPE_EXPECTING_NEWLINE: return SHT_OPERATOR; //assert(*p == '\\'); return get_color_type(sh - 1, p - 1);
+#define COLOR_OP() do { if (c_is_op(*p)) return SHT_OPERATOR; } while (0)
+    case STMT: COLOR_OP(); return SHT_IDENT;
+    case STMT_IN_TYPE: COLOR_OP(); return SHT_TYPE;
+    case STMT_GOT_TYPE: COLOR_OP(); return SHT_TYPE;
+    case STMT_IN_PAREN: COLOR_OP(); return SHT_FUNCTION;
+    case STMT_IN_VAR: COLOR_OP(); return SHT_FUNCTION;
+    case STMT_GOT_VAR: COLOR_OP(); return SHT_FUNCTION;
+    case ESCAPE_EXPECTING_NEWLINE: return get_color_type(sh - 1, sh[-1].where); //assert(*p == '\\'); return get_color_type(sh - 1, p - 1);
     //case ESCAPED_NEWLINE: return SHT_IDENT; // whitespace, doesn't matter.
-    case SAW_SLASH: return SHT_OPERATOR;//if (get_color_type(sh + 1, p + 1) == SHT_COMMENT) return SHT_COMMENT; return SHT_OPERATOR;
+    case SAW_SLASH: if (sh[1].type == LINE_COMMENT || sh[1].type == BLOCK_COMMENT) return SHT_COMMENT; return SHT_OPERATOR;//if (get_color_type(sh + 1, p + 1) == SHT_COMMENT) return SHT_COMMENT; return SHT_OPERATOR;
     case LINE_COMMENT: return SHT_COMMENT;
     case BLOCK_COMMENT: return SHT_COMMENT;
-    case BLOCK_COMMENT_STAR: /*assert(0);*/ return SHT_COMMENT;
+    case BLOCK_COMMENT_STAR: return SHT_COMMENT;
+    case EXPECT_PREPROC: return SHT_DIRECTIVE;
     case PREPROC: return SHT_DIRECTIVE;
     //case PREPROC_DONE: return SHT_IDENT;
-    case EXPR: /*if (c_is_op(*p)) return SHT_OPERATOR;*/ return SHT_IDENT;
-    case STMT_IN_TYPE: return SHT_TYPE;
-    case STMT_GOT_TYPE: return SHT_FUNCTION;
+    case EXPR: COLOR_OP(); return SHT_IDENT;
+    case STRINGLIT                : return SHT_STRING_LITERAL;
+    case CHARLIT                  : return SHT_STRING_LITERAL;
+    //case STRINGLIT_DONE           : return SHT_STRING_LITERAL;
+    case STRINGLIT_BS             : return SHT_STRING_LITERAL;
+    case PARAM                    : COLOR_OP(); return SHT_PARAMETER;
+    case PARAM_IN_TYPE            : COLOR_OP(); return SHT_TYPE;
+    case PARAM_GOT_TYPE            : COLOR_OP(); return SHT_PARAMETER;
+
+    case CONSUME: return get_color_type(sh - 1, p);
     }
     assert(0);
     return SHT_IDENT;
 } else {//#else
+    if (sh->type != SHT_COMMENT && sh->type != SHT_DIRECTIVE && sh->type != SHT_STRING_LITERAL && sh->type != SHT_NUMERIC_LITERAL) {
+        if (*p == '\\') return SHT_IDENT;
+        if (c_is_op(*p)) return SHT_OPERATOR;
+    }
     return sh->type;
 }//#endif
 }
 
 const char* dbg_get_sh_str(const Syntax_Highlight* sh) {
-if (use_dfa_parser) {
+if (0){//if (use_dfa_parser) {
     switch (sh->type) {
     case STMT                     : return "St";
     case STMT_IN_TYPE             : return "Ty";
-    case STMT_GOT_TYPE            : return "Vr";
-    case ESCAPE_EXPECTING_NEWLINE : return "Bs";
+    case STMT_GOT_TYPE            : return "TyD";
+    case STMT_IN_VAR              : return "Var";
+    case STMT_IN_PAREN            : return "Paren";
+    case STMT_GOT_VAR             : return "VarD";
+    case ESCAPE_EXPECTING_NEWLINE : return "Esc";
     //case ESCAPED_NEWLINE          : return "LF";
-    case SAW_SLASH                : return "Sl";
-    case LINE_COMMENT             : return "Lc";
-    case BLOCK_COMMENT            : return "Bc";
-    case BLOCK_COMMENT_STAR       : return "Bs";
-    case BLOCK_COMMENT_DONE       : return "Bd";
+    case SAW_SLASH                : return "SL";
+    case LINE_COMMENT             : return "LC";
+    case BLOCK_COMMENT            : return "BC";
+    case BLOCK_COMMENT_STAR       : return "BS";
+    case EXPECT_PREPROC           : return "LF";
     case PREPROC                  : return "Pp";
     //case PREPROC_DONE             : return "Pd";
     case EXPR                     : return "Ex";
+    case STRINGLIT                : return "Str";
+    case CHARLIT                  : return "Chr";
+    //case STRINGLIT_DONE           : return "StrD";
+    case STRINGLIT_BS             : return "StrBS";
+    case PARAM                    : return "Param";
+    case PARAM_IN_TYPE            : return "PrmTy";
+    case PARAM_GOT_TYPE            : return "PrmVar";
+
+    case CONSUME                  : return "Consume";
     }
     assert(0);
     return "?";
 } else {
     switch (sh->type) {
     case SHT_IDENT            : return "Id";
-    case SHT_COMMENT          : return "Co";
-    case SHT_KEYWORD          : return "Kw";
+    case SHT_COMMENT          : return "Com";
+    case SHT_KEYWORD          : return "Kyw";
     case SHT_OPERATOR         : return "Op";
     case SHT_TYPE             : return "Ty";
     case SHT_FUNCTION         : return "Fn";
     case SHT_GENERIC_TYPE     : return "Gt";
     case SHT_GENERIC_FUNCTION : return "Gf";
-    case SHT_MACRO            : return "Ma";
-    case SHT_NUMERIC_LITERAL  : return "Nl";
-    case SHT_STRING_LITERAL   : return "Sl";
+    case SHT_MACRO            : return "Mac";
+    case SHT_NUMERIC_LITERAL  : return "Num";
+    case SHT_STRING_LITERAL   : return "Str";
     case SHT_DIRECTIVE        : return "Pp";
     case SHT_ANNOTATION       : return "An";
-    case SHT_PARAMETER        : return "Pa";
+    case SHT_PARAMETER        : return "Prm";
     }
     return "Id";
 }
@@ -422,7 +465,7 @@ struct C_Lexer {
 
     void skip_gap() {
         p += gap_size;
-        index_offset += gap_size;
+        //index_offset += gap_size;
     }
 
     bool next() {
@@ -611,17 +654,17 @@ struct C_Lexer {
 
     void parse_braces() {
         assert(p[0] == '{');
-        push(SHT_OPERATOR);
+        //push(SHT_OPERATOR);
         p++;
         while (next()) {
             next_token();
             parse_stmt();
             if (p[0] == ')') {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
             }
             if (p[0] == ';') {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
             }
             if (p[0] == '}') break;
@@ -630,7 +673,7 @@ struct C_Lexer {
 
     void parse_params() {
         assert(p[0] == '(');
-        push(SHT_OPERATOR);
+        //push(SHT_OPERATOR);
         p++;
         while (next()) {
             next_token();
@@ -638,7 +681,7 @@ struct C_Lexer {
             if (c_ends_expression(p[0])) break;
         }
         if (p[0] == ')') {
-            push(SHT_OPERATOR);
+            //push(SHT_OPERATOR);
             p++;
             next_token();
         }
@@ -650,7 +693,7 @@ struct C_Lexer {
         case Cprivate:
         case Cprotected:
             if (p[0] == ':') {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
                 next_token();
             }
@@ -678,18 +721,18 @@ struct C_Lexer {
         case Cswitch:
         case Ccatch: {
             if (p[0] == '(') {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
                 while (next()) {
                     next_token();
                     parse_stmt();
                     if (p[0] == '}') break;
                     if (p[0] == ';') {
-                        push(SHT_OPERATOR);
+                        //push(SHT_OPERATOR);
                         p++;
                     }
                     if (p[0] == ')') {
-                        push(SHT_OPERATOR);
+                        //push(SHT_OPERATOR);
                         p++;
                         next_token();
                         break;
@@ -739,13 +782,13 @@ struct C_Lexer {
         next_token();
 
         if (p[0] == '(' || p[0] == '[') {
-            push(SHT_OPERATOR);
+            //push(SHT_OPERATOR);
             u32 end = ((p[0] == '(') ? ')' : ']');
             p++;
             next_token();
             parse_exprs(end);
             if (p[0] == end) {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 if (p[0] == ')') {
                     p++;
                     next_token();
@@ -785,7 +828,7 @@ struct C_Lexer {
                 p++;
             }
         } else if (c_is_op(p[0])) {
-            push(SHT_OPERATOR);
+            //push(SHT_OPERATOR);
             p++;
             next_token();
             parse_exprs();
@@ -818,7 +861,7 @@ struct C_Lexer {
             }
         }
         //if (p[0] == ')') {
-        //    push(SHT_OPERATOR);
+        //    //push(SHT_OPERATOR);
         //    p++;
         //    next_token();
         //}
@@ -844,7 +887,7 @@ struct C_Lexer {
         while (paren_nesting) {
             parse_exprs();
             if (p[0] == ')') {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
                 next_token();
                 paren_nesting--;
@@ -873,7 +916,7 @@ struct C_Lexer {
         if (p[0] == '{') {
             parse_braces();
             if (p[0] == '}') {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
             }
             return;
@@ -882,7 +925,7 @@ struct C_Lexer {
         if (!c_starts_ident(p[0])) {
             parse_exprs();
             if (p[0] == ')') {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
                 next_token();
             }
@@ -933,7 +976,7 @@ struct C_Lexer {
                     if (p[0] == '{') {
                         parse_braces();
                         if (p[0] == '}') {
-                            push(SHT_OPERATOR);
+                            //push(SHT_OPERATOR);
                             p++;
                             next_token();
                         }
@@ -973,7 +1016,7 @@ struct C_Lexer {
                     decl_type = current;
                     if (p[0] == '(') {
                         current->type = SHT_FUNCTION;
-                        push(SHT_OPERATOR);
+                        //push(SHT_OPERATOR);
                         p++;
                         next_token();
                         paren_nesting++;
@@ -1000,7 +1043,7 @@ struct C_Lexer {
                     break;
                 }
             } else if (p[0] == '(') {
-                current->type = SHT_OPERATOR;
+                //current->type = SHT_OPERATOR;
                 p++;
                 next_token();
                 paren_nesting++;
@@ -1011,7 +1054,7 @@ struct C_Lexer {
                 } else {
                     if (paren_nesting) {
                         paren_nesting--;
-                        current->type = SHT_OPERATOR;
+                        //current->type = SHT_OPERATOR;
                         p++;
                         next_token();
                     } else {
@@ -1019,11 +1062,11 @@ struct C_Lexer {
                     }
                 }
             } else if (p[0] == '*' || p[0] == '&') {
-                current->type = SHT_OPERATOR;
+                //current->type = SHT_OPERATOR;
                 p++;
                 next_token();
             } else if (p[0] == '=') {
-                current->type = SHT_OPERATOR;
+                //current->type = SHT_OPERATOR;
                 p++;
                 next_token();
                 if (!paren_nesting) {
@@ -1034,7 +1077,7 @@ struct C_Lexer {
                 SET_AS_DECL();
                 break;
             } else if (p[0] == ',') {
-                current->type = SHT_OPERATOR;
+                //current->type = SHT_OPERATOR;
                 p++;
                 next_token();
                 if (!paren_nesting && inside_parameters) {
@@ -1048,7 +1091,7 @@ struct C_Lexer {
                             parse_stmt(SHT_PARAMETER, nullptr, true);
                             next_token();
                             if (c_ends_expression(p[0])) {
-                                push(SHT_OPERATOR);
+                                //push(SHT_OPERATOR);
                                 p++;
                                 break;
                             }
@@ -1131,7 +1174,7 @@ IDENT, // @
 IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT, // A-N
 IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT,IDENT, // M-Z
 LSQR, // [
-BS, // \             asdf
+BS, // \     
 RSQR, // ]
 OP, // ^
 IDENT, // _
@@ -1146,185 +1189,242 @@ WHITE, // 127
 };
 
 static const u8 (state_table[NUM_STATES])[NUM_CHAR_TYPES] = {
-#define Chg CHANGED |
     { // STMT
-Chg     STMT_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
+        STMT_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
         STMT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        STMT, // '\r' '\n'
-Chg     EXPR, // '!' '%' '?' '^' '|' '~'
-Chg     EXPR, // '"'
-Chg     PREPROC | PUSH, // '#'
-Chg     EXPR, // '&'
-Chg     EXPR, // '\''
-Chg     /*PAREN_*/EXPR | PUSH, // '('
-Chg     EXPR, // ')' // @NOTE(phil): can't (safely) pop from here... should this trigger an error?
-Chg     EXPR, // '*'
-Chg     EXPR, // '+'
-Chg     EXPR, // ','
-Chg     EXPR, // '-'
-Chg     EXPR, // '.'
-Chg     SAW_SLASH | PUSH,//EXPR, // '/'
-Chg     EXPR, // '0'-'9'
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        EXPR | PUSH, // '"'
+        EXPR | PUSH, // '#'
+        EXPR | PUSH, // '&'
+        EXPR | PUSH, // '\''
+        EXPR | PUSH, // '('
+        EXPR | PUSH, // ')'
+        EXPR | PUSH, // '*'
+        EXPR | PUSH, // '+'
+        EXPR | PUSH, // ','
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH,//EXPR, // '/'
+        EXPR | PUSH, // '0'-'9'
         STMT, // ':'
         STMT, // ';'
-Chg     EXPR, // '<'
-Chg     EXPR, // '='
-Chg     EXPR, // '>'
-Chg     /*SQR_*/EXPR | PUSH, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
-Chg     EXPR, // ']' // @NOTE(phil): can't pop from "none"... should this trigger an error?
-        STMT, // '{' // @Temporary: need to nest this properly?
-        STMT, // '}'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        EXPR | PUSH, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP | CONSUME, // '}'
     },
     { // STMT_IN_TYPE
         STMT_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
-Chg     STMT_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     STMT_GOT_TYPE, // '\r' '\n'
-Chg     EXPR, // '!' '%' '?' '^' '|' '~'
-Chg     EXPR, // '"'
-Chg     EXPR, // '#'
-Chg     STMT_GOT_TYPE, // '&'
-Chg     EXPR, // '\''
-Chg     STMT_GOT_TYPE, // '('
-Chg     STMT_GOT_TYPE, // ')'
-Chg     STMT_GOT_TYPE, // '*'
-Chg     STMT_GOT_TYPE, // '+'
-Chg     STMT_GOT_TYPE, // ','
-Chg     STMT_GOT_TYPE, // '-'
-Chg     STMT_GOT_TYPE, // '.'
-Chg     SAW_SLASH | PUSH,//STMT_GOT_TYPE, // '/'
-Chg     STMT_IN_TYPE, // '0'-'9'
-Chg     STMT, // ':'
-Chg     STMT, // ';'
-Chg     STMT_GOT_TYPE, // '<'
-Chg     EXPR, // '='
-Chg     EXPR, // '>'
-Chg     EXPR, // '[' // @Todo: nest
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
-Chg     EXPR, // ']'
-Chg     EXPR, // '{'
-Chg     EXPR, // '}'
+        STMT_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        EXPR | PUSH, // '"'
+        EXPR | PUSH, // '#'
+        STMT_GOT_TYPE, // '&'
+        EXPR | PUSH, // '\''
+        STMT_IN_PAREN | PUSH, // '('
+        EXPR | PUSH, // ')'
+        STMT_GOT_TYPE, // '*'
+        EXPR | PUSH, // '+'
+        EXPR | PUSH, // ','
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH, // '/'
+        STMT_IN_TYPE, // '0'-'9'
+        STMT, // ':' // Label!!
+        STMT, // ';'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        EXPR | PUSH, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP | CONSUME, // '}'
     },
     { // STMT_GOT_TYPE
-        STMT_GOT_TYPE, // 0 '$' '@'-'Z' '_'-'z'
+        STMT_IN_VAR, // 0 '$' '@'-'Z' '_'-'z'
         STMT_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        STMT_GOT_TYPE, // '\r' '\n'
-Chg     EXPR, // '!' '%' '?' '^' '|' '~'
-        STMT_GOT_TYPE, // '"'
-Chg     PREPROC | PUSH,//STMT_GOT_TYPE, // '#'
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        EXPR | PUSH, // '"'
+        EXPR | PUSH, // '#'
         STMT_GOT_TYPE, // '&'
-        STMT_GOT_TYPE, // '\''
-Chg     EXPR, // '('
-Chg     EXPR, // ')'
+        EXPR | PUSH, // '\''
+        STMT_IN_PAREN | PUSH, // '('
+        EXPR | PUSH, // ')'
         STMT_GOT_TYPE, // '*'
-        STMT_GOT_TYPE, // '+'
+        EXPR | PUSH, // '+'
         STMT_GOT_TYPE, // ','
-Chg     EXPR, // '-'
-        STMT_GOT_TYPE, // '.'
-Chg     SAW_SLASH | PUSH,//STMT_GOT_TYPE, // '/'
-        STMT_GOT_TYPE, // '0'-'9'
-Chg     STMT, // ':'
-Chg     STMT, // ';'
-Chg     EXPR, // '<'
-Chg     EXPR, // '='
-Chg     EXPR, // '>'
-        STMT_GOT_TYPE, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
-Chg     EXPR, // ']'
-Chg     STMT, // '{'
-Chg     STMT, // '}'
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH,//STMT_GOT_TYPE, // '/'
+        EXPR | PUSH, // '0'-'9'
+        STMT, // ':'
+        STMT, // ';'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        EXPR | PUSH, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP | CONSUME, // '}'
+    },
+    { // STMT_IN_VAR
+        STMT_IN_VAR, // 0 '$' '@'-'Z' '_'-'z'
+        STMT_GOT_VAR, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        EXPR | PUSH, // '"'
+        EXPR | PUSH, // '#'
+        EXPR | PUSH, // '&'
+        EXPR | PUSH, // '\''
+        PARAM | PUSH, // '('
+        EXPR | PUSH, // ')'
+        EXPR | PUSH, // '*'
+        EXPR | PUSH, // '+'
+        STMT_GOT_TYPE, // ','
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH,//STMT_IN_VAR, // '/'
+        STMT_IN_VAR, // '0'-'9'
+        STMT, // ':'
+        STMT, // ';'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        EXPR | PUSH, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP | CONSUME, // '}'
+    },
+    { // STMT_IN_PAREN
+        STMT_IN_PAREN, // 0 '$' '@'-'Z' '_'-'z'
+        STMT_IN_PAREN, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        STMT_IN_PAREN, // '!' '%' '?' '^' '|' '~'
+        STMT_IN_PAREN, // '"'
+        STMT_IN_PAREN, // '#'
+        STMT_IN_PAREN, // '&'
+        STMT_IN_PAREN, // '\''
+        STMT_IN_PAREN | PUSH, // '('
+        POP | CONSUME, // ')'
+        STMT_IN_PAREN, // '*'
+        STMT_IN_PAREN, // '+'
+        STMT_IN_PAREN, // ','
+        STMT_IN_PAREN, // '-'
+        STMT_IN_PAREN, // '.'
+        SAW_SLASH | PUSH,//STMT_IN_PAREN, // '/'
+        STMT_IN_PAREN, // '0'-'9'
+        STMT_IN_PAREN, // ':'
+        POP, // ';'
+        STMT_IN_PAREN, // '<'
+        STMT_IN_PAREN, // '='
+        STMT_IN_PAREN, // '>'
+        STMT_IN_PAREN, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        STMT_IN_PAREN, // ']'
+        STMT | PUSH, // '{'
+        POP, // '}'
+    },
+    { // STMT_GOT_VAR
+        STMT_GOT_VAR, // 0 '$' '@'-'Z' '_'-'z'
+        STMT_GOT_VAR, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        EXPR | PUSH, // '"'
+        EXPR | PUSH, // '#'
+        EXPR | PUSH, // '&'
+        EXPR | PUSH, // '\''
+        PARAM | PUSH, // '('
+        EXPR | PUSH, // ')'
+        EXPR | PUSH, // '*'
+        EXPR | PUSH, // '+'
+        STMT_GOT_TYPE, // ','
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH,//STMT_GOT_VAR, // '/'
+        EXPR | PUSH, // '0'-'9'
+        STMT, // ':'
+        STMT, // ';'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        STMT_GOT_VAR, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP | CONSUME, // '}'
     },
     { // ESCAPE_EXPECTING_NEWLINE
-Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
-Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     POP, // '\r' '\n'
-Chg     POP, // '!' '%' '?' '^' '|' '~'
-Chg     POP, // '"'
-Chg     POP, // '#'
-Chg     POP, // '&'
-Chg     POP, // '\''
-Chg     POP, // '('
-Chg     POP, // ')'
-Chg     POP, // '*'
-Chg     POP, // '+'
-Chg     POP, // ','
-Chg     POP, // '-'
-Chg     POP, // '.'
-Chg     POP, // '/'
-Chg     POP, // '0'-'9'
-Chg     POP, // ':'
-Chg     POP, // ';'
-Chg     POP, // '<'
-Chg     POP, // '='
-Chg     POP, // '>'
-Chg     POP, // '['
+        POP, // 0 '$' '@'-'Z' '_'-'z'
+        POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        POP | CONSUME, // '\r' '\n'
+        POP, // '!' '%' '?' '^' '|' '~'
+        POP, // '"'
+        POP, // '#'
+        POP, // '&'
+        POP, // '\''
+        POP, // '('
+        POP, // ')'
+        POP, // '*'
+        POP, // '+'
+        POP, // ','
+        POP, // '-'
+        POP, // '.'
+        POP, // '/'
+        POP, // '0'-'9'
+        POP, // ':'
+        POP, // ';'
+        POP, // '<'
+        POP, // '='
+        POP, // '>'
+        POP, // '['
         ESCAPE_EXPECTING_NEWLINE, // '\\'
-Chg     POP, // ']'
-Chg     POP, // '{'
-Chg     POP, // '}'
+        POP, // ']'
+        POP, // '{'
+        POP, // '}'
     },
-    /*{ // ESCAPED_NEWLINE
-Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
-Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     POP, // '\r' '\n'
-Chg     POP, // '!' '%' '?' '^' '|' '~'
-Chg     POP, // '"'
-Chg     POP, // '#'
-Chg     POP, // '&'
-Chg     POP, // '\''
-Chg     POP, // '('
-Chg     POP, // ')'
-Chg     POP, // '*'
-Chg     POP, // '+'
-Chg     POP, // ','
-Chg     POP, // '-'
-Chg     POP, // '.'
-Chg     POP, // '/'
-Chg     POP, // '0'-'9'
-Chg     POP, // ':'
-Chg     POP, // ';'
-Chg     POP, // '<'
-Chg     POP, // '='
-Chg     POP, // '>'
-Chg     POP, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE, // '\\'
-Chg     POP, // ']'
-Chg     POP, // '{'
-Chg     POP, // '}'
-    },*/
     { // SAW_SLASH
-Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
-Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     POP, // '\r' '\n'
-Chg     POP, // '!' '%' '?' '^' '|' '~'
-Chg     POP, // '"'
-Chg     POP, // '#'
-Chg     POP, // '&'
-Chg     POP, // '\''
-Chg     POP, // '('
-Chg     POP, // ')'
-Chg     BLOCK_COMMENT, // '*'
-Chg     POP, // '+'
-Chg     POP, // ','
-Chg     POP, // '-'
-Chg     POP, // '.'
-Chg     LINE_COMMENT, // '/'
-Chg     POP, // '0'-'9'
-Chg     POP, // ':'
-Chg     POP, // ';'
-Chg     POP, // '<'
-Chg     POP, // '='
-Chg     POP, // '>'
-Chg     POP, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
-Chg     POP, // ']'
-Chg     POP, // '{'
-Chg     POP, // '}'
+        POP, // 0 '$' '@'-'Z' '_'-'z'
+        POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        POP, // '\r' '\n'
+        POP, // '!' '%' '?' '^' '|' '~'
+        POP, // '"'
+        POP, // '#'
+        POP, // '&'
+        POP, // '\''
+        POP, // '('
+        POP, // ')'
+        BLOCK_COMMENT, // '*'
+        POP, // '+'
+        POP, // ','
+        POP, // '-'
+        POP, // '.'
+        LINE_COMMENT, // '/'
+        POP, // '0'-'9'
+        POP, // ':'
+        POP, // ';'
+        POP, // '<'
+        POP, // '='
+        POP, // '>'
+        POP, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        POP, // ']'
+        POP, // '{'
+        POP, // '}'
     },
     { // LINE_COMMENT
         LINE_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
         LINE_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     POP, // '\r' '\n'
+        POP, // '\r' '\n'
         LINE_COMMENT, // '!' '%' '?' '^' '|' '~'
         LINE_COMMENT, // '"'
         LINE_COMMENT, // '#'
@@ -1345,7 +1445,7 @@ Chg     POP, // '\r' '\n'
         LINE_COMMENT, // '='
         LINE_COMMENT, // '>'
         LINE_COMMENT, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         LINE_COMMENT, // ']'
         LINE_COMMENT, // '{'
         LINE_COMMENT, // '}'
@@ -1361,7 +1461,7 @@ Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         BLOCK_COMMENT, // '\''
         BLOCK_COMMENT, // '('
         BLOCK_COMMENT, // ')'
-Chg     BLOCK_COMMENT_STAR, // '*'
+        BLOCK_COMMENT_STAR, // '*'
         BLOCK_COMMENT, // '+'
         BLOCK_COMMENT, // ','
         BLOCK_COMMENT, // '-'
@@ -1374,75 +1474,75 @@ Chg     BLOCK_COMMENT_STAR, // '*'
         BLOCK_COMMENT, // '='
         BLOCK_COMMENT, // '>'
         BLOCK_COMMENT, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         BLOCK_COMMENT, // ']'
         BLOCK_COMMENT, // '{'
         BLOCK_COMMENT, // '}'
     },
     { // BLOCK_COMMENT_STAR
-Chg     BLOCK_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
-Chg     BLOCK_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     BLOCK_COMMENT, // '\r' '\n'
-Chg     BLOCK_COMMENT, // '!' '%' '?' '^' '|' '~'
-Chg     BLOCK_COMMENT, // '"'
-Chg     BLOCK_COMMENT, // '#'
-Chg     BLOCK_COMMENT, // '&'
-Chg     BLOCK_COMMENT, // '\''
-Chg     BLOCK_COMMENT, // '('
-Chg     BLOCK_COMMENT, // ')'
+        BLOCK_COMMENT, // 0 '$' '@'-'Z' '_'-'z'
+        BLOCK_COMMENT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        BLOCK_COMMENT, // '\r' '\n'
+        BLOCK_COMMENT, // '!' '%' '?' '^' '|' '~'
+        BLOCK_COMMENT, // '"'
+        BLOCK_COMMENT, // '#'
+        BLOCK_COMMENT, // '&'
+        BLOCK_COMMENT, // '\''
+        BLOCK_COMMENT, // '('
+        BLOCK_COMMENT, // ')'
         BLOCK_COMMENT_STAR, // '*'
-Chg     BLOCK_COMMENT, // '+'
-Chg     BLOCK_COMMENT, // ','
-Chg     BLOCK_COMMENT, // '-'
-Chg     BLOCK_COMMENT, // '.'
-Chg     POP, // '/'
-Chg     BLOCK_COMMENT, // '0'-'9'
-Chg     BLOCK_COMMENT, // ':'
-Chg     BLOCK_COMMENT, // ';'
-Chg     BLOCK_COMMENT, // '<'
-Chg     BLOCK_COMMENT, // '='
-Chg     BLOCK_COMMENT, // '>'
-Chg     BLOCK_COMMENT, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
-Chg     BLOCK_COMMENT, // ']'
-Chg     BLOCK_COMMENT, // '{'
-Chg     BLOCK_COMMENT, // '}'
+        BLOCK_COMMENT, // '+'
+        BLOCK_COMMENT, // ','
+        BLOCK_COMMENT, // '-'
+        BLOCK_COMMENT, // '.'
+        POP | CONSUME, // '/'
+        BLOCK_COMMENT, // '0'-'9'
+        BLOCK_COMMENT, // ':'
+        BLOCK_COMMENT, // ';'
+        BLOCK_COMMENT, // '<'
+        BLOCK_COMMENT, // '='
+        BLOCK_COMMENT, // '>'
+        BLOCK_COMMENT, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        BLOCK_COMMENT, // ']'
+        BLOCK_COMMENT, // '{'
+        BLOCK_COMMENT, // '}'
     },
-    { // BLOCK_COMMENT_DONE
-Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
-Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     POP, // '\r' '\n'
-Chg     POP, // '!' '%' '?' '^' '|' '~'
-Chg     POP, // '"'
-Chg     POP, // '#'
-Chg     POP, // '&'
-Chg     POP, // '\''
-Chg     POP, // '('
-Chg     POP, // ')'
-Chg     POP, // '*'
-Chg     POP, // '+'
-Chg     POP, // ','
-Chg     POP, // '-'
-Chg     POP, // '.'
-Chg     POP, // '/'
-Chg     POP, // '0'-'9'
-Chg     POP, // ':'
-Chg     POP, // ';'
-Chg     POP, // '<'
-Chg     POP, // '='
-Chg     POP, // '>'
-Chg     POP, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE, // '\\'
-Chg     POP, // ']'
-Chg     POP, // '{'
-Chg     POP, // '}'
+    { // EXPECT_PREPROC
+        POP, // 0 '$' '@'-'Z' '_'-'z'
+        EXPECT_PREPROC, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC, // '\r' '\n'
+        POP, // '!' '%' '?' '^' '|' '~'
+        POP, // '"'
+        PREPROC, // '#'
+        POP, // '&'
+        POP, // '\''
+        POP, // '('
+        POP, // ')'
+        POP, // '*'
+        POP, // '+'
+        POP, // ','
+        POP, // '-'
+        POP, // '.'
+        POP, // '/'
+        POP, // '0'-'9'
+        POP, // ':'
+        POP, // ';'
+        POP, // '<'
+        POP, // '='
+        POP, // '>'
+        POP, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        POP, // ']'
+        POP, // '{'
+        POP, // '}'
     },
     { // PREPROC
         PREPROC, // 0 '$' '@'-'Z' '_'-'z'
         PREPROC, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     POP, // '\r' '\n'
+        EXPECT_PREPROC, // '\r' '\n'
         PREPROC, // '!' '%' '?' '^' '|' '~'
-        PREPROC, // '"'
+        STRINGLIT | PUSH, // '"'
         PREPROC, // '#'
         PREPROC, // '&'
         PREPROC, // '\''
@@ -1453,7 +1553,7 @@ Chg     POP, // '\r' '\n'
         PREPROC, // ','
         PREPROC, // '-'
         PREPROC, // '.'
-Chg     SAW_SLASH | PUSH, // '/'
+        SAW_SLASH | PUSH, // '/'
         PREPROC, // '0'-'9'
         PREPROC, // ':'
         PREPROC, // ';'
@@ -1461,103 +1561,334 @@ Chg     SAW_SLASH | PUSH, // '/'
         PREPROC, // '='
         PREPROC, // '>'
         PREPROC, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         PREPROC, // ']'
         PREPROC, // '{'
         PREPROC, // '}'
     },
-    /*{ // PREPROC_DONE
-Chg     POP, // 0 '$' '@'-'Z' '_'-'z'
-Chg     POP, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-Chg     POP, // '\r' '\n'
-Chg     POP, // '!' '%' '?' '^' '|' '~'
-Chg     POP, // '"'
-Chg     PREPROC, // '#'
-Chg     POP, // '&'
-Chg     POP, // '\''
-Chg     POP, // '('
-Chg     POP, // ')'
-Chg     POP, // '*'
-Chg     POP, // '+'
-Chg     POP, // ','
-Chg     POP, // '-'
-Chg     POP, // '.'
-Chg     SAW_SLASH | PUSH, // '/'
-Chg     POP, // '0'-'9'
-Chg     POP, // ':'
-Chg     POP, // ';'
-Chg     POP, // '<'
-Chg     POP, // '='
-Chg     POP, // '>'
-Chg     POP, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
-Chg     POP, // ']'
-Chg     POP, // '{'
-Chg     POP, // '}'
-    },*/
     { // EXPR
         EXPR, // 0 '$' '@'-'Z' '_'-'z'
         EXPR, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
-        EXPR, // '\r' '\n'
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
         EXPR, // '!' '%' '?' '^' '|' '~'
-        EXPR, // '"'
+        STRINGLIT | PUSH, // '"'
         EXPR, // '#'
         EXPR, // '&'
         EXPR, // '\''
-        EXPR, // '('
-        EXPR, // ')'
+        EXPR | PUSH, // '('
+        POP | CONSUME, // ')'
         EXPR, // '*'
         EXPR, // '+'
-        EXPR, // ','
+        POP, // ','
         EXPR, // '-'
         EXPR, // '.'
-Chg     SAW_SLASH | PUSH, // '/'
+        SAW_SLASH | PUSH, // '/'
         EXPR, // '0'-'9'
         EXPR, // ':'
-Chg     STMT, // ';'
+        POP, // ';'
         EXPR, // '<'
         EXPR, // '='
         EXPR, // '>'
         EXPR, // '['
-Chg     ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
         EXPR, // ']'
-        EXPR, // '{'
-        EXPR, // '}'
+        STMT | PUSH, // '{'
+        POP, // '}'
+    },
+    { // STRINGLIT
+        STRINGLIT, // 0 '$' '@'-'Z' '_'-'z'
+        STRINGLIT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        STRINGLIT,//POP, // '\r' '\n'
+        STRINGLIT, // '!' '%' '?' '^' '|' '~'
+        POP | CONSUME, // '"'
+        STRINGLIT, // '#'
+        STRINGLIT, // '&'
+        STRINGLIT, // '\''
+        STRINGLIT, // '('
+        STRINGLIT, // ')'
+        STRINGLIT, // '*'
+        STRINGLIT, // '+'
+        STRINGLIT, // ','
+        STRINGLIT, // '-'
+        STRINGLIT, // '.'
+        STRINGLIT, // '/'
+        STRINGLIT, // '0'-'9'
+        STRINGLIT, // ':'
+        STRINGLIT, // ';'
+        STRINGLIT, // '<'
+        STRINGLIT, // '='
+        STRINGLIT, // '>'
+        STRINGLIT, // '['
+        STRINGLIT_BS | PUSH, // '\\'
+        STRINGLIT, // ']'
+        STRINGLIT, // '{'
+        STRINGLIT, // '}'
+    },
+    { // CHARLIT
+        CHARLIT, // 0 '$' '@'-'Z' '_'-'z'
+        CHARLIT, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        CHARLIT, // '\r' '\n'
+        CHARLIT, // '!' '%' '?' '^' '|' '~'
+        CHARLIT, // '"'
+        CHARLIT, // '#'
+        CHARLIT, // '&'
+        POP | CONSUME, // '\''
+        CHARLIT, // '('
+        CHARLIT, // ')'
+        CHARLIT, // '*'
+        CHARLIT, // '+'
+        CHARLIT, // ','
+        CHARLIT, // '-'
+        CHARLIT, // '.'
+        CHARLIT, // '/'
+        CHARLIT, // '0'-'9'
+        CHARLIT, // ':'
+        CHARLIT, // ';'
+        CHARLIT, // '<'
+        CHARLIT, // '='
+        CHARLIT, // '>'
+        CHARLIT, // '['
+        STRINGLIT_BS | PUSH, // '\\'
+        CHARLIT, // ']'
+        CHARLIT, // '{'
+        CHARLIT, // '}'
+    },
+    { // STRINGLIT_BS
+        POP | CONSUME, // 0 '$' '@'-'Z' '_'-'z'
+        POP | CONSUME, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        POP | CONSUME, // '\r' '\n'
+        POP | CONSUME, // '!' '%' '?' '^' '|' '~'
+        POP | CONSUME, // '"'
+        POP | CONSUME, // '#'
+        POP | CONSUME, // '&'
+        POP | CONSUME, // '\''
+        POP | CONSUME, // '('
+        POP | CONSUME, // ')'
+        POP | CONSUME, // '*'
+        POP | CONSUME, // '+'
+        POP | CONSUME, // ','
+        POP | CONSUME, // '-'
+        POP | CONSUME, // '.'
+        POP | CONSUME, // '/'
+        POP | CONSUME, // '0'-'9'
+        POP | CONSUME, // ':'
+        POP | CONSUME, // ';'
+        POP | CONSUME, // '<'
+        POP | CONSUME, // '='
+        POP | CONSUME, // '>'
+        POP | CONSUME, // '['
+        POP | CONSUME, // '\\'
+        POP | CONSUME, // ']'
+        POP | CONSUME, // '{'
+        POP | CONSUME, // '}'
+    },
+    { // PARAM
+        PARAM_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
+        PARAM, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        STRINGLIT | PUSH, // '"'
+        EXPR | PUSH, // '#'
+        EXPR | PUSH, // '&'
+        CHARLIT | PUSH, // '\''
+        EXPR | PUSH, // '('
+        POP | CONSUME, // ')'
+        EXPR | PUSH, // '*'
+        EXPR | PUSH, // '+'
+        PARAM, // ','
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH, // '/'
+        EXPR | PUSH, // '0'-'9'
+        EXPR | PUSH, // ':'
+        POP, // ';'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        EXPR | PUSH, // '['
+        EXPR | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP | CONSUME, // '}'
+    },
+    { // PARAM_IN_TYPE
+        PARAM_IN_TYPE, // 0 '$' '@'-'Z' '_'-'z'
+        PARAM_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        EXPR | PUSH, // '"'
+        EXPR | PUSH, // '#'
+        PARAM_GOT_TYPE, // '&'
+        EXPR | PUSH, // '\''
+        PARAM_GOT_TYPE | PUSH, // '('
+        POP | CONSUME, // ')'
+        PARAM_GOT_TYPE, // '*'
+        EXPR | PUSH, // '+'
+        PARAM, // ','
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH, // '/'
+        PARAM_IN_TYPE, // '0'-'9'
+        EXPR | PUSH, // ':'
+        POP, // ';'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        EXPR | PUSH, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP, // '}'
+    },
+    { // PARAM_GOT_TYPE
+        PARAM_GOT_TYPE, // 0 '$' '@'-'Z' '_'-'z'
+        PARAM_GOT_TYPE, // 1-8 '\t' '\v' '\f' 14-31 ' ' 127
+        EXPECT_PREPROC | PUSH, // '\r' '\n'
+        EXPR | PUSH, // '!' '%' '?' '^' '|' '~'
+        EXPR | PUSH, // '"'
+        EXPR | PUSH, // '#'
+        EXPR | PUSH, // '&'
+        EXPR | PUSH, // '\''
+        PARAM_IN_TYPE | PUSH, // '('
+        POP | CONSUME, // ')'
+        EXPR | PUSH, // '*'
+        EXPR | PUSH, // '+'
+        PARAM, // ','
+        EXPR | PUSH, // '-'
+        EXPR | PUSH, // '.'
+        SAW_SLASH | PUSH, // '/'
+        EXPR | PUSH, // '0'-'9'
+        EXPR | PUSH, // ':'
+        POP, // ';'
+        EXPR | PUSH, // '<'
+        EXPR | PUSH, // '='
+        EXPR | PUSH, // '>'
+        EXPR | PUSH, // '['
+        ESCAPE_EXPECTING_NEWLINE | PUSH, // '\\'
+        EXPR | PUSH, // ']'
+        STMT | PUSH, // '{'
+        POP, // '}'
     },
 };
 
+//static const u8 pop_table[NUM_STATES] = {
+//    WHITE, // STMT: unreachable
+//    WHITE, // STMT_IN_TYPE: unreachable
+//    WHITE, // STMT_GOT_TYPE: unreachable
+//    WHITE, // ESCAPE_EXPECTING_NEWLINE: it wasn't a newline
+//    OP, // SAW_SLASH
+//    WHITE, // LINE_COMMENT
+//    WHITE, // BLOCK_COMMENT
+//    WHITE, // BLOCK_COMMENT_STAR: unreachable
+//    //WHITE, // BLOCK_COMMENT_DONE: unreachable
+//    WHITE, // PREPROC
+//    WHITE, // EXPR: unreachable?
+//};
+
     u8* sp = s.stack + s.sp;
 
+#define PUSH(Type) do { sh[0]->type = Type; sh[0]->where = p; sh[0]++; }  while(0)
+    /*
     while (p < pend) {
+        switch (u32 c = *p) {
+        case '/':
+            if (p[1] == '/') {
+                PUSH(SHT_COMMENT);
+                do {
+                    p++;
+                } while (!is_eol(*p) || p[-1] == '\\');
+            } else if (p[1] == '*') {
+                PUSH(SHT_COMMENT);
+                do {
+                    p++;
+                } while (*p != '*' || p[1] != '/');
+            }
+            break;
+        case '\'':
+        case '"': {
+            PUSH(SHT_STRING_LITERAL);
+            do {
+                p++;
+                if (*p == '\\') p++;
+            } while (*p != c);
+            break;
+        }
+        case 9:
+        case 10:
+        case 11:
+        case 12:
+        case 13:
+        case 32:
+            break;
+        default:
+            if (c_is_op(*p)) {
+                if (sh[0][-1].type != SHT_OPERATOR) {
+                    PUSH(SHT_OPERATOR);
+                }
+            } else {
+                if (sh[0][-1].type != SHT_IDENT) {
+                    PUSH(SHT_IDENT);
+                }
+            }
+            break;
+        }
+        p++;
+    }
+
+    /*/
+    for (; p < pend; p++) {
         const int raw = (int)*p;
         const int c = ((raw - 128) >> 31) & raw;
-        const int raw_type = char_type[c];
-        const int ch_type = raw_type;//& CHAR_TYPE_BIT_MASK;
+        int ch_type = char_type[c];
         int new_state = state_table[*sp][ch_type];
-        int changed = new_state & CHANGED;
-        
-        if (changed) {
+        int should_consume = new_state & CONSUME;
+        if (new_state != *sp) {
+        add_highlight:
             const int bump_amount = (s8)new_state >> 6; // sign-extend top 2 bits (00, 01, 11)
-            if (bump_amount == -1) { // is a pop
-                if (*sp == SAW_SLASH) {
-                    p--;
-                }
-                new_state = sp[-1];
-            }
             sp += bump_amount;
-
             sh[0]->type = (Syntax_Highlight_Type)(new_state & STATE_BIT_MASK);
             sh[0]->where = p;
             sh[0]++;
-
-            assert(sp >= s.stack);
+            if (0){assert(sp >= s.stack);}else{
+                if (sp < s.stack) {
+                    *++sp = STMT;
+                    sp[1] = STMT;
+                    should_consume = true;
+                }
+            }
             assert(sp < s.stack + sizeof(s.stack));
+            if (bump_amount == -1) { // was a pop
+                if (sp[1] == SAW_SLASH) {
+                    new_state = state_table[*sp][OP];
+                    goto add_highlight;
+                } else if (sp[1] == BLOCK_COMMENT_STAR || sp[1] == EXPECT_PREPROC) {
+                    new_state = state_table[*sp][WHITE];
+                    new_state = state_table[new_state][ch_type];
+                    goto add_highlight;
+                //} else if (sp[1] == EXPECT_PREPROC) {
+                //    new_state = state_table[*sp][WHITE];
+                //    new_state = state_table[new_state][ch_type];
+                //    goto add_highlight;
+                } else if (sp[1] == STMT_IN_PAREN) {
+                    if (*sp == STMT_IN_TYPE || *sp == STMT_GOT_TYPE) {
+                        *sp = STMT_GOT_VAR;
+                        should_consume = true;
+                    }
+                }
+                if (should_consume) {
+                    //sh[0]->type = (Syntax_Highlight_Type)(new_state & STATE_BIT_MASK);
+                    //sh[0]->where = p + 1;
+                    //sh[0]++;
+                    continue;
+                } else {
+                    new_state = state_table[*sp][ch_type];
+                    goto add_highlight;
+                }
+            }
         }
-
         *sp = (new_state & STATE_BIT_MASK);
-
-        p++;
     }
+    //*/
 
     s.sp = sp - s.stack;
     return s;
@@ -1596,11 +1927,12 @@ if (use_dfa_parser) {//#if DFA_PARSER
 
             if (p[0] == ')') {
                 // something's malformed, just struggle on.
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
+                next_token();
             }
             if (c_ends_statement(p[0])) {
-                push(SHT_OPERATOR);
+                //push(SHT_OPERATOR);
                 p++;
             }
         }
