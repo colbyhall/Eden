@@ -1,124 +1,95 @@
 #include "input.h"
-#include "keys.h"
+#include "editor.h"
+#include "buffer_view.h"
 
-Event make_window_resize_event(u32 old_width, u32 old_height) {
-	Event result = {};
-	result.type = ET_Window_Resize;
-	result.old_width = old_width;
-	result.old_height = old_height;
+bool exit_requested = false;
 
-	return result;
+bool is_mouse_over;
+bool was_mouse_over;
+
+ch::Vector2 last_mouse_position;
+ch::Vector2 current_mouse_position;
+
+static const usize MAX_MB = 3;
+static bool mb_down[MAX_MB];
+static bool mb_went_down[MAX_MB];
+static bool mb_went_up[MAX_MB];
+
+static const usize MAX_KEYS = 256;
+static bool keys_down[MAX_KEYS];
+static bool keys_went_down[MAX_KEYS];
+static bool keys_went_up[MAX_KEYS];
+
+void init_input() {
+	the_window.on_exit_requested = [](const ch::Window& window) {
+		exit_requested = true;
+	};
+
+	the_window.on_mouse_button_down = [](const ch::Window& window, u8 mouse_button) {
+		mb_down[mouse_button] = true;
+		mb_went_down[mouse_button] = true;
+	};
+
+	the_window.on_mouse_button_up = [](const ch::Window& window, u8 mouse_button) {
+		mb_down[mouse_button] = false;
+		mb_went_up[mouse_button] = true;
+	};
+
+	the_window.on_key_pressed = [](const ch::Window& window, u8 key) {
+		keys_down[key] = true;
+		keys_went_down[key] = true;
+	};
+
+	the_window.on_key_released = [](const ch::Window& window, u8 key) {
+		keys_down[key] = false;
+		keys_went_up[key] = true;
+	};
+
+	the_window.on_char_entered = [](const ch::Window& window, u32 c) {
+		if (focused_view) focused_view->on_char_entered(c);
+	};
 }
 
-Event make_exit_requested_event() {
-	Event result = {};
-	result.type = ET_Exit_Requested;
-	return result;
+void process_input() {
+	last_mouse_position = current_mouse_position;
+	was_mouse_over = is_mouse_over;
+	ch::mem_zero(mb_went_down, sizeof(mb_went_down));
+	ch::mem_zero(mb_went_up, sizeof(mb_went_up));
+	ch::mem_zero(keys_went_up, sizeof(keys_went_up));
+	ch::mem_zero(keys_went_down, sizeof(keys_went_down));
+
+	ch::poll_events();
+
+	ch::Vector2 u32_mouse_pos;
+	is_mouse_over = the_window.get_mouse_position(&u32_mouse_pos);
+	current_mouse_position.x = (f32)u32_mouse_pos.ux;
+	current_mouse_position.y = (f32)u32_mouse_pos.uy;
 }
 
-Event make_mouse_down_event(Vector2 mouse_position) {
-	Event result = {};
-	result.type = ET_Mouse_Down;
-	result.mouse_position = mouse_position;
-	return result;
+bool is_exit_requested() {
+	return exit_requested;
 }
 
-Event make_mouse_up_event(Vector2 mouse_position) {
-	Event result = {};
-	result.type = ET_Mouse_Up;
-	result.mouse_position = mouse_position;
-	return result;
+bool is_mb_down(u8 mb) {
+	return mb_down[mb];
 }
 
-Event make_mouse_moved_event(Vector2 mouse_position) {
-	Event result = {};
-	result.type = ET_Mouse_Moved;
-	result.mouse_position = mouse_position;
-	return result;
+bool did_mb_go_down(u8 mb) {
+	return mb_went_down[mb];
 }
 
-Event make_mouse_wheel_scrolled_event(float delta) {
-	Event result = {};
-	result.type = ET_Mouse_Wheel_Scrolled;
-	result.delta = delta;
-	return result;
+bool did_mb_go_up(u8 mb) {
+	return mb_went_up[mb];
 }
 
-Event make_key_pressed_event(u8 key_code) {
-	Event result = {};
-	result.type = ET_Key_Pressed;
-	result.key_code = key_code;
-	return result;
+bool is_key_down(u8 key) {
+	return keys_down[key];
 }
 
-
-Event make_key_released_event(u8 key_code) {
-	Event result = {};
-	result.type = ET_Key_Released;
-	result.key_code = key_code;
-	return result;
+bool did_key_go_down(u8 key) {
+	return keys_went_down[key];
 }
 
-Event make_char_entered_event(u32 c) {
-	Event result = {};
-	result.type = ET_Char_Entered;
-	result.c = c;
-	return result;
-}
-
-Event_Listener make_event_listener(void* owner, Process_Event process_event, Event_Type type) {
-	Event_Listener result = {};
-	result.owner = owner;
-	result.process_func = process_event;
-	result.type = type;
-	assert(result);
-	return result;
-}
-
-void process_input_event(Input_State* input, Event* event) {
-	for (Event_Listener& el : input->event_listeners) {
-		if (el.type == event->type || el.type == ET_None) {
-			el.process_func(el.owner, event);
-		}
-
-		switch (event->type) {
-		case ET_Mouse_Down:
-			input->mouse_went_down = true;
-            input->left_mouse_button_down = true;
-			break;
-		case ET_Mouse_Up:
-			input->mouse_went_up = true;
-            input->left_mouse_button_down = false;
-			break;
-		case ET_Key_Pressed:
-		case ET_Key_Released:
-			const u32 key_code = event->key_code;
-			if (key_code == KEY_CTRL) {
-				input->ctrl_is_down = event->type == ET_Key_Pressed;
-			} else if (key_code == KEY_ALT) {
-				input->alt_is_down = event->type == ET_Key_Pressed;
-			} else if (key_code == KEY_SHIFT) {
-                input->shift_is_down = event->type == ET_Key_Pressed;
-            }
-			break;
-		}
-	}
-}
-
-bool bind_event_listener(Input_State* input, const Event_Listener& event_listener) {
-	if (array_contains(&input->event_listeners, event_listener)) {
-		return false;
-	}
-
-	assert(event_listener);
-	array_add(&input->event_listeners, event_listener);
-	return true;
-}
-
-bool unbind_event_listener(Input_State* input, const Event_Listener& event_listener) {
-	return array_remove(&input->event_listeners, event_listener);
-}
-
-Input_State::Input_State() {
-	array_reserve(&event_listeners, 1024);
+bool did_key_go_up(u8 key) {
+	return keys_went_up[key];
 }

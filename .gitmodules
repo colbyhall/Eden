@@ -1,0 +1,3 @@
+[submodule "libs/ch_stl"]
+    path = libs/ch_stl
+    url = https://github.com/Colbeyyy/ch_stl
