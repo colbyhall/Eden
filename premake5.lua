@@ -19,6 +19,7 @@ workspace "YEET"
 project "YEET"
     language "C++"
 	dependson "ch_stl"
+	kind "WindowedApp"
 
 	defines
 	{
@@ -53,7 +54,6 @@ project "YEET"
 			"BUILD_RELEASE#0",
 			"CH_BUILD_DEBUG#1"
 		}
-		kind "ConsoleApp"
 		runtime "Debug"
 		symbols "On"
 
@@ -64,7 +64,6 @@ project "YEET"
 			"BUILD_DEBUG#0",
 			"NDEBUG"
 		}
-		kind "WindowedApp"
 		runtime "Release"
         optimize "On"
         

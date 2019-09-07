@@ -16,6 +16,6 @@ CH_FORCEINLINE bool gui_button(const tchar* s, f32 x0, f32 y0, f32 x1, f32 y1) {
 	return gui_button(real, x0, y0, x1, y1);
 }
 
-void gui_text_edit(const ch::Gap_Buffer<u32>& gap_buffer, ssize* cursor, ssize* selection, bool show_cursor, f32 x0, f32 y0, f32 x1, f32 y1);
+bool gui_text_edit(const ch::Gap_Buffer<u32>& gap_buffer, ssize* cursor, ssize* selection, bool show_cursor, u64 max_lines, bool show_line_numbers, f32 x0, f32 y0, f32 x1, f32 y1);
 
 void draw_gui();

@@ -37,16 +37,19 @@ static void tick_editor(f32 dt) {
 	tick_views(dt);
 }
 
-#if CH_PLATFORM_WINDOWS && !CH_BUILD_DEBUG
+#if CH_PLATFORM_WINDOWS
 int WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #else
 int main() {
 #endif
+	init_config();
+	const Config& config = get_config();
+
 	const bool gl_loaded = ch::load_gl();
 	assert(gl_loaded);
 	{
-		const u32 width = 1280;
-		const u32 height = (u32)((f32)width * (9.f / 16.f));
+		const u32 width = config.last_window_width;
+		const u32 height = config.last_window_height;
 		const bool window_created = ch::create_gl_window(window_title, width, height, 0, &the_window);
 		assert(window_created);
 	}
@@ -76,14 +79,21 @@ int main() {
 
 	the_window.set_visibility(true);
 
+	ch::Allocator temp_arena = ch::make_arena_allocator(1024 * 1024 * 32);
+	ch::context_allocator = temp_arena;
+
 	f64 last_frame_time = ch::get_time_in_seconds();
 	while (!is_exit_requested()) {
 		const f64 current_time = ch::get_time_in_seconds();
 		const f32 dt = (f32)(current_time - last_frame_time);
 		last_frame_time = current_time;
+		ch::reset_arena_allocator(&temp_arena);
 
 		process_input();
 		tick_editor(dt);
 		draw_editor();
+		try_refresh_config();
 	}
+
+	shutdown_config();
 }

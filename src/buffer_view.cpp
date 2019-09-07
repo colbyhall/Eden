@@ -22,11 +22,13 @@ void Buffer_View::on_char_entered(u32 c) {
 		if (cursor > -1) {
 			buffer->remove_char(cursor);
 			cursor -= 1;
+			selection -= 1;
 		}
 		break;
 	default:
 		buffer->add_char(c, cursor + 1);
 		cursor += 1;
+		selection += 1;
 		break;
 	}
 }
@@ -64,7 +66,9 @@ void tick_views(f32 dt) {
 
 		Buffer* the_buffer = find_buffer(view->the_buffer);
 
-		gui_text_edit(the_buffer->gap_buffer, &view->cursor, &view->selection, view->show_cursor, x0, y0, x1, y1);
+		if (gui_text_edit(the_buffer->gap_buffer, &view->cursor, &view->selection, view->show_cursor, the_buffer->eol_table.count, get_config().show_line_numbers, x0, y0, x1, y1)) {
+			view->reset_cursor_timer();
+		}
 
 		x += x1 - x0;
 	}
