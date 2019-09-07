@@ -12,13 +12,13 @@ ch::Vector2 current_mouse_position;
 
 static const usize MAX_MB = 3;
 static bool mb_down[MAX_MB];
-static bool mb_went_down[MAX_MB];
-static bool mb_went_up[MAX_MB];
+static bool mb_pressed[MAX_MB];
+static bool mb_released[MAX_MB];
 
 static const usize MAX_KEYS = 256;
 static bool keys_down[MAX_KEYS];
-static bool keys_went_down[MAX_KEYS];
-static bool keys_went_up[MAX_KEYS];
+static bool keys_pressed[MAX_KEYS];
+static bool keys_released[MAX_KEYS];
 
 void init_input() {
 	the_window.on_exit_requested = [](const ch::Window& window) {
@@ -27,22 +27,22 @@ void init_input() {
 
 	the_window.on_mouse_button_down = [](const ch::Window& window, u8 mouse_button) {
 		mb_down[mouse_button] = true;
-		mb_went_down[mouse_button] = true;
+		mb_pressed[mouse_button] = true;
 	};
 
 	the_window.on_mouse_button_up = [](const ch::Window& window, u8 mouse_button) {
 		mb_down[mouse_button] = false;
-		mb_went_up[mouse_button] = true;
+		mb_released[mouse_button] = true;
 	};
 
 	the_window.on_key_pressed = [](const ch::Window& window, u8 key) {
 		keys_down[key] = true;
-		keys_went_down[key] = true;
+		keys_pressed[key] = true;
 	};
 
 	the_window.on_key_released = [](const ch::Window& window, u8 key) {
 		keys_down[key] = false;
-		keys_went_up[key] = true;
+		keys_released[key] = true;
 	};
 
 	the_window.on_char_entered = [](const ch::Window& window, u32 c) {
@@ -53,10 +53,10 @@ void init_input() {
 void process_input() {
 	last_mouse_position = current_mouse_position;
 	was_mouse_over = is_mouse_over;
-	ch::mem_zero(mb_went_down, sizeof(mb_went_down));
-	ch::mem_zero(mb_went_up, sizeof(mb_went_up));
-	ch::mem_zero(keys_went_up, sizeof(keys_went_up));
-	ch::mem_zero(keys_went_down, sizeof(keys_went_down));
+	ch::mem_zero(mb_pressed, sizeof(mb_pressed));
+	ch::mem_zero(mb_released, sizeof(mb_released));
+	ch::mem_zero(keys_released, sizeof(keys_released));
+	ch::mem_zero(keys_pressed, sizeof(keys_pressed));
 
 	ch::poll_events();
 
@@ -70,26 +70,26 @@ bool is_exit_requested() {
 	return exit_requested;
 }
 
-bool is_mb_down(u8 mb) {
+bool is_mouse_button_down(u8 mb) {
 	return mb_down[mb];
 }
 
-bool did_mb_go_down(u8 mb) {
-	return mb_went_down[mb];
+bool was_mouse_button_pressed(u8 mb) {
+	return mb_pressed[mb];
 }
 
-bool did_mb_go_up(u8 mb) {
-	return mb_went_up[mb];
+bool was_mouse_button_released(u8 mb) {
+	return mb_released[mb];
 }
 
 bool is_key_down(u8 key) {
 	return keys_down[key];
 }
 
-bool did_key_go_down(u8 key) {
-	return keys_went_down[key];
+bool was_key_pressed(u8 key) {
+	return keys_pressed[key];
 }
 
-bool did_key_go_up(u8 key) {
-	return keys_went_up[key];
+bool was_key_released(u8 key) {
+	return keys_released[key];
 }

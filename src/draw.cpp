@@ -1,7 +1,6 @@
 #include "draw.h"
 #include "editor.h"
 #include "gui.h"
-#include "buffer_view.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <stb/stb_rect_pack.h>
@@ -328,10 +327,6 @@ void init_draw() {
 	const bool global_shader_loaded = load_shader_from_source(global_shader_source, &global_shader);
 	assert(global_shader_loaded);
 	glUseProgram(global_shader.program_id);
-
-	the_window.on_resize = [](const ch::Window& window) {
-		draw_editor();
-	};
 }
 
 static void frame_begin() {
@@ -348,8 +343,8 @@ static void frame_end() {
 
 void draw_editor() {
 	frame_begin();
-		
-	draw_views();
+
+	draw_gui();
 
 	frame_end();
 }
@@ -458,8 +453,9 @@ void Font::bind() const {
 
 
 void immediate_glyph(const Font_Glyph& glyph, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
-	y += font.size - font.line_gap;
-
+	// @NOTE(CHall): draw glyphs top down
+	y += the_font.size;
+	
 	const f32 x0 = x + glyph.bearing_x;
 	const f32 y0 = y + glyph.bearing_y;
 	const f32 x1 = x0 + glyph.width;

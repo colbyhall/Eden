@@ -4,6 +4,7 @@
 #include "gui.h"
 #include "input.h"
 #include "buffer_view.h"
+#include "config.h"
 
 #include <ch_stl/opengl.h>
 #include <ch_stl/time.h>
@@ -52,6 +53,11 @@ int main() {
 	const bool is_gl_current = ch::make_current(the_window);
 	assert(is_gl_current);
 
+	the_window.on_resize = [](const ch::Window& window) {
+		tick_editor(0.f);
+		draw_editor();
+	};
+
 	init_draw();
 	init_input();
 
@@ -64,7 +70,7 @@ int main() {
 		p.append(CH_TEXT("consola.ttf"));
 		const bool loaded_font = load_font_from_path(p, &the_font);
 		assert(loaded_font);
-		the_font.size = 24;
+		the_font.size = get_config().font_size;
 		the_font.pack_atlas();
 	}
 

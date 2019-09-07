@@ -20,12 +20,22 @@ struct Action_Bind {
 
 void init_input();
 void process_input();
+
 bool is_exit_requested();
 
-bool is_mb_down(u8 mb);
-bool did_mb_go_down(u8 mb);
-bool did_mb_go_up(u8 mb);
+/**
+ * Input Verbiage
+ * 
+ * down = mouse button or key is currently being held down
+ * up = opposite of down
+ * pressed = mouse button or key went down that frame
+ * released = mouse button or key went up that frame
+ */
+
+bool is_mouse_button_down(u8 mb);
+bool was_mouse_button_pressed(u8 mb);
+bool was_mouse_button_released(u8 mb);
 
 bool is_key_down(u8 key);
-bool did_key_go_down(u8 key);
-bool did_key_go_up(u8 key);
+bool was_key_pressed(u8 key);
+bool was_key_released(u8 key);
