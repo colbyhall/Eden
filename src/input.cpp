@@ -39,6 +39,7 @@ void init_input() {
 	the_window.on_key_pressed = [](const ch::Window& window, u8 key) {
 		keys_down[key] = true;
 		keys_pressed[key] = true;
+		if (focused_view) focused_view->on_key_pressed(key);
 	};
 
 	the_window.on_key_released = [](const ch::Window& window, u8 key) {

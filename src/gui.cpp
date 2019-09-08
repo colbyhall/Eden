@@ -126,7 +126,11 @@ const f32 border_width = 5.f;
 
 /* GUI */
 
-bool gui_button(const ch::String& s, f32 x0, f32 y0, f32 x1, f32 y1) {
+void gui_label(const ch::String& s, const ch::Color& color, f32 x, f32 y) {
+	push_text(s, x, y, color);
+}
+
+bool gui_button(f32 x0, f32 y0, f32 x1, f32 y1) {
 	bool result = false;
 
 	const bool lmb_went_down = was_mouse_button_pressed(CH_MOUSE_LEFT);
@@ -134,7 +138,21 @@ bool gui_button(const ch::String& s, f32 x0, f32 y0, f32 x1, f32 y1) {
 
 	const bool is_hovered = is_point_in_rect(current_mouse_position, x0, y0, x1, y1);
 
-	push_quad(x0, y0, x1, y1, ch::white);
+	push_quad(x0, y0, x1, y1, get_config().foreground_color);
+
+	return result;
+}
+
+// @TODO: Finish
+bool gui_button_label(const ch::String& s, f32 x0, f32 y0, f32 x1, f32 y1) {
+	bool result = false;
+
+	const bool lmb_went_down = was_mouse_button_pressed(CH_MOUSE_LEFT);
+	const bool lmb_down = is_mouse_button_down(CH_MOUSE_LEFT);
+
+	const bool is_hovered = is_point_in_rect(current_mouse_position, x0, y0, x1, y1);
+
+	push_quad(x0, y0, x1, y1, get_config().foreground_color);
 
 	return result;
 }
@@ -163,7 +181,9 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 	*x += text_draw_size.x + line_number_padding;
 }
 
-bool gui_text_edit(const ch::Gap_Buffer<u32>& gap_buffer, ssize* cursor, ssize* selection, bool show_cursor, u64 max_lines, bool show_line_numbers, f32 x0, f32 y0, f32 x1, f32 y1) {
+#define LINE_COUNT_DEBUG 1
+
+bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, f32 x0, f32 y0, f32 x1, f32 y1) {
 	const ch::Vector2 mouse_pos = current_mouse_position;
 	const bool was_lmb_pressed = was_mouse_button_pressed(CH_MOUSE_LEFT);
 	const bool is_lmb_down = is_mouse_button_down(CH_MOUSE_LEFT);
@@ -179,83 +199,107 @@ bool gui_text_edit(const ch::Gap_Buffer<u32>& gap_buffer, ssize* cursor, ssize* 
 	const ssize orig_cursor = *cursor;
 	const ssize orig_selection = *selection;
 
+	const usize num_lines = buffer.eol_table.count;
+	const ch::Gap_Buffer<u32>& gap_buffer = buffer.gap_buffer;
+
+	// @NOTE(CHall): Draw line number quad
 	if (show_line_numbers) {
 		const f32 ln_x0 = x0;
 		const f32 ln_y0 = y0;
-		const f32 ln_x1 = ln_x0 + ch::get_num_digits(max_lines) * space_glyph->advance + line_number_padding;
+		const f32 ln_x1 = ln_x0 + ch::get_num_digits(num_lines) * space_glyph->advance + line_number_padding;
 		const f32 ln_y1 = y1;
 		push_quad(ln_x0, ln_y0, ln_x1, ln_y1, config.line_number_background_color);
 	}
 	
-	{
-		const f32 starting_x = x0;
-		const f32 starting_y = y0;
-		f32 x = starting_x;
-		f32 y = starting_y;
-		u64 line_number = 1;
+	const f32 starting_x = x0;
+	const f32 starting_y = y0;
+	f32 x = starting_x;
+	f32 y = starting_y;
+	u64 line_number = 1;
 
-		if (show_line_numbers) push_line_number(line_number, max_lines, &x, y);
-		for (usize i = 0; i < gap_buffer.count(); i += 1) {
-			const u32 c = gap_buffer[i];
-			ch::Color color = config.foreground_color;
+#if LINE_COUNT_DEBUG
+	u32 line_char_count = 0;
+#endif
+
+	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
+	for (usize i = 0; i < gap_buffer.count(); i += 1) {
+		const u32 c = gap_buffer[i];
+		ch::Color color = config.foreground_color;
+
+#if LINE_COUNT_DEBUG
+		line_char_count += 1;
+#endif
 			
-			const Font_Glyph* g = the_font[c];
-			if (!g) {
-				color = ch::magenta;
-				g = unknown_glyph;
-			}
-
-			if (x + space_glyph->advance > x1 && c != ch::eol) {
-				x = starting_x;
-				y += font_height;
-
-				x += space_glyph->advance * (ch::get_num_digits(max_lines) + 1) + line_number_padding;
-				// @TODO(CHall): maybe draw some kind of carriage return symbol?
-			}
-
-			if (is_point_in_glyph(mouse_pos, g, x, y)) {
-				if (was_lmb_pressed) {
-					*cursor = i - 1;
-					*selection = *cursor;
-				}
-				else if (is_lmb_down) {
-					*cursor = i - 1;
-				}
-			}
-
-			const bool is_in_selection = (orig_cursor > orig_selection && (ssize)i >= orig_selection + 1 && (ssize)i < orig_cursor + 1) || (orig_cursor < orig_selection && (ssize)i < orig_selection + 1 && (ssize)i >= orig_cursor + 1);
-			if (is_in_selection) {
-				push_quad(x, y, x + g->advance, y + font_height, config.selection_color);
-			}
-
-			const bool is_in_cursor = *cursor + 1 == i && show_cursor;
-			if (is_in_cursor) {
-				push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
-				color = config.background_color;
-			}
-
-			if (c == ch::eol) {
-				x = starting_x;
-				y += font_height;
-				line_number += 1;
-				if (show_line_numbers) push_line_number(line_number, max_lines, &x, y);
-				continue;
-			}
-
-			if (c == '\t') {
-				x += space_glyph->advance * config.tab_width;
-				continue;
-			}
-
-			if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
-			
-			push_glyph(g, x, y, color);
-
-			x += g->advance;
+		const Font_Glyph* g = the_font[c];
+		if (!g) {
+			color = ch::magenta;
+			g = unknown_glyph;
 		}
 
-		if (*cursor + 1 == gap_buffer.count() && show_cursor) push_quad(x, y, x + space_glyph->advance, y + font_height, config.cursor_color);
+		if (x + space_glyph->advance > x1 && c != ch::eol) {
+			x = starting_x;
+			y += font_height;
+
+			x += space_glyph->advance * (ch::get_num_digits(num_lines) + 1) + line_number_padding;
+			// @TODO(CHall): maybe draw some kind of carriage return symbol?
+		}
+
+		if (is_point_in_glyph(mouse_pos, g, x, y)) {
+			if (was_lmb_pressed) {
+				*cursor = i - 1;
+				*selection = *cursor;
+			}
+			else if (is_lmb_down) {
+				*cursor = i - 1;
+			}
+		}
+
+		const bool is_in_selection = (orig_cursor > orig_selection && (ssize)i >= orig_selection + 1 && (ssize)i < orig_cursor + 1) || (orig_cursor < orig_selection && (ssize)i < orig_selection + 1 && (ssize)i >= orig_cursor + 1);
+		if (is_in_selection) {
+			push_quad(x, y, x + g->advance, y + font_height, config.selection_color);
+		}
+
+		const bool is_in_cursor = *cursor + 1 == i && show_cursor;
+		if (is_in_cursor) {
+			push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
+			color = config.background_color;
+		}
+
+		if (c == ch::eol) {
+#if LINE_COUNT_DEBUG
+			tchar temp[128];
+			ch::sprintf(temp, CH_TEXT("[Actual=%lu; EOL_Table=%lu]"), line_char_count, buffer.eol_table[line_number - 1]);
+			push_text(temp, x, y, ch::magenta);
+			line_char_count = 0;
+#endif
+
+			x = starting_x;
+			y += font_height;
+			line_number += 1;
+			if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
+			continue;
+		}
+
+		if (c == '\t') {
+			x += space_glyph->advance * config.tab_width;
+			continue;
+		}
+
+		if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
+			
+		push_glyph(g, x, y, color);
+
+		x += g->advance;
 	}
+
+#if LINE_COUNT_DEBUG
+	tchar temp[128];
+	ch::sprintf(temp, CH_TEXT("[Actual=%lu; EOL_Table=%lu]"), line_char_count, buffer.eol_table[line_number - 1]);
+	push_text(temp, x, y, ch::magenta);
+	line_char_count = 0;
+#endif
+
+	if (*cursor + 1 == gap_buffer.count() && show_cursor) push_quad(x, y, x + space_glyph->advance, y + font_height, config.cursor_color);
 
 	return *cursor != orig_cursor || *selection != orig_selection;
 }

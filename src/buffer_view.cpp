@@ -10,31 +10,140 @@ Buffer_View* focused_view;
 Buffer_View* hovered_view;
 ch::Array<Buffer_View*> views;
 
+void Buffer_View::set_cursor(ssize new_cursor) {
+	Buffer* buffer = find_buffer(the_buffer);
+	assert(buffer);
+	assert(new_cursor >= -1 && new_cursor < (ssize)buffer->gap_buffer.count());
+
+	cursor = new_cursor;
+
+	const bool shift_down = is_key_down(CH_KEY_SHIFT);
+	if (!shift_down) {
+		selection = cursor;	
+	}
+}
+
+void Buffer_View::remove_selection() {
+	if (!has_selection()) return;
+
+	Buffer* buffer = find_buffer(the_buffer);
+	assert(buffer);
+
+	if (cursor > selection) {
+		for (ssize i = cursor; i > selection; i--) {
+			buffer->gap_buffer.remove_at_index(i);
+		}
+		cursor = selection;
+	}
+	else {
+		for (ssize i = selection; i > cursor; i--) {
+			if (i < (ssize)buffer->gap_buffer.count()) {
+				buffer->gap_buffer.remove_at_index(i);
+			}
+		}
+		selection = cursor;
+	}
+
+	buffer->refresh_eol_table();
+}
+
+ssize Buffer_View::seek_dir(bool left) const {
+	Buffer* buffer = find_buffer(the_buffer);
+	assert(buffer);
+
+	ssize result = cursor + (!left * 2);
+	if (left) {
+		for (; result > -1; result -= 1) {
+			const tchar c = buffer->gap_buffer[result];
+			if (ch::is_symbol(c) || ch::is_whitespace(c)) {
+				result -= 1;
+				break;
+			}
+		}
+	}
+	else {
+		for (; result < (ssize)buffer->gap_buffer.count() - 1; result += 1) {
+			const tchar c = buffer->gap_buffer[result];
+			if (ch::is_symbol(c) || ch::is_whitespace(c)) {
+				result -= 1;
+				break;
+			}
+		}
+	}
+
+	return result;
+}
+
 void Buffer_View::on_char_entered(u32 c) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
 
 	if (c == '\r') c = ch::eol;
 
+	if (c < 32 || c > 126) return;
+
+	remove_selection();
+	buffer->add_char(c, cursor + 1);
+	cursor += 1;
+	selection = cursor;
+
 	reset_cursor_timer();
-	switch (c) {
-	case CH_KEY_BACKSPACE:
-		if (cursor > -1) {
-			buffer->remove_char(cursor);
-			cursor -= 1;
-			selection -= 1;
-		}
-		break;
-	default:
-		buffer->add_char(c, cursor + 1);
-		cursor += 1;
-		selection += 1;
-		break;
-	}
 }
 
-void Buffer_View::on_action_entered(const Action_Bind& action) {
+void Buffer_View::on_key_pressed(u8 key) {
+	Buffer* buffer = find_buffer(the_buffer);
+	assert(buffer);
 
+	const bool ctrl_pressed = is_key_down(CH_KEY_CONTROL);
+	const bool shift_pressed = is_key_down(CH_KEY_SHIFT);
+
+	reset_cursor_timer();
+	switch (key) {
+	case CH_KEY_BACKSPACE: 
+		if (cursor > -1) {
+			if (ctrl_pressed) {
+				selection = seek_dir(true);
+				remove_selection();
+			} else {
+				buffer->remove_char(cursor);
+				cursor -= 1;
+				selection = cursor;
+			}
+		}
+		break;
+	case CH_KEY_DELETE:
+		if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
+			if (ctrl_pressed) {
+				selection = seek_dir(false);
+				remove_selection();
+			} else {
+				buffer->remove_char(cursor + 1);
+			}
+		}
+		break;
+	case CH_KEY_LEFT:
+		if (cursor > -1) {
+			if (ctrl_pressed) {
+				set_cursor(seek_dir(true));
+			} else {
+				set_cursor(cursor - 1);
+			}
+		} else {
+			set_cursor(cursor);
+		}
+		break;
+	case CH_KEY_RIGHT:
+		if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
+			if (ctrl_pressed) {
+				set_cursor(seek_dir(false));
+			} else {
+				set_cursor(cursor + 1);
+			}
+		} else {
+			set_cursor(cursor);
+		}
+		break;
+	}
 }
 
 void tick_views(f32 dt) {
@@ -43,10 +152,12 @@ void tick_views(f32 dt) {
 	const f32 viewport_width = (f32)viewport_size.ux;
 	const f32 viewport_height = (f32)viewport_size.uy;
 
+	const Config& config = get_config();
+
 	for (usize i = 0; i < views.count; i += 1) {
 		Buffer_View* view = views[i];
 
-		view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, get_config().scroll_speed);
+		view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
 
 		u32 blink_time;
 		if (!ch::get_caret_blink_time(&blink_time)) {
@@ -66,7 +177,7 @@ void tick_views(f32 dt) {
 
 		Buffer* the_buffer = find_buffer(view->the_buffer);
 
-		if (gui_text_edit(the_buffer->gap_buffer, &view->cursor, &view->selection, view->show_cursor, the_buffer->eol_table.count, get_config().show_line_numbers, x0, y0, x1, y1)) {
+		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, x0, y0, x1, y1)) {
 			view->reset_cursor_timer();
 		}
 

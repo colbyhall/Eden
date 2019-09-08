@@ -24,8 +24,12 @@ struct Buffer_View {
 		cursor_blink_time = 0.f;
 	}
 
+	void set_cursor(ssize new_cursor);
+	void remove_selection();
+	ssize seek_dir(bool left) const;
+
 	void on_char_entered(u32 c);
-	void on_action_entered(const struct Action_Bind& action);
+	void on_key_pressed(u8 key);
 };
 
 extern Buffer_View* focused_view;

@@ -22,4 +22,6 @@ struct Buffer {
 
 	void add_char(u32 c, usize index);
 	void remove_char(usize index);
+
+	void refresh_eol_table();
 };
