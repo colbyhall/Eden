@@ -80,7 +80,7 @@ void Buffer_View::on_char_entered(u32 c) {
 
 	if (c == '\r') c = ch::eol;
 
-	if (c < 32 || c > 126) return;
+	if ((c < 32 || c > 126) && c != ch::eol) return;
 
 	remove_selection();
 	buffer->add_char(c, cursor + 1);
