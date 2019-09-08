@@ -1,7 +1,7 @@
 #include "draw.h"
 #include "editor.h"
 #include "gui.h"
-#include "buffer_view.h"
+#include "config.h"
 
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <stb/stb_rect_pack.h>
@@ -328,10 +328,6 @@ void init_draw() {
 	const bool global_shader_loaded = load_shader_from_source(global_shader_source, &global_shader);
 	assert(global_shader_loaded);
 	glUseProgram(global_shader.program_id);
-
-	the_window.on_resize = [](const ch::Window& window) {
-		draw_editor();
-	};
 }
 
 static void frame_begin() {
@@ -348,8 +344,8 @@ static void frame_end() {
 
 void draw_editor() {
 	frame_begin();
-		
-	draw_views();
+
+	draw_gui();
 
 	frame_end();
 }
@@ -458,8 +454,9 @@ void Font::bind() const {
 
 
 void immediate_glyph(const Font_Glyph& glyph, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
-	y += font.size - font.line_gap;
-
+	// @NOTE(CHall): draw glyphs top down
+	y += the_font.size;
+	
 	const f32 x0 = x + glyph.bearing_x;
 	const f32 y0 = y + glyph.bearing_y;
 	const f32 x1 = x0 + glyph.width;
@@ -514,7 +511,7 @@ ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y
 		if (s[i] == '\t') {
 			const Font_Glyph* space_glyph = font[' '];
 			assert(space_glyph);
-			x += space_glyph->advance  * 4.f;
+			x += space_glyph->advance  * get_config().tab_width;
 			continue;
 		}
 
@@ -528,6 +525,48 @@ ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y
 
 		if (x - original_x > largest_x) largest_x = x - original_x;
 		if (y - original_y > largest_y) largest_y = x - original_y;
+	}
+
+	return ch::Vector2(largest_x, largest_y);
+}
+
+ch::Vector2 get_string_draw_size(const ch::String& s, const Font& font) {
+	const f32 font_height = font.size;
+
+	const f32 starting_x = 0.f;
+	const f32 starting_y = 0.f;
+
+	f32 largest_x = 0.f;
+	f32 largest_y = 0.f;
+
+	f32 x = starting_x;
+	f32 y = starting_y;
+
+	const Font_Glyph* space_glyph = font[' '];
+	const Font_Glyph* unknown_glyph = font['?'];
+
+	for (usize i = 0; i < s.count; i++) {
+		if (s[i] == ch::eol) {
+			y += font_height;
+			x = starting_x;
+			continue;
+		}
+
+		if (s[i] == '\t') {
+			x += space_glyph->advance  * get_config().tab_width;
+			continue;
+		}
+
+		const Font_Glyph* g = font[s[i]];
+
+		if (!g) {
+			g = unknown_glyph;
+		}
+
+		x += g->advance;
+
+		if (x - starting_x > largest_x) largest_x = x - starting_x;
+		if (y - starting_y > largest_y) largest_y = x - starting_y;
 	}
 
 	return ch::Vector2(largest_x, largest_y);

@@ -32,7 +32,6 @@ extern Buffer_View* focused_view;
 extern Buffer_View* hovered_view;
 
 void tick_views(f32 dt);
-void draw_views();
 
 usize push_view(Buffer_ID the_buffer);
 usize insert_view(Buffer_ID the_buffer, usize index);

@@ -103,6 +103,14 @@ CH_FORCEINLINE ch::Vector2 draw_string(const tchar* s, const Font& font, f32 x, 
 	return result;
 }
 
+ch::Vector2 get_string_draw_size(const ch::String& s, const Font& font);
+CH_FORCEINLINE ch::Vector2 get_string_draw_size(const tchar* s, const Font& font) {
+	ch::String new_s;
+	new_s.data = (tchar*)s; // I'm psure this is undefined behavior and bad but oh well
+	new_s.count = ch::strlen(s);
+	return get_string_draw_size(new_s, font);
+}
+
 void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index = 9.f);
 CH_FORCEINLINE void draw_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index = 9.f) {
 	immediate_begin();
