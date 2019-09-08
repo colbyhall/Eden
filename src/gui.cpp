@@ -181,7 +181,7 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 	*x += text_draw_size.x + line_number_padding;
 }
 
-#define LINE_COUNT_DEBUG 1
+#define LINE_COUNT_DEBUG 0
 
 bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, f32 x0, f32 y0, f32 x1, f32 y1) {
 	const ch::Vector2 mouse_pos = current_mouse_position;
