@@ -37,7 +37,7 @@ void Buffer::add_char(u32 c, usize index) {
 		const usize line_size = eol_table[index_line];
 		eol_table[index_line] = index_column + 1;
 		eol_table.insert(line_size - index_column, index_line + 1);
-	} else if (index_line < eol_table.count) { // @Hack
+	} else if (index_line < (ssize)eol_table.count) { // @Hack
 		eol_table[index_line] += 1;
 	}
 }

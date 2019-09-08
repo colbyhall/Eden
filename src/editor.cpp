@@ -56,6 +56,8 @@ int main() {
 	const bool is_gl_current = ch::make_current(the_window);
 	assert(is_gl_current);
 
+	if (config.was_maximized) the_window.maximize();
+
 	the_window.on_resize = [](const ch::Window& window) {
 		tick_editor(0.f);
 		draw_editor();

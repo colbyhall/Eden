@@ -13,9 +13,10 @@ macro(bool, show_line_numbers, true) \
 macro(ch::Color, line_number_background_color, 0x041E24FF) \
 macro(ch::Color, line_number_text_color, 0x083945FF) \
 macro(f32, scroll_speed, 5.f) \
-macro(u8, tab_width, 4) \
+macro(u16, tab_width, 4) \
 macro(u32, last_window_width, 1920) \
-macro(u32, last_window_height, 1080) 
+macro(u32, last_window_height, 1080) \
+macro(bool, was_maximized, false)
 
 struct Config {
 #define PUSH_VARS(t, n, v) t n = v;
@@ -30,3 +31,7 @@ const Config& get_config();
 void init_config();
 void try_refresh_config();
 void shutdown_config();
+
+// @NOTE(Chall): this kind of sucks
+void on_window_resize_config();
+void on_window_maximized_config();

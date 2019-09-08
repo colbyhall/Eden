@@ -1,6 +1,7 @@
 #include "input.h"
 #include "editor.h"
 #include "buffer_view.h"
+#include "config.h"
 
 bool exit_requested = false;
 
@@ -47,6 +48,14 @@ void init_input() {
 
 	the_window.on_char_entered = [](const ch::Window& window, u32 c) {
 		if (focused_view) focused_view->on_char_entered(c);
+	};
+
+	the_window.on_resize = [](const ch::Window& window) {
+		on_window_resize_config();
+	};
+
+	the_window.on_maximized = [](const ch::Window& window) {
+		on_window_maximized_config();
 	};
 }
 
