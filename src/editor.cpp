@@ -58,7 +58,7 @@ int main() {
 
 	if (config.was_maximized) the_window.maximize();
 
-	the_window.on_resize = [](const ch::Window& window) {
+	the_window.on_sizing = [](const ch::Window& window) {
 		tick_editor(0.f);
 		draw_editor();
 	};
