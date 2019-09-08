@@ -4,7 +4,6 @@
 #include <ch_stl/gap_buffer.h>
 #include <ch_stl/hash.h>
 #include "draw.h"
-#include "parsing.h"
 
 using Buffer_ID = usize;
 
@@ -17,9 +16,6 @@ struct Buffer {
 	ch::Gap_Buffer<u32> gap_buffer;
 	ch::Path full_path;
 	ch::Array<usize> eol_table;
-
-    Lexeme* lexemes = nullptr;
-    f64 parse_time;
 
 	Buffer();
 	Buffer(Buffer_ID _id);
