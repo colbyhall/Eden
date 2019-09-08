@@ -126,29 +126,18 @@ struct Lexer {
     }
 };
 
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRALEAN
-#include <Windows.h>
-
-f64 get_time() {
-    LARGE_INTEGER li;
-    QueryPerformanceCounter(&li);
-    f64 d = (f64)li.QuadPart;
-    QueryPerformanceFrequency(&li);
-    d /= li.QuadPart;
-    return d;
-}
+#include <ch_stl\time.h>
 
 void parse_cpp(struct Buffer* buf) {
     ch::Gap_Buffer<u32>& b = buf->gap_buffer;
     usize buffer_count = b.count();
     if (!buffer_count) return;
 
-    //buf->lexemes = (Lexeme*)ch::realloc(buf->lexemes, (buffer_count + 1) * sizeof(Lexeme));
+    buf->lexemes = (Lexeme*)ch::realloc(buf->lexemes, (buffer_count + 1) * sizeof(Lexeme));
 
     {
-        //buf->parse_time = -get_time();
-        //defer(buf->parse_time += get_time());
+        buf->parse_time = -ch::get_time_in_seconds();
+        defer(buf->parse_time += ch::get_time_in_seconds());
 
         u32* begin = b.data;
         u32* gap = b.gap;
@@ -159,7 +148,7 @@ void parse_cpp(struct Buffer* buf) {
         }
         Lexer lexer = {};
         lexer.last = begin;
-        Lexeme* lex_seeker = nullptr;//buf->lexemes;
+        Lexeme* lex_seeker = buf->lexemes;
         lexer.lex(begin, gap, lex_seeker);
         lexer.lex(gap_end, buffer_end, lex_seeker);
     }
