@@ -1,5 +1,6 @@
 #include "parsing.h"
 #include "buffer.h"
+#include <ch_stl\time.h>
 
 static const u8 data_table[] = {
 //static const u8 char_type[128] = {
@@ -125,8 +126,6 @@ struct Lexer {
         }
     }
 };
-
-#include <ch_stl\time.h>
 
 void parse_cpp(struct Buffer* buf) {
     ch::Gap_Buffer<u32>& b = buf->gap_buffer;
