@@ -141,18 +141,17 @@ static void export_config(const Config& config, const ch::Path& path = config_pa
 }
 
 void init_config() {
+	Config* new_conf = ch_new Config;
+	*new_conf = default_config;
+	
 	ch::File_Data fd;
 	if (ch::load_file_into_memory(config_path, &fd)) {
-		Config* new_conf = ch_new Config;
-		*new_conf = default_config;
-		if (parse_config(fd, new_conf)) {
-			if (loaded_config) {
-				ch_delete loaded_config;
-			}
-
-			loaded_config = new_conf;
+		if (parse_config(fd, new_conf) && loaded_config) {
+			ch_delete loaded_config;
 		}
 	}
+
+	loaded_config = new_conf;
 }
 
 void try_refresh_config() {

@@ -7,7 +7,6 @@
 #include <ch_stl/math.h>
 
 Buffer_View* focused_view;
-Buffer_View* hovered_view;
 ch::Array<Buffer_View*> views;
 
 void Buffer_View::set_cursor(ssize new_cursor) {
@@ -74,6 +73,10 @@ ssize Buffer_View::seek_dir(bool left) const {
 	return result;
 }
 
+void Buffer_View::set_focused() {
+	focused_view = this;
+}
+
 void Buffer_View::on_char_entered(u32 c) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
@@ -96,6 +99,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 
 	const bool ctrl_pressed = is_key_down(CH_KEY_CONTROL);
 	const bool shift_pressed = is_key_down(CH_KEY_SHIFT);
+	const bool alt_pressed = is_key_down(CH_KEY_ALT);
 
 	reset_cursor_timer();
 	switch (key) {
@@ -122,25 +126,44 @@ void Buffer_View::on_key_pressed(u8 key) {
 		}
 		break;
 	case CH_KEY_LEFT:
-		if (cursor > -1) {
-			if (ctrl_pressed) {
-				set_cursor(seek_dir(true));
-			} else {
-				set_cursor(cursor - 1);
-			}
+		if (alt_pressed) {
+			ssize index = get_view_index(this);
+			index -= 1;
+
+			if (index < 0) index = views.count - 1;
+
+			views[index]->set_focused();
 		} else {
-			set_cursor(cursor);
+			if (cursor > -1) {
+				if (ctrl_pressed) {
+					set_cursor(seek_dir(true));
+				} else {
+					set_cursor(cursor - 1);
+				}
+			} else {
+				set_cursor(cursor);
+			}
 		}
 		break;
 	case CH_KEY_RIGHT:
-		if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
-			if (ctrl_pressed) {
-				set_cursor(seek_dir(false));
+		if (alt_pressed) {
+			ssize index = get_view_index(this);
+			index += 1;
+
+			if (index > (ssize)views.count - 1) index = 0;
+
+			views[index]->set_focused();
+		}
+		else {
+			if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
+				if (ctrl_pressed) {
+					set_cursor(seek_dir(false));
+				} else {
+					set_cursor(cursor + 1);
+				}
 			} else {
-				set_cursor(cursor + 1);
+				set_cursor(cursor);
 			}
-		} else {
-			set_cursor(cursor);
 		}
 		break;
 	}
@@ -172,12 +195,12 @@ void tick_views(f32 dt) {
 
 		const f32 x0 = x;
 		const f32 y0 = 0.f;
-		const f32 x1 = (i == views.count - 1) ? viewport_width - x : viewport_width * view->width_ratio;
+		const f32 x1 = x0 + ((i == views.count - 1) ? viewport_width - x : viewport_width * view->width_ratio);
 		const f32 y1 = viewport_height;
 
 		Buffer* the_buffer = find_buffer(view->the_buffer);
 
-		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, x0, y0, x1, y1)) {
+		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, x0, y0, x1, y1)) {
 			view->reset_cursor_timer();
 		}
 

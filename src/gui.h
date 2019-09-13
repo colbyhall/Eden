@@ -25,6 +25,6 @@ CH_FORCEINLINE bool gui_button_label(const tchar* s, f32 x0, f32 y0, f32 x1, f32
 	return gui_button_label(real, x0, y0, x1, y1);
 }
 
-bool gui_buffer(const struct Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, f32 x0, f32 y0, f32 x1, f32 y1);
+bool gui_buffer(const struct Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 x0, f32 y0, f32 x1, f32 y1);
 
 void draw_gui();

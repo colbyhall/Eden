@@ -183,7 +183,7 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 
 #define LINE_COUNT_DEBUG 0
 
-bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, f32 x0, f32 y0, f32 x1, f32 y1) {
+bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 x0, f32 y0, f32 x1, f32 y1) {
 	const ch::Vector2 mouse_pos = current_mouse_position;
 	const bool was_lmb_pressed = was_mouse_button_pressed(CH_MOUSE_LEFT);
 	const bool is_lmb_down = is_mouse_button_down(CH_MOUSE_LEFT);
@@ -221,6 +221,19 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	u32 line_char_count = 0;
 #endif
 
+	auto draw_cursor = [&](const Font_Glyph* g) {
+		if (edit_mode) {
+			push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
+		} else {
+			push_border_quad(x, y, x + g->advance, y + font_height, 1.f, config.cursor_color);
+		}
+	};
+
+	if (*cursor + 1 > (ssize)gap_buffer.count()) {
+		*cursor = gap_buffer.count() - 1;
+		*selection = *cursor;
+	}
+
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	for (usize i = 0; i < gap_buffer.count(); i += 1) {
 		const u32 c = gap_buffer[i];
@@ -240,7 +253,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			x = starting_x;
 			y += font_height;
 
-			x += space_glyph->advance * (ch::get_num_digits(num_lines) + 1) + line_number_padding;
+			x += space_glyph->advance * (ch::get_num_digits(num_lines)) + line_number_padding;
 			// @TODO(CHall): maybe draw some kind of carriage return symbol?
 		}
 
@@ -255,15 +268,20 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		}
 
 		const bool is_in_selection = (orig_cursor > orig_selection && (ssize)i >= orig_selection + 1 && (ssize)i < orig_cursor + 1) || (orig_cursor < orig_selection && (ssize)i < orig_selection + 1 && (ssize)i >= orig_cursor + 1);
-		if (is_in_selection) {
+		if (is_in_selection && edit_mode) {
 			push_quad(x, y, x + g->advance, y + font_height, config.selection_color);
 		}
 
-		const bool is_in_cursor = *cursor + 1 == i && show_cursor;
+		const bool is_in_cursor = *cursor + 1 == i;
 		if (is_in_cursor) {
-			push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
-			color = config.background_color;
-		}
+			if (show_cursor || !edit_mode) {
+				draw_cursor(g);
+			}
+			
+			if (edit_mode && show_cursor) {
+				color = config.background_color;
+			}
+		} 
 
 		if (c == ch::eol) {
 #if LINE_COUNT_DEBUG
@@ -299,7 +317,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	line_char_count = 0;
 #endif
 
-	if (*cursor + 1 == gap_buffer.count() && show_cursor) push_quad(x, y, x + space_glyph->advance, y + font_height, config.cursor_color);
+	if (*cursor + 1 == gap_buffer.count() && (show_cursor || !edit_mode)) draw_cursor(space_glyph);
 
 	return *cursor != orig_cursor || *selection != orig_selection;
 }
@@ -315,7 +333,7 @@ void draw_gui() {
 			immediate_quad(it.x0, it.y0, it.x1, it.y1, it.color, it.z_index);
 			break;
 		case RT_Border_Quad:
-			// draw_border_quad(it.x0, it.y0, it.x1, it.y1, it.thickness, it.color, it.z_index);
+			immediate_border_quad(it.x0, it.y0, it.x1, it.y1, it.thickness, it.color, it.z_index);
 			break;
 		case RT_Text:
 			immediate_string(it.text, the_font, it.x, it.y, it.color, it.z_index);

@@ -68,6 +68,7 @@ int main() {
 
 	Buffer* buffer = create_buffer();
 	push_view(buffer->id);
+	push_view(buffer->id);
 
 	// @TEMP(CHall): Load font and get size
 	{
@@ -79,11 +80,10 @@ int main() {
 		the_font.pack_atlas();
 	}
 
-	the_window.set_visibility(true);
-
 	ch::Allocator temp_arena = ch::make_arena_allocator(1024 * 1024 * 32);
 	ch::context_allocator = temp_arena;
 
+	the_window.set_visibility(true);
 	f64 last_frame_time = ch::get_time_in_seconds();
 	while (!is_exit_requested()) {
 		const f64 current_time = ch::get_time_in_seconds();

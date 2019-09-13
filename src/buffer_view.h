@@ -28,12 +28,11 @@ struct Buffer_View {
 	void remove_selection();
 	ssize seek_dir(bool left) const;
 
+	void set_focused();
+
 	void on_char_entered(u32 c);
 	void on_key_pressed(u8 key);
 };
-
-extern Buffer_View* focused_view;
-extern Buffer_View* hovered_view;
 
 void tick_views(f32 dt);
 

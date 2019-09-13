@@ -8,6 +8,8 @@ bool exit_requested = false;
 bool is_mouse_over;
 bool was_mouse_over;
 
+extern Buffer_View* focused_view;
+
 ch::Vector2 last_mouse_position;
 ch::Vector2 current_mouse_position;
 
