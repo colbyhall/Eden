@@ -200,6 +200,8 @@ void tick_views(f32 dt) {
 
 		Buffer* the_buffer = find_buffer(view->the_buffer);
 
+        parsing::parse_cpp(the_buffer);
+
 		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, x0, y0, x1, y1)) {
 			view->reset_cursor_timer();
 		}

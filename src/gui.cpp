@@ -234,6 +234,8 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		*selection = *cursor;
 	}
 
+    const parsing::Lexeme* lexeme = buffer.lexemes.cbegin();
+    const parsing::Lexeme* const lexemes_end = buffer.lexemes.cend();
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	for (usize i = 0; i < gap_buffer.count(); i += 1) {
 		const u32 c = gap_buffer[i];
@@ -242,7 +244,43 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 #if LINE_COUNT_DEBUG
 		line_char_count += 1;
 #endif
-			
+        {
+            // Obtain the current lexeme based on the current index
+            auto cursor_to_index = [](const ch::Gap_Buffer<u32>& b, const u32* p) -> usize {
+                usize result = p - b.data;
+                if (p >= b.gap) result -= b.gap_size;
+                return result;
+            };
+            while (lexeme + 1 < lexemes_end && i >= cursor_to_index(gap_buffer, lexeme[1].p)) {
+                lexeme++;
+                //push_glyph(the_font['_'], x, y, ch::magenta);
+            }
+
+            assert(lexeme < lexemes_end);
+            // @Temporary method to determine the colour of the current lexeme.
+            // Configurable colours on the roadmap
+            if (lexeme->lex_state == parsing::IN_PREPROC && (lexeme->ch == parsing::IDENT || lexeme->p[0] == '#')) {
+                color = ch::Color(0.1f, 1.0f, 0.6f, 1.0f);
+            } else if (lexeme->lex_state & (parsing::IN_LINE_COMMENT | parsing::IN_BLOCK_COMMENT)) {
+                color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
+            } else {
+                switch (lexeme->dfa) {
+                case parsing::DFA_OP:
+                    color = ch::Color(0.7f, 0.7f, 0.7f, 1.0f);
+                    break;
+                case parsing::DFA_STRINGLIT:
+                case parsing::DFA_STRINGLIT_BS:
+                case parsing::DFA_CHARLIT:
+                case parsing::DFA_CHARLIT_BS:
+                    color = ch::Color(1.0f, 1.0f, 0.2f, 1.0f);
+                    break;
+                case parsing::DFA_NUMLIT:
+                    color = ch::Color(0.5f, 0.5f, 1.0f, 1.0f);
+                    break;
+                }
+            }
+        }
+
 		const Font_Glyph* g = the_font[c];
 		if (!g) {
 			color = ch::magenta;
