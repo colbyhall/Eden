@@ -182,6 +182,7 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 }
 
 #define LINE_COUNT_DEBUG 0
+#define PARSE_SPEED_DEBUG 0
 
 bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 x0, f32 y0, f32 x1, f32 y1) {
 	const ch::Vector2 mouse_pos = current_mouse_position;
@@ -386,12 +387,14 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
         }
 	}
 
+#if PARSE_SPEED_DEBUG
     {
         // @Debug: Debug code to print the lexer speed in the corner.
         tchar temp[128];
 	    ch::sprintf(temp, CH_TEXT("%lluMB/s"), (u64)((buffer.gap_buffer.count()*4)/buffer.parse_time/1024/1024));
 	    push_text(temp, x0, y0, ch::magenta);
     }
+#endif
 
 #if LINE_COUNT_DEBUG
 	tchar temp[128];
