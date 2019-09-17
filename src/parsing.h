@@ -6,12 +6,15 @@ struct Buffer;
 namespace parsing {
 enum Char_Type : u8 {
     WHITE,
+    NEWLINE,     // '\r' '\n'
     IDENT,       // '$' '@'-'Z' '_'-'z'
+    POUND,       // '#'
     DOUBLEQUOTE, // '"'
     SINGLEQUOTE, // '\''
     DIGIT,       // '0'-'9'
+    SLASH,       // '/'
     BS,          // '\\'
-    OP,          // '!' '%' '?' '^' '|' '~' '/'
+    OP,          // '!' '%' '?' '^' '|' '~'
 
     AND,    // '&'
     LPAREN, // '('
@@ -37,14 +40,19 @@ enum Char_Type : u8 {
 };
 
 enum Lex_Dfa : u8 {
-    DFA_WHITE,
-    DFA_IDENT,
-    DFA_OP,
     DFA_STRINGLIT,
     DFA_STRINGLIT_BS,
     DFA_CHARLIT,
     DFA_CHARLIT_BS,
+    DFA_PREPROC_SLASH,
+    DFA_SLASH,
+    DFA_LINE_COMMENT,
+    DFA_WHITE,
+    DFA_IDENT,
+    DFA_OP,
     DFA_NUMLIT,
+    DFA_PREPROC,
+    DFA_PREPROC_BS,
 
     DFA_NUM_STATES
 };
@@ -60,7 +68,7 @@ struct Lexeme {
     const u32* p;
     Char_Type ch : 8;
     Lex_Dfa dfa : 8;
-    Lexer_State lex_state : 8;
+    int lex_state : 8;
 };
 
 void parse_cpp(Buffer* b);

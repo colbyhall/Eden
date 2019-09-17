@@ -70,6 +70,21 @@ int main() {
 	push_view(buffer->id);
 	push_view(buffer->id);
 
+    {
+        // @TEMP(phil) load test file
+        ch::File_Data fd = {};
+        fd.allocator = ch::context_allocator;
+        ch::load_file_into_memory(CH_TEXT("./test_files/test_stb.h"), &fd, fd.allocator);
+        defer(fd.free());
+        buffer->gap_buffer.resize(fd.size);
+        usize j = 0;
+        for (usize i = 0; i < fd.size; i++) {
+            if (fd.data[i] == '\r') continue;
+            buffer->gap_buffer.insert(fd.data[i], j);
+            j++;
+        }
+    }
+
 	// @TEMP(CHall): Load font and get size
 	{
 		ch::Path p = ch::get_os_font_path();

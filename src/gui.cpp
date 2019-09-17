@@ -259,25 +259,45 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             assert(lexeme < lexemes_end);
             // @Temporary method to determine the colour of the current lexeme.
             // Configurable colours on the roadmap
-            if (lexeme->lex_state == parsing::IN_PREPROC && (lexeme->ch == parsing::IDENT || lexeme->p[0] == '#')) {
-                color = ch::Color(0.1f, 1.0f, 0.6f, 1.0f);
-            } else if (lexeme->lex_state & (parsing::IN_LINE_COMMENT | parsing::IN_BLOCK_COMMENT)) {
+            switch (lexeme->dfa) {
+            case parsing::DFA_STRINGLIT:
+            case parsing::DFA_STRINGLIT_BS:
+            case parsing::DFA_CHARLIT:
+            case parsing::DFA_CHARLIT_BS:
+                color = ch::Color(1.0f, 1.0f, 0.2f, 1.0f);
+                break;
+            case parsing::DFA_LINE_COMMENT:
                 color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
-            } else {
-                switch (lexeme->dfa) {
-                case parsing::DFA_OP:
-                    color = ch::Color(0.7f, 0.7f, 0.7f, 1.0f);
-                    break;
-                case parsing::DFA_STRINGLIT:
-                case parsing::DFA_STRINGLIT_BS:
-                case parsing::DFA_CHARLIT:
-                case parsing::DFA_CHARLIT_BS:
-                    color = ch::Color(1.0f, 1.0f, 0.2f, 1.0f);
-                    break;
-                case parsing::DFA_NUMLIT:
-                    color = ch::Color(0.5f, 0.5f, 1.0f, 1.0f);
-                    break;
+                break;
+            case parsing::DFA_WHITE:
+                break;
+            case parsing::DFA_IDENT:
+                break;
+            case parsing::DFA_OP:
+                color = ch::Color(0.7f, 0.7f, 0.7f, 1.0f);
+                break;
+            case parsing::DFA_NUMLIT:
+                color = ch::Color(0.5f, 0.5f, 1.0f, 1.0f);
+                break;
+            case parsing::DFA_PREPROC:
+            case parsing::DFA_PREPROC_BS:
+                color = ch::Color(0.1f, 1.0f, 0.6f, 1.0f);
+                break;
+            case parsing::DFA_PREPROC_SLASH:
+                if (lexeme + 1 < lexemes_end && lexeme[1].dfa == parsing::DFA_LINE_COMMENT) {
+                        color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
+                } else {
+                    color = ch::Color(0.1f, 1.0f, 0.6f, 1.0f);
                 }
+                break;
+            case parsing::DFA_SLASH:
+                if (lexeme + 1 < lexemes_end && lexeme[1].dfa == parsing::DFA_LINE_COMMENT) {
+                        color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
+                }
+                break;
+            }
+            if (lexeme->lex_state) {
+                color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
             }
         }
 
@@ -346,7 +366,18 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		push_glyph(g, x, y, color);
 
 		x += g->advance;
+
+        // @TEMP(phil) this is necessary for large files, or else you will OOM on render commands.
+        if (y > the_window.get_size().uy * 1.8f) {
+            break;
+        }
 	}
+
+    {
+        tchar temp[128];
+	    ch::sprintf(temp, CH_TEXT("%lluMB/s"), (u64)((buffer.gap_buffer.count()*4)/buffer.parse_time/1024/1024));
+	    push_text(temp, x0, y0, ch::magenta);
+    }
 
 #if LINE_COUNT_DEBUG
 	tchar temp[128];

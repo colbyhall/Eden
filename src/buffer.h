@@ -18,6 +18,7 @@ struct Buffer {
 	ch::Path full_path;
 	ch::Array<usize> eol_table;
 
+    bool syntax_dirty = true;
     ch::Array<parsing::Lexeme> lexemes;
     f64 parse_time;
 

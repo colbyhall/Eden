@@ -91,6 +91,8 @@ void Buffer_View::on_char_entered(u32 c) {
 	selection = cursor;
 
 	reset_cursor_timer();
+
+    buffer->syntax_dirty = true;
 }
 
 void Buffer_View::on_key_pressed(u8 key) {
@@ -113,6 +115,8 @@ void Buffer_View::on_key_pressed(u8 key) {
 				cursor -= 1;
 				selection = cursor;
 			}
+
+            buffer->syntax_dirty = true;
 		}
 		break;
 	case CH_KEY_DELETE:
@@ -123,6 +127,8 @@ void Buffer_View::on_key_pressed(u8 key) {
 			} else {
 				buffer->remove_char(cursor + 1);
 			}
+
+            buffer->syntax_dirty = true;
 		}
 		break;
 	case CH_KEY_LEFT:
@@ -176,7 +182,7 @@ void tick_views(f32 dt) {
 	const f32 viewport_height = (f32)viewport_size.uy;
 
 	const Config& config = get_config();
-
+    
 	for (usize i = 0; i < views.count; i += 1) {
 		Buffer_View* view = views[i];
 
@@ -199,8 +205,8 @@ void tick_views(f32 dt) {
 		const f32 y1 = viewport_height;
 
 		Buffer* the_buffer = find_buffer(view->the_buffer);
-
-        parsing::parse_cpp(the_buffer);
+        
+        parsing::parse_cpp(find_buffer(views[0]->the_buffer));
 
 		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, x0, y0, x1, y1)) {
 			view->reset_cursor_timer();
