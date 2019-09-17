@@ -70,6 +70,7 @@ int main() {
 	push_view(buffer->id);
 	push_view(buffer->id);
 
+#if 1
     {
         // @TEMP(phil) load test file
         ch::File_Data fd = {};
@@ -83,7 +84,9 @@ int main() {
             buffer->gap_buffer.insert(fd.data[i], j);
             j++;
         }
+        buffer->refresh_eol_table();
     }
+#endif
 
 	// @TEMP(CHall): Load font and get size
 	{

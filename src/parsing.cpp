@@ -76,7 +76,7 @@ static const u8 lex_table[] = {
     DFA_PREPROC,      // SINGLEQUOTE
     DFA_PREPROC,      // DIGIT
     DFA_LINE_COMMENT, // SLASH
-    DFA_PREPROC_BS,   // BS
+    DFA_PREPROC,   // BS
     DFA_PREPROC,      // OP
     // State: DFA_SLASH
     DFA_WHITE,        // WHITE
@@ -153,24 +153,14 @@ static const u8 lex_table[] = {
     DFA_PREPROC,       // SINGLEQUOTE
     DFA_PREPROC,       // DIGIT
     DFA_PREPROC_SLASH, // SLASH
-    DFA_PREPROC_BS,    // BS
-    DFA_PREPROC,       // OP
-    // State: DFA_PREPROC_BS
-    DFA_PREPROC,       // WHITE
-    DFA_PREPROC,       // NEWLINE
-    DFA_PREPROC,       // IDENT
-    DFA_PREPROC,       // POUND
-    DFA_PREPROC,       // DOUBLEQUOTE
-    DFA_PREPROC,       // SINGLEQUOTE
-    DFA_PREPROC,       // DIGIT
-    DFA_PREPROC_SLASH, // SLASH
-    DFA_PREPROC_BS,    // BS
+    DFA_PREPROC,       // BS
     DFA_PREPROC,       // OP
 };
 
 struct Lexer_Data {
     int state = 0;
     Lex_Dfa dfa = {};
+    const u32* idx_base;
 };
 
 static const u32 *lex(Lexer_Data& l, const u32* p, const u32* const end,
@@ -178,44 +168,44 @@ static const u32 *lex(Lexer_Data& l, const u32* p, const u32* const end,
 #define get64(p) (*reinterpret_cast<const u64*>(p))
 #define as64(low, high) ((low) | static_cast<u64>(high) << 32)
     
-    while (p < end) {
+    for (; p < end; p++) {
         if (l.state) {
             if (get64(p) == as64('*', '/')) {
                 l.state = 0;
-                lexemes->p = p + 2;
+                lexemes->i = p + 2 - l.idx_base;
                 lexemes->dfa = l.dfa;
                 lexemes++;
-                p += 2;
-                continue;
+                p += 1;
             }
-        } else {
-            if (get64(p) == as64('/', '*')) {
-                if (l.dfa > DFA_LINE_COMMENT) {
-                    l.state = 1;
-                    lexemes->p = p;
-                    lexemes->lex_state = 1;
-                    lexemes++;
-                    p += 2;
-                    continue;
-                }
-            }
-            int c = (int)*p;
-            c &= (c - 128) >> 31;
-            Char_Type ch = (Char_Type)char_type[c];
-            Char_Type ch_to_lex = ch;
-            if (ch_to_lex > OP) {
-                ch_to_lex = OP;
-            }
-            Lex_Dfa new_dfa = (Lex_Dfa)lex_table[l.dfa * NUM_CHAR_TYPES_IN_LEXER + ch_to_lex];
-            if (new_dfa != l.dfa) {
-                lexemes->p = p;
-                lexemes->ch = ch;
-                lexemes->dfa = new_dfa;
-                lexemes++;
-                l.dfa = new_dfa;
-            }
+            continue;
         }
-        p++;
+        if (get64(p) == as64('/', '*')) {
+            if (l.dfa > DFA_LINE_COMMENT) {
+                l.state = 1;
+                lexemes->i = p - l.idx_base;
+                lexemes->dfa = DFA_BLOCK_COMMENT;
+                lexemes++;
+                p += 1;
+            }
+            continue;
+        } else if (get64(p) == as64('\\', '\n')) {
+            p += 1;
+            continue;
+        }
+        int c = (int)*p;
+        c &= (c - 128) >> 31;
+        Char_Type ch = (Char_Type)char_type[c];
+        Char_Type ch_to_lex = ch;
+        if (ch_to_lex > OP) {
+            ch_to_lex = OP;
+        }
+        Lex_Dfa new_dfa = (Lex_Dfa)lex_table[l.dfa * NUM_CHAR_TYPES_IN_LEXER + ch_to_lex];
+        if (new_dfa != l.dfa) {
+            lexemes->i = p - l.idx_base;
+            lexemes->dfa = new_dfa;
+            lexemes++;
+            l.dfa = new_dfa;
+        }
     }
     return p;
 }
@@ -244,16 +234,16 @@ void parse_cpp(Buffer* buf) {
         }
         Lexer_Data lexer = {};
         lexer.dfa = DFA_WHITE;
+        lexer.idx_base = b.data;
         Lexeme* lex_seeker = buf->lexemes.begin();
         const u32* const finished_on = lex(lexer, b.data, b.gap, lex_seeker);
         const usize skip_ahead = finished_on - b.gap;
+        lexer.idx_base = b.data + b.gap_size;
         lex(lexer, gap_end + skip_ahead, buffer_end, lex_seeker);
         {
             assert(lex_seeker < buf->lexemes.begin() + buf->lexemes.allocated);
-            lex_seeker->p = buffer_end;
-            lex_seeker->ch = WHITE;
+            lex_seeker->i = buffer_count;
             lex_seeker->dfa = DFA_WHITE;
-            lex_seeker->lex_state = IN_NO_COMMENT;
             lex_seeker++;
         }
         buf->lexemes.count = lex_seeker - buf->lexemes.begin();

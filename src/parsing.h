@@ -52,24 +52,20 @@ enum Lex_Dfa : u8 {
     DFA_OP,
     DFA_NUMLIT,
     DFA_PREPROC,
-    DFA_PREPROC_BS,
+
+    // should be unreachable from any other DFA
+    DFA_BLOCK_COMMENT,
 
     DFA_NUM_STATES
 };
 
-enum Lexer_State : u8 {
-    IN_NO_COMMENT = 0,
-    IN_BLOCK_COMMENT = 1,
-    IN_LINE_COMMENT = 2,
-    IN_PREPROC = 4,
-};
-
+#pragma pack(push)
+#pragma pack(1)
 struct Lexeme {
-    const u32* p;
-    Char_Type ch : 8;
-    Lex_Dfa dfa : 8;
-    int lex_state : 8;
+    unsigned int i : 28;
+    unsigned int dfa : 4;
 };
+#pragma pack(pop)
 
 void parse_cpp(Buffer* b);
 

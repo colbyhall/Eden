@@ -251,7 +251,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
                 if (p >= b.gap) result -= b.gap_size;
                 return result;
             };
-            while (lexeme + 1 < lexemes_end && i >= cursor_to_index(gap_buffer, lexeme[1].p)) {
+            while (lexeme + 1 < lexemes_end && i >= lexeme[1].i) {
                 lexeme++;
                 //push_glyph(the_font['_'], x, y, ch::magenta);
             }
@@ -261,11 +261,12 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             // Configurable colours on the roadmap
             switch (lexeme->dfa) {
             case parsing::DFA_STRINGLIT:
-            case parsing::DFA_STRINGLIT_BS:
+            //case parsing::DFA_STRINGLIT_BS:
             case parsing::DFA_CHARLIT:
-            case parsing::DFA_CHARLIT_BS:
+            //case parsing::DFA_CHARLIT_BS:
                 color = ch::Color(1.0f, 1.0f, 0.2f, 1.0f);
                 break;
+            case parsing::DFA_BLOCK_COMMENT:
             case parsing::DFA_LINE_COMMENT:
                 color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
                 break;
@@ -280,7 +281,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
                 color = ch::Color(0.5f, 0.5f, 1.0f, 1.0f);
                 break;
             case parsing::DFA_PREPROC:
-            case parsing::DFA_PREPROC_BS:
+            //case parsing::DFA_PREPROC_BS:
                 color = ch::Color(0.1f, 1.0f, 0.6f, 1.0f);
                 break;
             case parsing::DFA_PREPROC_SLASH:
@@ -295,9 +296,6 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
                         color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
                 }
                 break;
-            }
-            if (lexeme->lex_state) {
-                color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
             }
         }
 
