@@ -234,8 +234,10 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		*selection = *cursor;
 	}
 
-    const parsing::Lexeme* lexeme = buffer.lexemes.cbegin();
+    // Some bookkeeping variables are needed to identify the current syntax highlight.
+    const parsing::Lexeme* const lexemes_begin = buffer.lexemes.cbegin();
     const parsing::Lexeme* const lexemes_end = buffer.lexemes.cend();
+    const parsing::Lexeme* lexeme = lexemes_begin;
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	for (usize i = 0; i < gap_buffer.count(); i += 1) {
 		const u32 c = gap_buffer[i];
@@ -246,54 +248,67 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 #endif
         {
             // Obtain the current lexeme based on the current index
-            auto cursor_to_index = [](const ch::Gap_Buffer<u32>& b, const u32* p) -> usize {
-                usize result = p - b.data;
-                if (p >= b.gap) result -= b.gap_size;
-                return result;
-            };
             while (lexeme + 1 < lexemes_end && i >= lexeme[1].i) {
                 lexeme++;
-                //push_glyph(the_font['_'], x, y, ch::magenta);
+                //push_glyph(the_font['_'], x, y, ch::magenta); // @Debug
             }
 
             assert(lexeme < lexemes_end);
             // @Temporary method to determine the colour of the current lexeme.
-            // Configurable colours on the roadmap
+            // More nuanced parsing and configurable colours are on the roadmap. -phillip
+            ch::Color stringlit = {1.0f, 1.0f, 0.2f, 1.0f};
+            ch::Color comment = {0.3f, 0.3f, 0.3f, 1.0f};
+            ch::Color preproc = {0.1f, 1.0f, 0.6f, 1.0f};
+            ch::Color op = {0.7f, 0.7f, 0.7f, 1.0f};
+            ch::Color numlit = {0.5f, 0.5f, 1.0f, 1.0f};
             switch (lexeme->dfa) {
             case parsing::DFA_STRINGLIT:
-            //case parsing::DFA_STRINGLIT_BS:
             case parsing::DFA_CHARLIT:
-            //case parsing::DFA_CHARLIT_BS:
-                color = ch::Color(1.0f, 1.0f, 0.2f, 1.0f);
+                color = stringlit;
                 break;
+            case parsing::DFA_PREPROC_BLOCK_COMMENT:
+            case parsing::DFA_PREPROC_BLOCK_COMMENT_STAR:
             case parsing::DFA_BLOCK_COMMENT:
+            case parsing::DFA_BLOCK_COMMENT_STAR:
             case parsing::DFA_LINE_COMMENT:
-                color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
+                color = comment;
                 break;
             case parsing::DFA_WHITE:
+                if (lexeme > lexemes_begin && lexeme[-1].dfa == parsing::DFA_STRINGLIT) {
+                    color = stringlit;
+                }
+                if (lexeme > lexemes_begin && lexeme[-1].dfa == parsing::DFA_CHARLIT) {
+                    color = stringlit;
+                }
+                if (lexeme > lexemes_begin && lexeme[-1].dfa <= parsing::DFA_LINE_COMMENT) {
+                    color = comment;
+                }
                 break;
             case parsing::DFA_IDENT:
                 break;
             case parsing::DFA_OP:
-                color = ch::Color(0.7f, 0.7f, 0.7f, 1.0f);
+                color = op;
                 break;
             case parsing::DFA_NUMLIT:
-                color = ch::Color(0.5f, 0.5f, 1.0f, 1.0f);
+                color = numlit;
                 break;
             case parsing::DFA_PREPROC:
-            //case parsing::DFA_PREPROC_BS:
-                color = ch::Color(0.1f, 1.0f, 0.6f, 1.0f);
+                if (c == '/' && lexeme > lexemes_begin && lexeme[-1].dfa <= parsing::DFA_LINE_COMMENT) {
+                    color = comment;
+                } else {
+                    color = preproc;
+                }
                 break;
             case parsing::DFA_PREPROC_SLASH:
-                if (lexeme + 1 < lexemes_end && lexeme[1].dfa == parsing::DFA_LINE_COMMENT) {
-                        color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
+                if (lexeme + 1 < lexemes_end && lexeme[1].dfa <= parsing::DFA_LINE_COMMENT) {
+                    color = comment;
                 } else {
-                    color = ch::Color(0.1f, 1.0f, 0.6f, 1.0f);
+                    color = preproc;
                 }
                 break;
             case parsing::DFA_SLASH:
-                if (lexeme + 1 < lexemes_end && lexeme[1].dfa == parsing::DFA_LINE_COMMENT) {
-                        color = ch::Color(0.3f, 0.3f, 0.3f, 1.0f);
+                if (lexeme + 1 < lexemes_end && lexeme[1].dfa <= parsing::DFA_LINE_COMMENT) {
+                    color = comment;
                 }
                 break;
             }
@@ -372,6 +387,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	}
 
     {
+        // @Debug: Debug code to print the lexer speed in the corner.
         tchar temp[128];
 	    ch::sprintf(temp, CH_TEXT("%lluMB/s"), (u64)((buffer.gap_buffer.count()*4)/buffer.parse_time/1024/1024));
 	    push_text(temp, x0, y0, ch::magenta);

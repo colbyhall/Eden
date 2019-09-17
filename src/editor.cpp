@@ -70,17 +70,23 @@ int main() {
 	push_view(buffer->id);
 	push_view(buffer->id);
 
-#if 1
+#if 0
+    // @Temporary: Load test file.
+    // If you have a file in bin/test_files/test_stb.h, use this to auto-load the file.
+    // My test file is upwards of 10 megabytes, so it's not checked into git.
+    // In the future this will be superseded by a flie loading system; this is just
+    // to test parsing speeds. -phillip 2019-09-17
     {
-        // @TEMP(phil) load test file
         ch::File_Data fd = {};
-        fd.allocator = ch::context_allocator;
+        fd.allocator = ch::context_allocator; // Assign the allocator so we can free.
         ch::load_file_into_memory(CH_TEXT("./test_files/test_stb.h"), &fd, fd.allocator);
         defer(fd.free());
-        buffer->gap_buffer.resize(fd.size);
+        buffer->gap_buffer.resize(fd.size); // Pre-allocate.
         usize j = 0;
         for (usize i = 0; i < fd.size; i++) {
-            if (fd.data[i] == '\r') continue;
+            if (fd.data[i] == '\r') {
+                continue;
+            }
             buffer->gap_buffer.insert(fd.data[i], j);
             j++;
         }
