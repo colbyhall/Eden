@@ -77,6 +77,15 @@ void Buffer_View::set_focused() {
 	focused_view = this;
 }
 
+void Buffer_View::update_desired_column() {
+	Buffer* buffer = find_buffer(the_buffer);
+	assert(buffer);
+
+	const u64 current_line = buffer->get_line_from_index(cursor + 1);
+	const u64 line_index = buffer->get_index_from_line(current_line);
+	desired_column = (cursor + 1) - line_index;
+}
+
 void Buffer_View::on_char_entered(u32 c) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
@@ -89,6 +98,8 @@ void Buffer_View::on_char_entered(u32 c) {
 	buffer->add_char(c, cursor + 1);
 	cursor += 1;
 	selection = cursor;
+
+	update_desired_column();
 
 	reset_cursor_timer();
 
@@ -107,7 +118,9 @@ void Buffer_View::on_key_pressed(u8 key) {
 	switch (key) {
 	case CH_KEY_BACKSPACE: 
 		if (cursor > -1) {
-			if (ctrl_pressed) {
+			if (has_selection()) {
+				remove_selection();
+			} else if (ctrl_pressed) {
 				selection = seek_dir(true);
 				remove_selection();
 			} else {
@@ -117,11 +130,14 @@ void Buffer_View::on_key_pressed(u8 key) {
 			}
 
             buffer->syntax_dirty = true;
+			update_desired_column();
 		}
 		break;
 	case CH_KEY_DELETE:
 		if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
-			if (ctrl_pressed) {
+			if (has_selection()) {
+				remove_selection();
+			} else if (ctrl_pressed) {
 				selection = seek_dir(false);
 				remove_selection();
 			} else {
@@ -129,6 +145,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 			}
 
             buffer->syntax_dirty = true;
+			update_desired_column();
 		}
 		break;
 	case CH_KEY_LEFT:
@@ -149,6 +166,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 			} else {
 				set_cursor(cursor);
 			}
+			update_desired_column();
 		}
 		break;
 	case CH_KEY_RIGHT:
@@ -159,8 +177,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 			if (index > (ssize)views.count - 1) index = 0;
 
 			views[index]->set_focused();
-		}
-		else {
+		} else {
 			if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
 				if (ctrl_pressed) {
 					set_cursor(seek_dir(false));
@@ -170,8 +187,41 @@ void Buffer_View::on_key_pressed(u8 key) {
 			} else {
 				set_cursor(cursor);
 			}
+			update_desired_column();
 		}
 		break;
+	case CH_KEY_UP: {
+		const u64 current_line = buffer->get_line_from_index(cursor + 1);
+		if (current_line > 0) {
+			const u64 target_line = current_line - 1;
+			const u64 line_index = buffer->get_index_from_line(target_line);
+			const u64 line_size = buffer->eol_table[target_line];
+			u64 new_index = line_index;
+			if (desired_column > line_size) {
+				new_index += line_size - 1;
+			} else {
+				new_index += desired_column;
+			}
+			set_cursor(new_index - 1);
+		}
+
+	} break;
+	case CH_KEY_DOWN: {
+		const u64 current_line = buffer->get_line_from_index(cursor + 1);
+		if (current_line < buffer->eol_table.count - 1) {
+			const u64 target_line = current_line + 1;
+			const u64 line_index = buffer->get_index_from_line(target_line);
+			const u64 line_size = buffer->eol_table[target_line];
+			u64 new_index = line_index;
+			if (desired_column > line_size) {
+				new_index += line_size - 1;
+			}
+			else {
+				new_index += desired_column;
+			}
+			set_cursor(new_index - 1);
+		}
+	} break;
 	}
 }
 
@@ -210,6 +260,7 @@ void tick_views(f32 dt) {
 
 		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, x0, y0, x1, y1)) {
 			view->reset_cursor_timer();
+			view->update_desired_column();
 		}
 
 		x += x1 - x0;

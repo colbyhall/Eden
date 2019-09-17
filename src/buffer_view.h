@@ -11,6 +11,8 @@ struct Buffer_View {
 	ssize cursor = -1;
 	ssize selection = -1;
 
+	u64 desired_column;
+
 	f32 current_scroll_y = 0.f;
 	f32 target_scroll_y = 0.f;
 
@@ -29,6 +31,8 @@ struct Buffer_View {
 	ssize seek_dir(bool left) const;
 
 	void set_focused();
+
+	void update_desired_column();
 
 	void on_char_entered(u32 c);
 	void on_key_pressed(u8 key);

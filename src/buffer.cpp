@@ -46,3 +46,25 @@ void Buffer::refresh_eol_table() {
 
 	eol_table[eol_table.count - 1] = char_count;
 }
+
+u64 Buffer::get_index_from_line(u64 line) {
+	assert(line < eol_table.count);
+
+	u64 result = 0;
+	for (usize i = 0; i < line; i++) {
+		result += eol_table[i];
+	}
+	return result;
+}
+
+u64 Buffer::get_line_from_index(u64 index) {
+	assert(index <= gap_buffer.count());
+
+	u64 current_index = 0;
+	for (usize i = 0; i < eol_table.count; i++) {
+		current_index += eol_table[i];
+		if (current_index > index) return i;
+	}
+
+	return eol_table.count - 1;
+}

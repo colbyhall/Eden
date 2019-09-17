@@ -29,4 +29,7 @@ struct Buffer {
 	void remove_char(usize index);
 
 	void refresh_eol_table();
+
+	u64 get_index_from_line(u64 line);
+	u64 get_line_from_index(u64 index);
 };

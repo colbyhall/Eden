@@ -169,6 +169,9 @@ static bool is_point_in_glyph(ch::Vector2 p, const Font_Glyph* g, f32 x, f32 y) 
 static const f32 line_number_padding = 3.f;
 
 static void push_line_number(u64 current_line_number, u64 max_line_number, f32* x, f32 y) {
+	// @NOTE(CHall): Quick and easy way to get the min alignment
+	if (max_line_number < 10) max_line_number = 10;
+
 	const Font_Glyph* space_glyph = the_font[' '];
 
 	const u8 spaces_needed = ch::get_num_digits(max_line_number) - ch::get_num_digits(current_line_number);
@@ -181,7 +184,6 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 	*x += text_draw_size.x + line_number_padding;
 }
 
-#define LINE_COUNT_DEBUG 0
 #define PARSE_SPEED_DEBUG 0
 
 bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 x0, f32 y0, f32 x1, f32 y1) {
@@ -205,9 +207,10 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 	// @NOTE(CHall): Draw line number quad
 	if (show_line_numbers) {
+		const u32 num_digits = ch::max(ch::get_num_digits(num_lines), (u32)2);
 		const f32 ln_x0 = x0;
 		const f32 ln_y0 = y0;
-		const f32 ln_x1 = ln_x0 + ch::get_num_digits(num_lines) * space_glyph->advance + line_number_padding;
+		const f32 ln_x1 = ln_x0 + (num_digits * space_glyph->advance) + line_number_padding;
 		const f32 ln_y1 = y1;
 		push_quad(ln_x0, ln_y0, ln_x1, ln_y1, config.line_number_background_color);
 	}
@@ -217,10 +220,6 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	f32 x = starting_x;
 	f32 y = starting_y;
 	u64 line_number = 1;
-
-#if LINE_COUNT_DEBUG
-	u32 line_char_count = 0;
-#endif
 
 	auto draw_cursor = [&](const Font_Glyph* g) {
 		if (edit_mode) {
@@ -244,9 +243,6 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		const u32 c = gap_buffer[i];
 		ch::Color color = config.foreground_color;
 
-#if LINE_COUNT_DEBUG
-		line_char_count += 1;
-#endif
         {
             // Obtain the current lexeme based on the current index
             while (lexeme + 1 < lexemes_end && i >= lexeme[1].i) {
@@ -333,8 +329,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			if (was_lmb_pressed) {
 				*cursor = i - 1;
 				*selection = *cursor;
-			}
-			else if (is_lmb_down) {
+			} else if (is_lmb_down) {
 				*cursor = i - 1;
 			}
 		}
@@ -356,13 +351,6 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		} 
 
 		if (c == ch::eol) {
-#if LINE_COUNT_DEBUG
-			tchar temp[128];
-			ch::sprintf(temp, CH_TEXT("[Actual=%lu; EOL_Table=%lu]"), line_char_count, buffer.eol_table[line_number - 1]);
-			push_text(temp, x, y, ch::magenta);
-			line_char_count = 0;
-#endif
-
 			x = starting_x;
 			y += font_height;
 			line_number += 1;
