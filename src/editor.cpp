@@ -10,6 +10,10 @@
 #include <ch_stl/time.h>
 #include <ch_stl/hash_table.h>
 
+#if CH_PLATFORM_WINDOWS
+#include "win32/icon_win32.h"
+#endif
+
 ch::Window the_window;
 
 const tchar* window_title = CH_TEXT("YEET");
@@ -52,6 +56,11 @@ int main() {
 		const u32 height = config.last_window_height;
 		const bool window_created = ch::create_gl_window(window_title, width, height, 0, &the_window);
 		assert(window_created);
+#if CH_PLATFORM_WINDOWS
+		HICON the_icon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
+		assert(the_icon);
+		SendMessage((HWND)the_window.os_handle, WM_SETICON, ICON_BIG, (LPARAM)the_icon);
+#endif
 	}
 	const bool is_gl_current = ch::make_current(the_window);
 	assert(is_gl_current);

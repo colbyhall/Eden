@@ -80,5 +80,6 @@ project "YEET"
 		files 
 		{
 			"src/win32/**.h",
-			"src/win32/**.cpp"
+			"src/win32/**.cpp",
+			"src/win32/**.rc"
 		}
