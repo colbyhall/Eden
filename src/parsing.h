@@ -6,21 +6,12 @@ struct Buffer;
 // C++ lexing/parsing tools.
 namespace parsing {
 // This is an enum for categorizing C++ source code characters.
-// The input space is split up into two different sections:
-// Everything used by the lexer, and everything else.
 // Since the lexer uses a table-based DFA, all of its relevant
 // char types need to be numerically adjacent, so that they can
-// index a contiguous cache-friendly table. That's why you see
-// that characters like SLASH (used in scanning comments) and POUND
-// (used in scanning preprocessor directives) are in the first
-// section, but not AND or COLON (just regular old operators).
+// index a contiguous cache-friendly table.
 // Strictly speaking, a real lexer would also process digraphs,
 // but digraphs are rarely used. Trigraphs are never used.
-//
-// n.b.: Backslashes get checked by their ASCII value directly in the
-// core loop, so the backslash does not need to be listed here.
 enum Char_Type : u8 {
-    // Everything used by the lexer:
     WHITE,
     NEWLINE,     // '\r' '\n'
     IDENT,       // '$' '@'-'Z' '_'-'z'
@@ -30,29 +21,9 @@ enum Char_Type : u8 {
     DIGIT,       // '0'-'9'
     SLASH,       // '/'
     STAR,        // '*'
-    OP,          // '!' '%' '?' '^' '|' '~'
-
-    // Everything else
-    AND,    // '&'
-    LPAREN, // '('
-    RPAREN, // ')'
-    PLUS,   // '+'
-    COMMA,  // ','
-    MINUS,  // '-'
-    DOT,    // '.'
-    COLON,  // ':'
-    SEMI,   // ';'
-    LT,     // '<'
-    EQU,    // '='
-    GT,     // '>'
-    LSQR,   // '['
-    RSQR,   // ']'
-    LCURLY, // '{'
-    RCURLY, // '}'
-
+    BS,          // '\\'
+    OP,
     NUM_CHAR_TYPES,
-
-    NUM_CHAR_TYPES_IN_LEXER = OP + 1,
 };
 
 // This is the actual DFA state machine. It's not perfect,
@@ -77,7 +48,9 @@ enum Lex_Dfa : u8 {
     DFA_PREPROC_BLOCK_COMMENT_STAR,
     DFA_LINE_COMMENT,
     DFA_STRINGLIT,
+    DFA_STRINGLIT_BS,
     DFA_CHARLIT,
+    DFA_CHARLIT_BS,
     DFA_PREPROC_SLASH,
     DFA_SLASH,
     DFA_WHITE,
@@ -86,13 +59,20 @@ enum Lex_Dfa : u8 {
     DFA_NUMLIT,
     DFA_PREPROC,
 
-    DFA_NUM_STATES
+    DFA_NUM_STATES,
+
+    // This is an informational bitmask that may be used in the future.
+    // At the moment it is 0, so that it has no effect when bitwise-ORed.
+    ADD = 0,
 };
 
+#pragma pack(push)
+#pragma pack(1)
 struct Lexeme {
-    unsigned int i : 28;
-    unsigned int dfa : 4;
+    const u32* i;
+    u8 dfa;
 };
+#pragma pack(pop)
 
 void parse_cpp(Buffer* b);
 

@@ -245,7 +245,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
         {
             // Obtain the current lexeme based on the current index
-            while (lexeme + 1 < lexemes_end && i >= lexeme[1].i) {
+
+            while (lexeme + 1 < lexemes_end &&
+                   // @TEMPORARY @HACK @@@
+                   ((ch::Gap_Buffer<u32>&)gap_buffer).get_index_as_cursor(i) >= (const u32*)lexeme[1].i
+                   ) {
                 lexeme++;
                 //push_glyph(the_font['_'], x, y, ch::magenta); // @Debug
             }
@@ -260,7 +264,9 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             ch::Color numlit = {0.5f, 0.5f, 1.0f, 1.0f};
             switch (lexeme->dfa) {
             case parsing::DFA_STRINGLIT:
+            case parsing::DFA_STRINGLIT_BS:
             case parsing::DFA_CHARLIT:
+            case parsing::DFA_CHARLIT_BS:
                 color = stringlit;
                 break;
             case parsing::DFA_PREPROC_BLOCK_COMMENT:
@@ -379,7 +385,8 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
     {
         // @Debug: Debug code to print the lexer speed in the corner.
         tchar temp[128];
-	    ch::sprintf(temp, CH_TEXT("%lluMB/s"), (u64)((buffer.gap_buffer.count()*4)/buffer.parse_time/1024/1024));
+        // @Cleanup
+	    ch::sprintf(temp, CH_TEXT("%.3f GB/s"), (f64)((buffer.gap_buffer.count()*4)/buffer.parse_time/1024.0/1024.0/1024.0));
 	    push_text(temp, x0, y0, ch::magenta);
     }
 #endif
