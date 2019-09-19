@@ -248,7 +248,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
             while (lexeme + 1 < lexemes_end &&
                    // @TEMPORARY @HACK @@@
-                   ((ch::Gap_Buffer<u32>&)gap_buffer).get_index_as_cursor(i) >= (const u32*)lexeme[1].i
+                   ((ch::Gap_Buffer<u32>&)gap_buffer).get_index_as_cursor(i + 1) - 1 >= (const u32*)lexeme[1].i
                    ) {
                 lexeme++;
                 //push_glyph(the_font['_'], x, y, ch::magenta); // @Debug
@@ -263,19 +263,24 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             ch::Color op = {0.7f, 0.7f, 0.7f, 1.0f};
             ch::Color numlit = {0.5f, 0.5f, 1.0f, 1.0f};
             switch (lexeme->dfa) {
+            case parsing::DFA_PREPROC:
+                color = preproc;
+                break;
+            case parsing::DFA_MACRO:
+                color = numlit;
+                break;
             case parsing::DFA_STRINGLIT:
             case parsing::DFA_STRINGLIT_BS:
             case parsing::DFA_CHARLIT:
             case parsing::DFA_CHARLIT_BS:
                 color = stringlit;
                 break;
-            case parsing::DFA_PREPROC_BLOCK_COMMENT:
-            case parsing::DFA_PREPROC_BLOCK_COMMENT_STAR:
             case parsing::DFA_BLOCK_COMMENT:
             case parsing::DFA_BLOCK_COMMENT_STAR:
             case parsing::DFA_LINE_COMMENT:
                 color = comment;
                 break;
+            case parsing::DFA_WHITE_BS:
             case parsing::DFA_WHITE:
                 if (lexeme > lexemes_begin && lexeme[-1].dfa == parsing::DFA_STRINGLIT) {
                     color = stringlit;
@@ -290,25 +295,13 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             case parsing::DFA_IDENT:
                 break;
             case parsing::DFA_OP:
+            case parsing::DFA_OP2:
                 color = op;
+                break;
+            case parsing::DFA_NEWLINE:
                 break;
             case parsing::DFA_NUMLIT:
                 color = numlit;
-                break;
-            case parsing::DFA_PREPROC:
-            case parsing::DFA_PREPROC_BS:
-                if (c == '/' && lexeme > lexemes_begin && lexeme[-1].dfa <= parsing::DFA_LINE_COMMENT) {
-                    color = comment;
-                } else {
-                    color = preproc;
-                }
-                break;
-            case parsing::DFA_PREPROC_SLASH:
-                if (lexeme + 1 < lexemes_end && lexeme[1].dfa <= parsing::DFA_LINE_COMMENT) {
-                    color = comment;
-                } else {
-                    color = preproc;
-                }
                 break;
             case parsing::DFA_SLASH:
                 if (lexeme + 1 < lexemes_end && lexeme[1].dfa <= parsing::DFA_LINE_COMMENT) {
@@ -386,8 +379,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
     {
         // @Debug: Debug code to print the lexer speed in the corner.
         tchar temp[128];
-        // @Cleanup
-	    ch::sprintf(temp, CH_TEXT("%.3f GB/s"), (f64)((buffer.gap_buffer.count()*4)/buffer.parse_time/1024.0/1024.0/1024.0));
+        // @Cleanup: Massive @Hack here.
+	    ch::sprintf(temp, CH_TEXT("Lex: %.3f GB/s\nParse: %llu million lexemes/s\nTotal: %.3f GB/s"),
+            (f64)((buffer.gap_buffer.count()*4)/buffer.lex_time  /1024/1024/1024),
+            (u64)((buffer.lexemes.count)/buffer.parse_time/1000/1000),
+            (f64)((buffer.gap_buffer.count()*4)/(buffer.lex_time+buffer.parse_time)/1024/1024/1024));
 	    push_text(temp, x0, y0, ch::magenta);
     }
 #endif
