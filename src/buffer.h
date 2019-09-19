@@ -20,7 +20,7 @@ struct Buffer {
 
     bool syntax_dirty = true;
     ch::Array<parsing::Lexeme> lexemes;
-    f64 parse_time;
+    f64 parse_time = 0;
 
 	Buffer();
 	Buffer(Buffer_ID _id);

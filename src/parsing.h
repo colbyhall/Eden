@@ -5,27 +5,14 @@ struct Buffer;
 
 // C++ lexing/parsing tools.
 namespace parsing {
-// This is an enum for categorizing C++ source code characters.
-// Since the lexer uses a table-based DFA, all of its relevant
-// char types need to be numerically adjacent, so that they can
-// index a contiguous cache-friendly table.
-// Strictly speaking, a real lexer would also process digraphs,
-// but digraphs are rarely used. Trigraphs are never used.
-enum Char_Type : u8 {
-    WHITE,
-    NEWLINE,     // '\r' '\n'
-    IDENT,       // '$' '@'-'Z' '_'-'z'
-    POUND,       // '#'
-    DOUBLEQUOTE, // '"'
-    SINGLEQUOTE, // '\''
-    DIGIT,       // '0'-'9'
-    SLASH,       // '/'
-    STAR,        // '*'
-    BS,          // '\\'
-    OP,
-    NUM_CHAR_TYPES,
-};
-
+// @Temporary @Todo @Cleanup @Hack @@@
+#if 1
+#define BS(...) __VA_ARGS__
+#define BN(...)
+#else
+#define BS(...)
+#define BN(...) __VA_ARGS__
+#endif
 // This is the actual DFA state machine. It's not perfect,
 // but I (phillip) can get it to run at 1.25GB/s on a 3.6 GHz machine
 // with 1600 MHz DDR3 RAM and, as of writing, YEET's UTF32 gap buffer.
@@ -57,13 +44,35 @@ enum Lex_Dfa : u8 {
     DFA_IDENT,
     DFA_OP,
     DFA_NUMLIT,
-    DFA_PREPROC,
+    DFA_NEWLINE,
+    BS(DFA_PREPROC_BS,)
 
     DFA_NUM_STATES,
 
     // This is an informational bitmask that may be used in the future.
     // At the moment it is 0, so that it has no effect when bitwise-ORed.
     ADD = 0,
+};
+
+// This is an enum for categorizing C++ source code characters.
+// Since the lexer uses a table-based DFA, all of its relevant
+// char types need to be numerically adjacent, so that they can
+// index a contiguous cache-friendly table.
+// Strictly speaking, a real lexer would also process digraphs,
+// but digraphs are rarely used. Trigraphs are never used.
+enum Char_Type : u8 {
+    WHITE       = DFA_NUM_STATES *  0, 
+    NEWLINE     = DFA_NUM_STATES *  1,     // '\r' '\n'
+    IDENT       = DFA_NUM_STATES *  2,       // '$' '@'-'Z' '_'-'z'
+    POUND       = DFA_NUM_STATES *  3,       // '#'
+    DOUBLEQUOTE = DFA_NUM_STATES *  4, // '"'
+    SINGLEQUOTE = DFA_NUM_STATES *  5, // '\''
+    DIGIT       = DFA_NUM_STATES *  6,       // '0'-'9'
+    SLASH       = DFA_NUM_STATES *  7,       // '/'
+    STAR        = DFA_NUM_STATES *  8,        // '*'
+    BS          = DFA_NUM_STATES *  9,          // '\\'
+    OP          = DFA_NUM_STATES * 10,
+    NUM_CHAR_TYPES,
 };
 
 #pragma pack(push)

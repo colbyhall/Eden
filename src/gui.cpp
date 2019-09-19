@@ -296,6 +296,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
                 color = numlit;
                 break;
             case parsing::DFA_PREPROC:
+            BS(case parsing::DFA_PREPROC_BS:)
                 if (c == '/' && lexeme > lexemes_begin && lexeme[-1].dfa <= parsing::DFA_LINE_COMMENT) {
                     color = comment;
                 } else {
@@ -376,7 +377,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		x += g->advance;
 
         // @TEMP(phil) this is necessary for large files, or else you will OOM on render commands.
-        if (y > the_window.get_size().uy * 1.8f) {
+        if (y > the_window.get_size().uy) {
             break;
         }
 	}
