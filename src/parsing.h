@@ -44,7 +44,7 @@ enum Lex_Dfa : u8 {
     DFA_IDENT,
     DFA_OP,
     DFA_NUMLIT,
-    DFA_NEWLINE,
+    DFA_PREPROC,
     BS(DFA_PREPROC_BS,)
 
     DFA_NUM_STATES,
