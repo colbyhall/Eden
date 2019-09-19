@@ -296,7 +296,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
                 color = numlit;
                 break;
             case parsing::DFA_PREPROC:
-            BS(case parsing::DFA_PREPROC_BS:)
+            case parsing::DFA_PREPROC_BS:
                 if (c == '/' && lexeme > lexemes_begin && lexeme[-1].dfa <= parsing::DFA_LINE_COMMENT) {
                     color = comment;
                 } else {

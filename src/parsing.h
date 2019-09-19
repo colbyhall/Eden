@@ -5,14 +5,6 @@ struct Buffer;
 
 // C++ lexing/parsing tools.
 namespace parsing {
-// @Temporary @Todo @Cleanup @Hack @@@
-#if 1
-#define BS(...) __VA_ARGS__
-#define BN(...)
-#else
-#define BS(...)
-#define BN(...) __VA_ARGS__
-#endif
 // This is the actual DFA state machine. It's not perfect,
 // but I (phillip) can get it to run at 1.25GB/s on a 3.6 GHz machine
 // with 1600 MHz DDR3 RAM and, as of writing, YEET's UTF32 gap buffer.
@@ -45,7 +37,7 @@ enum Lex_Dfa : u8 {
     DFA_OP,
     DFA_NUMLIT,
     DFA_PREPROC,
-    BS(DFA_PREPROC_BS,)
+    DFA_PREPROC_BS,
 
     DFA_NUM_STATES,
 
