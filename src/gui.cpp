@@ -262,7 +262,15 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             ch::Color preproc = {0.1f, 1.0f, 0.6f, 1.0f};
             ch::Color op = {0.7f, 0.7f, 0.7f, 1.0f};
             ch::Color numlit = {0.5f, 0.5f, 1.0f, 1.0f};
+            ch::Color type = {0.0f, 0.7f, 0.9f, 1.0f};
+            ch::Color keyword = {1.0f, 1.0f, 1.0f, 1.0f};
             switch (lexeme->dfa) {
+            case parsing::DFA_FUNCTION:
+                color = preproc;
+                break;
+            case parsing::DFA_KEYWORD:
+                color = keyword;
+                break;
             case parsing::DFA_PREPROC:
                 color = preproc;
                 break;
@@ -306,7 +314,12 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             case parsing::DFA_SLASH:
                 if (lexeme + 1 < lexemes_end && lexeme[1].dfa <= parsing::DFA_LINE_COMMENT) {
                     color = comment;
+                } else {
+                    color = op;
                 }
+                break;
+            case parsing::DFA_TYPE:
+                color = type;
                 break;
             }
         }

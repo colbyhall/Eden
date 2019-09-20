@@ -19,14 +19,14 @@ enum Lex_Dfa : u8 {
     DFA_BLOCK_COMMENT,
     DFA_BLOCK_COMMENT_STAR,
     DFA_LINE_COMMENT,
+    DFA_WHITE,
+    DFA_WHITE_BS,
+    DFA_NEWLINE,
     DFA_STRINGLIT,
     DFA_STRINGLIT_BS,
     DFA_CHARLIT,
     DFA_CHARLIT_BS,
     DFA_SLASH,
-    DFA_WHITE,
-    DFA_WHITE_BS,
-    DFA_NEWLINE,
     DFA_IDENT,
     DFA_OP,
     DFA_OP2,
@@ -36,6 +36,9 @@ enum Lex_Dfa : u8 {
 
     DFA_PREPROC,
     DFA_MACRO,
+    DFA_TYPE,
+    DFA_KEYWORD,
+    DFA_FUNCTION,
 };
 
 // This is an enum for categorizing C++ source code characters.

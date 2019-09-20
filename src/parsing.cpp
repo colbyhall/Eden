@@ -25,14 +25,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
+    DFA_WHITE,         // DFA_WHITE
+    DFA_WHITE,         // DFA_WHITE_BS
+    DFA_NEWLINE,       // DFA_NEWLINE
     DFA_STRINGLIT,     // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_CHARLIT,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_WHITE,         // DFA_SLASH
-    DFA_WHITE,         // DFA_WHITE
-    DFA_WHITE,         // DFA_WHITE_BS
-    DFA_WHITE,         // DFA_NEWLINE
     DFA_WHITE,         // DFA_IDENT
     DFA_WHITE,         // DFA_OP
     DFA_WHITE,         // DFA_OP2
@@ -41,14 +41,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_NEWLINE,       // DFA_LINE_COMMENT
+    DFA_NEWLINE,       // DFA_WHITE
+    DFA_WHITE,         // DFA_WHITE_BS
+    DFA_NEWLINE,       // DFA_NEWLINE
     DFA_NEWLINE,       // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_NEWLINE,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_NEWLINE,       // DFA_SLASH
-    DFA_NEWLINE,       // DFA_WHITE
-    DFA_WHITE,         // DFA_WHITE_BS
-    DFA_NEWLINE,       // DFA_NEWLINE
     DFA_NEWLINE,       // DFA_IDENT
     DFA_NEWLINE,       // DFA_OP
     DFA_NEWLINE,       // DFA_OP2
@@ -57,30 +57,30 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
+    DFA_IDENT,         // DFA_WHITE
+    DFA_IDENT,         // DFA_WHITE_BS
+    DFA_IDENT,         // DFA_NEWLINE
     DFA_STRINGLIT,     // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_CHARLIT,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_IDENT,         // DFA_SLASH
-    DFA_IDENT,         // DFA_WHITE
-    DFA_IDENT,         // DFA_WHITE_BS
-    DFA_IDENT,         // DFA_NEWLINE
     DFA_IDENT,         // DFA_IDENT
     DFA_IDENT,         // DFA_OP
     DFA_IDENT,         // DFA_OP2
-    DFA_NUMLIT,        // DFA_NUMLIT
+    DFA_IDENT,         // DFA_NUMLIT
     // DOUBLEQUOTE
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
-    DFA_WHITE,         // DFA_STRINGLIT
+    DFA_STRINGLIT,     // DFA_WHITE
+    DFA_STRINGLIT,     // DFA_WHITE_BS
+    DFA_STRINGLIT,     // DFA_NEWLINE
+    DFA_OP,            // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_CHARLIT,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_STRINGLIT,     // DFA_SLASH
-    DFA_STRINGLIT,     // DFA_WHITE
-    DFA_STRINGLIT,     // DFA_WHITE_BS
-    DFA_STRINGLIT,     // DFA_NEWLINE
     DFA_STRINGLIT,     // DFA_IDENT
     DFA_STRINGLIT,     // DFA_OP
     DFA_STRINGLIT,     // DFA_OP2
@@ -89,14 +89,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
-    DFA_STRINGLIT,     // DFA_STRINGLIT
-    DFA_STRINGLIT,     // DFA_STRINGLIT_BS
-    DFA_WHITE,         // DFA_CHARLIT
-    DFA_CHARLIT,       // DFA_CHARLIT_BS
-    DFA_CHARLIT,       // DFA_SLASH
     DFA_CHARLIT,       // DFA_WHITE
     DFA_CHARLIT,       // DFA_WHITE_BS
     DFA_CHARLIT,       // DFA_NEWLINE
+    DFA_STRINGLIT,     // DFA_STRINGLIT
+    DFA_STRINGLIT,     // DFA_STRINGLIT_BS
+    DFA_OP,            // DFA_CHARLIT
+    DFA_CHARLIT,       // DFA_CHARLIT_BS
+    DFA_CHARLIT,       // DFA_SLASH
     DFA_CHARLIT,       // DFA_IDENT
     DFA_CHARLIT,       // DFA_OP
     DFA_CHARLIT,       // DFA_OP2
@@ -105,14 +105,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
+    DFA_NUMLIT,        // DFA_WHITE
+    DFA_NUMLIT,        // DFA_WHITE_BS
+    DFA_NUMLIT,        // DFA_NEWLINE
     DFA_STRINGLIT,     // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_CHARLIT,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_NUMLIT,        // DFA_SLASH
-    DFA_NUMLIT,        // DFA_WHITE
-    DFA_NUMLIT,        // DFA_WHITE_BS
-    DFA_NUMLIT,        // DFA_NEWLINE
     DFA_IDENT,         // DFA_IDENT
     DFA_NUMLIT,        // DFA_OP
     DFA_NUMLIT,        // DFA_OP2
@@ -121,14 +121,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_WHITE,         // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
+    DFA_SLASH,         // DFA_WHITE
+    DFA_SLASH,         // DFA_WHITE_BS
+    DFA_SLASH,         // DFA_NEWLINE
     DFA_STRINGLIT,     // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_CHARLIT,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_LINE_COMMENT,  // DFA_SLASH
-    DFA_SLASH,         // DFA_WHITE
-    DFA_SLASH,         // DFA_WHITE_BS
-    DFA_SLASH,         // DFA_NEWLINE
     DFA_SLASH,         // DFA_IDENT
     DFA_SLASH,         // DFA_OP
     DFA_SLASH,         // DFA_OP2
@@ -137,14 +137,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT_STAR, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT_STAR, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,       // DFA_LINE_COMMENT
+    DFA_OP,                 // DFA_WHITE
+    DFA_OP,                 // DFA_WHITE_BS
+    DFA_OP,                 // DFA_NEWLINE
     DFA_STRINGLIT,          // DFA_STRINGLIT
     DFA_STRINGLIT,          // DFA_STRINGLIT_BS
     DFA_CHARLIT,            // DFA_CHARLIT
     DFA_CHARLIT,            // DFA_CHARLIT_BS
     DFA_BLOCK_COMMENT,      // DFA_SLASH
-    DFA_OP,                 // DFA_WHITE
-    DFA_OP,                 // DFA_WHITE_BS
-    DFA_OP,                 // DFA_NEWLINE
     DFA_OP,                 // DFA_IDENT
     DFA_OP2,                // DFA_OP
     DFA_OP,                 // DFA_OP2
@@ -153,14 +153,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
+    DFA_WHITE_BS,      // DFA_WHITE
+    DFA_WHITE_BS,      // DFA_WHITE_BS
+    DFA_WHITE_BS,      // DFA_NEWLINE
     DFA_STRINGLIT_BS,  // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_CHARLIT_BS,    // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_WHITE_BS,      // DFA_SLASH
-    DFA_WHITE_BS,      // DFA_WHITE
-    DFA_WHITE_BS,      // DFA_WHITE_BS
-    DFA_WHITE_BS,      // DFA_NEWLINE
     DFA_WHITE_BS,      // DFA_IDENT
     DFA_WHITE_BS,      // DFA_OP
     DFA_WHITE_BS,      // DFA_OP2
@@ -169,14 +169,14 @@ static const u8 lex_table[] = {
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT_STAR
     DFA_LINE_COMMENT,  // DFA_LINE_COMMENT
+    DFA_OP,            // DFA_WHITE
+    DFA_OP,            // DFA_WHITE_BS
+    DFA_OP,            // DFA_NEWLINE
     DFA_STRINGLIT,     // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_CHARLIT,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
     DFA_OP,            // DFA_SLASH
-    DFA_OP,            // DFA_WHITE
-    DFA_OP,            // DFA_WHITE_BS
-    DFA_OP,            // DFA_NEWLINE
     DFA_OP,            // DFA_IDENT
     DFA_OP2,           // DFA_OP
     DFA_OP,            // DFA_OP2
@@ -188,10 +188,11 @@ struct Lexer_Data {
     const u32* idx_base;
 };
 
-static const u32 *lex(Lexer_Data& l, const u32* p, const u32* const end,
-                      Lexeme*& lexemes) {
+void lex(Lexer_Data& l, const u32* p, const u32* const end, Lexeme*& lexemes) {
     for (; p < end; p++) {
-        u8 new_dfa = lex_table[l.dfa + char_type[(int)*p & (((int)*p - 128) >> 31)]];
+        int c = (int)*p;
+        c &= (c - 128) >> 31;
+        u8 new_dfa = lex_table[l.dfa + char_type[c]];
         if (new_dfa != l.dfa) {
             lexemes->i = p;
             lexemes->dfa = new_dfa;
@@ -199,14 +200,26 @@ static const u32 *lex(Lexer_Data& l, const u32* p, const u32* const end,
             l.dfa = new_dfa;
         }
     }
-    return p;
+}
+
+const u32* temp_parser_gap;
+u64 temp_parser_gap_size;
+u64 toklen(Lexeme* l) {
+    const u32* next_i;
+    if (l[1].dfa == DFA_NUM_STATES) {
+        next_i = l[2].i;
+    } else {
+        next_i = l[1].i;
+    }
+    if (l->i < temp_parser_gap && next_i > temp_parser_gap) {
+        return next_i - l->i - temp_parser_gap_size;
+    } else {
+        return next_i - l->i;
+    }
 }
 
 Lexeme* skip_comments_in_line(Lexeme* l, Lexeme* end) {
-    while (l < end &&
-           (l->dfa <= DFA_LINE_COMMENT ||
-            (l->dfa >= DFA_WHITE && l->dfa < DFA_NEWLINE) ||
-            (l->dfa == DFA_SLASH && l[1].dfa <= DFA_LINE_COMMENT))) {
+    while (l < end && (l->dfa < DFA_NEWLINE || l->dfa == DFA_SLASH && l[1].dfa <= DFA_LINE_COMMENT)) {
         l++;
     }
     return l;
@@ -219,12 +232,12 @@ Lexeme* parse_preproc(Lexeme* l, Lexeme* end) {
         l->dfa = DFA_PREPROC;
         l++;
         l = skip_comments_in_line(l, end);
-        if (l < end && l->i[0] == '<') {
+        if (l->i[0] == '<') {
             l->dfa = DFA_STRINGLIT;
             while (l < end && l->dfa != DFA_NEWLINE) {
                 l->dfa = DFA_STRINGLIT;
                 l++;
-                if (l < end && l->i[0] == '>') {
+                if (l->i[0] == '>') {
                     l->dfa = DFA_STRINGLIT;
                     l++;
                     break;
@@ -240,21 +253,285 @@ Lexeme* parse_preproc(Lexeme* l, Lexeme* end) {
     return l;
 }
 Lexeme* next_token(Lexeme* l, Lexeme* end) {
+skip_more_comments:;
     l = skip_comments_in_line(l, end);
+    if (l->i[0] == '#') l = parse_preproc(l, end);
     if (l->dfa == DFA_NEWLINE) {
         l++;
-        l = skip_comments_in_line(l, end);
-        if (l < end && l->i[0] == '#') parse_preproc(l, end);
+        goto skip_more_comments;
     }
     return l;
 }
 
-void parse(Lexeme* l, Lexeme* end, const u32* gap, const u32* gap_end) {
-    if (l < end && l->i[0] == '#') parse_preproc(l, end);
+Lexeme* parse_stringlit(Lexeme* l) {
+    do {
+        l++;
+    } while (l->dfa == DFA_STRINGLIT || l->dfa == DFA_STRINGLIT_BS);
+    if (l->dfa == DFA_OP) { // implies l < end
+        assert(l->i[0] == '"');
+        l->dfa = DFA_STRINGLIT;
+        l++;
+    }
+    return l;
+}
+Lexeme* parse_charlit(Lexeme* l) {
+    do {
+        l++;
+    } while (l->dfa == DFA_CHARLIT || l->dfa == DFA_CHARLIT_BS);
+    if (l->dfa == DFA_OP) { // implies l < end
+        assert(l->i[0] == '\'');
+        l->dfa = DFA_CHARLIT;
+        l++;
+    }
+    return l;
+}
+
+Lexeme* parse_numlit(Lexeme* l) {
+    l++;
+    if (l->dfa == DFA_IDENT) {
+        l->dfa = DFA_NUMLIT;
+        l++;
+    }
+    if (l->i[0] == '.') {
+        l->dfa = DFA_NUMLIT;
+        l++;
+        if (l->dfa == DFA_NUMLIT) {
+            l++;
+        }
+    }
+    if (l->dfa == DFA_IDENT) {
+        l->dfa = DFA_NUMLIT;
+        l++;
+    }
+    return l;
+}
+
+Lexeme* parse_expr(Lexeme* l, Lexeme* end, bool break_on_comma = false);
+Lexeme* parse_parens(Lexeme* l, Lexeme* end) {
+    l++;
     while (l < end) {
         l = next_token(l, end);
+        l = parse_expr(l, end);
+        if (l->i[0] == ')') {
+            l++;
+            break;
+        }
+        if (l->i[0] == ';' ||
+            l->i[0] == ']' ||
+            l->i[0] == '}') {
+            break;
+        }
+    }
+    return l;
+}
+
+Lexeme* parse_braces(Lexeme* l, Lexeme* end);
+
+struct Ident {
+    Lexeme* start;
+    Lexeme* end;
+    operator bool() {
+        return end > start;
+    }
+    void assign(Lex_Dfa dfa) {
+        for (Lexeme* p = start; p < end; p++) {
+            p = next_token(p, end);
+            p->dfa = dfa;
+        }
+    }
+};
+Ident parse_ident(Lexeme* l, Lexeme* end) {
+    Ident result;
+    result.start = l;
+    result.end = l;
+    if (l->i[0] == ':' && l[1].i[0] == ':') {
+    more_idents:;
+        l->dfa = DFA_IDENT;
         l++;
-        // @Todo: more here
+        l->dfa = DFA_IDENT;
+        l++;
+        l = next_token(l, end);
+    }
+    if (l->dfa == DFA_IDENT) {
+        l++;
+        result.end = l;
+        l = next_token(l, end);
+        if (l->i[0] == ':' && l[1].i[0] == ':') goto more_idents;
+    }
+    return result;
+}
+
+Lexeme* parse_expr(Lexeme* l, Lexeme* end, bool break_on_comma) {
+    if (l->i[0] == '(') {
+        l = parse_parens(l, end);
+        l = next_token(l, end);
+    }
+
+    if (l->i[0] == '!' ||
+        l->i[0] == '&' ||
+        l->i[0] == '*' ||
+        l->i[0] == '-' ||
+        l->i[0] == '~' ||
+        l->i[0] == '+') {
+        l++;
+        l = next_token(l, end);
+    }
+    
+    while (Ident ident = parse_ident(l, end)) {
+        l = ident.end;
+        l = next_token(l, end);
+        if (l->i[0] == '(') {
+            ident.assign(DFA_FUNCTION);
+            l = parse_parens(l, end);
+        }
+    }
+    if (l->dfa == DFA_STRINGLIT) {
+        l = parse_stringlit(l);
+    } else if (l->dfa == DFA_CHARLIT) {
+        l = parse_charlit(l);
+    } else if (l->dfa == DFA_NUMLIT) {
+        l = parse_numlit(l);
+    } else if (l->i[0] == '.') {
+        l = parse_numlit(l - 1);
+    }
+check_for_binary_op:;
+    l = next_token(l, end);
+    if (l->i[0] == '(') {
+        l = parse_parens(l, end);
+    }
+    if ((l->i[0] == '!' && l[1].i[0] == '=') ||
+         l->i[0] == '%' ||
+         l->i[0] == '^' ||
+         l->i[0] == '&' ||
+         l->i[0] == '*' ||
+         l->i[0] == '-' ||
+         l->i[0] == '=' ||
+         (!break_on_comma && l->i[0] == ',') ||
+         l->i[0] == '.' ||
+         l->i[0] == '/' ||
+         l->i[0] == '+' ||
+         l->i[0] == '|' ||
+         l->i[0] == '<' ||
+         l->i[0] == '>') {
+        l++;
+        if (l->i[0] == '=') l++;
+        l = next_token(l, end);
+        l = parse_expr(l, end);
+    } else if (l->i[0] == '[') {
+        l++;
+        while (l < end) {
+            l = next_token(l, end);
+            l = parse_expr(l, end);
+            if (l->i[0] == ']') {
+                l++;
+                goto check_for_binary_op;
+                break;
+            }
+            if (l->i[0] == ')' ||
+                l->i[0] == ';' ||
+                l->i[0] == '}') {
+                break;
+            }
+        }
+    } else if (l->i[0] == '{') {
+        l = parse_braces(l, end);
+        goto check_for_binary_op;
+    } else if (l->i[0] == '?') {
+        l++;
+        l = next_token(l, end);
+        l = parse_expr(l, end);
+        l = next_token(l, end);
+        if (l->i[0] == ':') {
+            l++;
+            l = next_token(l, end);
+            l = parse_expr(l, end);
+        }
+    }
+    return l;
+}
+
+Lexeme* parse_stmt(Lexeme* l, Lexeme* end);
+Lexeme* parse_braces(Lexeme* l, Lexeme* end) {
+    l++;
+    while (l < end) {
+        l = next_token(l, end);
+        l = parse_stmt(l, end);
+        if (l->i[0] == '}') {
+            l++;
+            break;
+        }
+        if (l->i[0] == ')' ||
+            l->i[0] == ';' ||
+            l->i[0] == ']') {
+            l++;
+        }
+    }
+    return l;
+}
+
+Lexeme* parse_stmt(Lexeme* l, Lexeme* end) {
+    if (l->dfa == DFA_IDENT) {
+        switch (toklen(l)) {
+        assign_keyword:;
+            l->dfa = DFA_KEYWORD;
+            l++;
+            l = next_token(l, end);
+            break;
+        case 2:
+            if (l->i[0] == 'i' && l->i[1] == 'f') goto assign_keyword;
+        case 3:
+            if (l->i[0] == 'f' && l->i[1] == 'o' && l->i[1] == 'r') goto assign_keyword;
+        //case 3:
+        //    if (l->i[0] == 'i' && l->i[1] == 'n' && l->i[2] == 't') goto assign_keyword;
+        default:;
+        }
+    }
+    if (l->i[0] == '{') return parse_braces(l, end);
+
+    if (Ident maybe_type = parse_ident(l, end)) {
+        l = maybe_type.end;
+        l = next_token(l, end);
+        if (Ident maybe_function = parse_ident(l, end)) {
+            l = maybe_function.end;
+            maybe_type.assign(DFA_TYPE);
+            l = next_token(l, end);
+            if (l->i[0] == '(') {
+                maybe_function.assign(DFA_FUNCTION);
+            } else {
+                maybe_type = maybe_function;
+            }
+        } else if (l->i[0] == '(') {
+            maybe_type.assign(DFA_FUNCTION);
+            l = parse_parens(l, end);
+        }
+    }
+    while (l < end) {
+        l = next_token(l, end);
+        l = parse_expr(l, end);
+        if (l->i[0] == ';' ||
+            l->i[0] == ':') {
+            l++;
+            break;
+        }
+        if (l->i[0] == ')' ||
+            l->i[0] == ']' ||
+            l->i[0] == '}') {
+            break;
+        }
+    }
+    return l;
+}
+
+void parse(Lexeme* l, Lexeme* end) {
+    while (l < end) {
+        l = next_token(l, end);
+        l = parse_stmt(l, end);
+        if (l->i[0] == ']' ||
+            l->i[0] == ';' ||
+            l->i[0] == ')' ||
+            l->i[0] == '}') {
+            l++;
+        }
     }
 }
 
@@ -264,34 +541,60 @@ void parse_cpp(Buffer* buf) {
     ch::Gap_Buffer<u32>& b = buf->gap_buffer;
     usize buffer_count = b.count();
 
-    buf->lexemes.reserve((buffer_count + 1) - buf->lexemes.allocated);
+    // Three extra lexemes:
+    // One extra lexeme at the front.
+    // One at the back to indicate buffer end to the parser, pointing to safe
+    // scratch data.
+    // One after that pointing to the the real position of the (unreadable) buffer
+    // end, so that identifier lengths can be correctly computed.
+    buf->lexemes.reserve((1 + buffer_count + 1 + 1) - buf->lexemes.allocated);
     buf->lexemes.count = 1;
     if (buffer_count) {
-
-        u32* gap_end = b.gap + b.gap_size;
-        u32* buffer_end = b.data + b.allocated;
         Lexer_Data lexer = {};
-        lexer.dfa = DFA_WHITE;
+        lexer.dfa = DFA_NEWLINE;
         lexer.idx_base = b.data;
         Lexeme* lex_seeker = buf->lexemes.begin();
+        {
+            lex_seeker->i = b.data;
+            lex_seeker->dfa = lexer.dfa;
+            lex_seeker++;
+        }
         
         f64 lex_time = -ch::get_time_in_seconds();
-        const u32* const finished_on = lex(lexer, b.data, b.gap, lex_seeker);
-        const usize skip_ahead = finished_on - b.gap;
-        lexer.idx_base = b.data + b.gap_size;
-        lex(lexer, gap_end + skip_ahead, buffer_end, lex_seeker);
+        lex(lexer, b.data, b.gap, lex_seeker);
+        Lexeme* lexeme_at_gap = lex_seeker - 1;
+        lex(lexer, b.gap + b.gap_size, b.data + b.allocated, lex_seeker);
         lex_time += ch::get_time_in_seconds();
+
+        if (lexeme_at_gap > buf->lexemes.begin() && lexeme_at_gap < lex_seeker) {
+            assert(lexeme_at_gap->i < b.gap);
+            if (lexeme_at_gap + 1 < lex_seeker) {
+                assert(lexeme_at_gap[1].i >= b.gap + b.gap_size);
+            }
+            b.move_gap_to_index(lexeme_at_gap->i - b.data);
+            assert(lexeme_at_gap->i == b.gap);
+        }
+
         {
             assert(lex_seeker < buf->lexemes.begin() + buf->lexemes.allocated);
-            lex_seeker->i = buffer_end;
-            lex_seeker->dfa = DFA_WHITE;
+            lex_seeker->dfa = DFA_NUM_STATES;
+            static const u32 dummy_buffer[16];
+            lex_seeker->i = &dummy_buffer[0]; // So the parser can safely read from here.
+            lex_seeker++;
+            assert(lex_seeker < buf->lexemes.begin() + buf->lexemes.allocated);
+            lex_seeker->dfa = DFA_NUM_STATES;
+            lex_seeker->i = b.data + b.allocated; // So the parser knows the real end position.
             lex_seeker++;
         }
         buf->lexemes.count = lex_seeker - buf->lexemes.begin();
 
+        temp_parser_gap = b.gap;
+        temp_parser_gap_size = b.gap_size;
+
         f64 parse_time = -ch::get_time_in_seconds();
-        parse(buf->lexemes.begin(), buf->lexemes.end(), b.gap, gap_end);
+        parse(buf->lexemes.begin(), buf->lexemes.end() - 2);
         parse_time += ch::get_time_in_seconds();
+        buf->lexemes.end()[-2] = buf->lexemes.end()[-1];
         buf->lex_time = lex_time;
         buf->parse_time = parse_time;
     }
