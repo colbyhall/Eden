@@ -12,6 +12,7 @@ extern Buffer_View* focused_view;
 
 ch::Vector2 last_mouse_position;
 ch::Vector2 current_mouse_position;
+f32 current_mouse_scroll_y;
 
 static const usize MAX_MB = 3;
 static bool mb_down[MAX_MB];
@@ -60,6 +61,10 @@ void init_input() {
 	the_window.on_maximized = [](const ch::Window& window) {
 		on_window_maximized_config();
 	};
+
+	the_window.on_mouse_wheel_scrolled = [](const ch::Window& window, f32 delta) {
+		current_mouse_scroll_y = delta;
+	};
 }
 
 void process_input() {
@@ -69,6 +74,7 @@ void process_input() {
 	ch::mem_zero(mb_released, sizeof(mb_released));
 	ch::mem_zero(keys_released, sizeof(keys_released));
 	ch::mem_zero(keys_pressed, sizeof(keys_pressed));
+	current_mouse_scroll_y = 0.f;
 
 	ch::poll_events();
 

@@ -186,7 +186,7 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 
 #define PARSE_SPEED_DEBUG 0
 
-bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 x0, f32 y0, f32 x1, f32 y1) {
+bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 scroll_y, f32* out_max_scroll_y, f32 x0, f32 y0, f32 x1, f32 y1) {
 	const ch::Vector2 mouse_pos = current_mouse_position;
 	const bool was_lmb_pressed = was_mouse_button_pressed(CH_MOUSE_LEFT);
 	const bool is_lmb_down = is_mouse_button_down(CH_MOUSE_LEFT);
@@ -215,7 +215,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	}
 	
 	const f32 starting_x = x0;
-	const f32 starting_y = y0;
+	const f32 starting_y = y0 - scroll_y;
 	f32 x = starting_x;
 	f32 y = starting_y;
 	u64 line_number = 1;
@@ -335,7 +335,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			g = unknown_glyph;
 		}
 
-		if (x + space_glyph->advance > x1 && c != ch::eol) {
+		if (x + space_glyph->advance * 2 > x1 && c != ch::eol) {
 			x = starting_x;
 			y += font_height;
 
@@ -388,14 +388,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 		if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
 			
-		if (!ch::is_whitespace(c)) {
+		if (!ch::is_whitespace(c) && old_y > y0) {
 			push_glyph(g, old_x, old_y, color);
 		}
 
-        // @TEMP(phil) this is necessary for large files, or else you will OOM on render commands.
-        if (y > the_window.get_size().uy) {
-            break;
-        }
+		if (y > y1) break;
 	}
 
 #if PARSE_SPEED_DEBUG
@@ -412,9 +409,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
     }
 #endif
 
+	*out_max_scroll_y = y - starting_y;
+
 	if (*cursor + 1 == gap_buffer.count() && (show_cursor || !edit_mode)) draw_cursor(space_glyph, x, y);
 
-	return *cursor != orig_cursor || *selection != orig_selection;
+	return *cursor != orig_cursor || *selection != orig_selection || (was_lmb_pressed && is_point_in_rect(mouse_pos, x0, y0, x1, y1));
 }
 
 void draw_gui() {

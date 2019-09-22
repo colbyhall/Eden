@@ -5,6 +5,7 @@
 
 extern ch::Vector2 last_mouse_position;
 extern ch::Vector2 current_mouse_position;
+extern f32 current_mouse_scroll_y;
 
 struct Key_Bind {
 	bool shift_down;

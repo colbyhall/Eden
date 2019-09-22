@@ -242,6 +242,7 @@ void tick_views(f32 dt) {
 	const ch::Vector2 viewport_size = the_window.get_viewport_size();
 	const f32 viewport_width = (f32)viewport_size.ux;
 	const f32 viewport_height = (f32)viewport_size.uy;
+	const ch::Vector2 mouse_pos = current_mouse_position;
 
 	const Config& config = get_config();
     
@@ -267,12 +268,24 @@ void tick_views(f32 dt) {
 		const f32 y1 = viewport_height;
 
 		Buffer* the_buffer = find_buffer(view->the_buffer);
+
+		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1)) {
+			view->target_scroll_y -= current_mouse_scroll_y;
+
+			if (view->target_scroll_y < 0.f) view->target_scroll_y = 0.f;
+		}
         
         parsing::parse_cpp(find_buffer(views[0]->the_buffer));
 
-		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, x0, y0, x1, y1)) {
+		f32 max_scroll_y = 0.f;
+		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, view->current_scroll_y, &max_scroll_y, x0, y0, x1, y1)) {
 			view->reset_cursor_timer();
 			view->update_desired_column();
+			view->set_focused();
+		}
+
+		if (view->target_scroll_y > max_scroll_y) {
+			view->target_scroll_y = max_scroll_y;
 		}
 
 		x += x1 - x0;

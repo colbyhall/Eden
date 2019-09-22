@@ -12,7 +12,7 @@ macro(ch::Color, selected_text_color, ch::white) \
 macro(bool, show_line_numbers, true) \
 macro(ch::Color, line_number_background_color, 0x041E24FF) \
 macro(ch::Color, line_number_text_color, 0x083945FF) \
-macro(f32, scroll_speed, 5.f) \
+macro(f32, scroll_speed, 50.f) \
 macro(u16, tab_width, 4) \
 macro(u32, last_window_width, 1920) \
 macro(u32, last_window_height, 1080) \

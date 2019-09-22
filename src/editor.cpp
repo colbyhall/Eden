@@ -115,7 +115,7 @@ int main() {
     // to test parsing speeds. -phillip 2019-09-17
     {
         ch::File_Data fd = {};
-		const ch::Path path = CH_TEXT("./test_files/test_stb.h");
+		const ch::Path path = CH_TEXT("../src/gui.cpp");
         if (ch::load_file_into_memory(path, &fd)) {
 			defer(fd.free());
 			buffer->gap_buffer.resize(fd.size); // Pre-allocate.
