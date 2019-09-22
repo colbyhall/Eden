@@ -7,7 +7,7 @@
 * Todo list is [here](https://trello.com/b/nOWap4k8/yeet-production)
 * Currently supported on Windows with Linux, and Mac support coming soon
 
-##Core Contributors
+## Core Contributors
 * Colby Hall
 * Phillip Trudeau
 
@@ -16,7 +16,7 @@
 * [premake5](https://premake.github.io/download.html)
 * [ch_stl](https://github.com/colbeyyy/ch_stl) from [Colby Hall](https://twitter.com/imcolbyhall) & Phillip Trudeau
 
-** License
+## License
 ```
 This is free and unencumbered software released into the public domain.
 
