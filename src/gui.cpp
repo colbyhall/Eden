@@ -3,6 +3,7 @@
 #include "draw.h"
 #include "input.h"
 #include "config.h"
+#include "ch_stl/time.h"
 
 enum Render_Type {
 	RT_Quad,
@@ -90,7 +91,7 @@ static ch::Vector2 push_text(const ch::String& text, f32 x, f32 y, const ch::Col
 	rc.type = RT_Text;
 	rc.color = color;
 	rc.z_index = z_index;
-	rc.text = text;
+	rc.text = text.copy();
 	rc.x = x;
 	rc.y = y - the_font.line_gap;
 	commands.push(rc);
@@ -127,7 +128,15 @@ const f32 border_width = 5.f;
 /* GUI */
 
 void gui_label(const ch::String& s, const ch::Color& color, f32 x, f32 y) {
-	push_text(s, x, y, color);
+	ch::Vector2 draw_size = get_string_draw_size(s, the_font);
+	ch::Vector2 padding = 5.f;
+
+	const f32 x0 = x;
+	const f32 y0 = y;
+	const f32 x1 = x0 + draw_size.x + padding.x;
+	const f32 y1 = y0 + draw_size.y + padding.y;
+	push_quad(x0, y0, x1, y1, ch::white);
+	push_text(s, x + padding.x / 2.f, y + padding.y / 2.f, color);
 }
 
 bool gui_button(f32 x0, f32 y0, f32 x1, f32 y1) {
@@ -185,8 +194,10 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 }
 
 #define PARSE_SPEED_DEBUG 0
+#define LINE_DEBUG 0
 
 bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 scroll_y, f32* out_max_scroll_y, f32 x0, f32 y0, f32 x1, f32 y1) {
+	CH_SCOPED_TIMER(GUI_BUFFER);
 	const ch::Vector2 mouse_pos = current_mouse_position;
 	const bool was_lmb_pressed = was_mouse_button_pressed(CH_MOUSE_LEFT);
 	const bool is_lmb_down = is_mouse_button_down(CH_MOUSE_LEFT);
@@ -199,34 +210,57 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	const Font_Glyph* space_glyph = the_font[' '];
 	const Font_Glyph* unknown_glyph = the_font['?'];
 
+	auto draw_cursor = [&](const Font_Glyph* g, f32 x, f32 y) {
+		if (edit_mode) {
+			push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
+		}
+		else {
+			push_border_quad(x, y, x + g->advance, y + font_height, 1.f, config.cursor_color);
+		}
+	};
+
 	const ssize orig_cursor = *cursor;
 	const ssize orig_selection = *selection;
 
 	const usize num_lines = buffer.eol_table.count;
 	const ch::Gap_Buffer<u32>& gap_buffer = buffer.gap_buffer;
 
-	if (show_line_numbers) {
-		const u32 num_digits = ch::max(ch::get_num_digits(num_lines), (u32)2);
-		const f32 ln_x0 = x0;
-		const f32 ln_y0 = y0;
-		const f32 ln_x1 = ln_x0 + (num_digits * space_glyph->advance) + line_number_padding;
-		const f32 ln_y1 = y1;
-		push_quad(ln_x0, ln_y0, ln_x1, ln_y1, config.line_number_background_color);
-	}
-	
 	const f32 starting_x = x0;
 	const f32 starting_y = y0 - scroll_y;
 	f32 x = starting_x;
 	f32 y = starting_y;
 	u64 line_number = 1;
 
-	auto draw_cursor = [&](const Font_Glyph* g, f32 x, f32 y) {
-		if (edit_mode) {
-			push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
-		} else {
-			push_border_quad(x, y, x + g->advance, y + font_height, 1.f, config.cursor_color);
+	const f32 width = x1 - x0;
+
+	f32 line_number_quad_width = 0.f;
+	if (show_line_numbers) {
+		const u32 num_digits = ch::max(ch::get_num_digits(num_lines), (u32)2);
+		line_number_quad_width = (num_digits * space_glyph->advance) + line_number_padding;
+		const f32 ln_x0 = x0;
+		const f32 ln_y0 = y0;
+		const f32 ln_x1 = ln_x0 + line_number_quad_width;
+		const f32 ln_y1 = y1;
+		push_quad(ln_x0, ln_y0, ln_x1, ln_y1, config.line_number_background_color);
+	}
+
+	usize starting_index = 0;
+	for (usize i = 0; i < buffer.line_column_table.count; i += 1) {
+		if (y > -font_height) {
+			starting_index = buffer.get_index_from_line(i);
+			line_number = i + 1;
+			break;
 		}
-	};
+
+		f32 line_size_x = buffer.line_column_table[i] * space_glyph->advance;
+
+		while (line_size_x + space_glyph->advance * 2 > width - line_number_quad_width) {
+			line_size_x -= width;
+			y += font_height;
+		}
+
+		y += font_height;
+	}
 
 	if (*cursor + 1 > (ssize)gap_buffer.count()) {
 		*cursor = gap_buffer.count() - 1;
@@ -240,14 +274,14 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	
-	for (usize i = 0; i < gap_buffer.count(); i += 1) {
+	for (usize i = starting_index; i < gap_buffer.count(); i += 1) {
 		const u32 c = gap_buffer[i];
 		ch::Color color = config.foreground_color;
 
 		const f32 old_x = x;
 		const f32 old_y = y;
 
-		if (!buffer.disable_parse)
+		if (false)
         {
             // Obtain the current lexeme based on the current index
 
@@ -371,6 +405,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		} 
 
 		if (c == ch::eol) {
+#if LINE_DEBUG
+			tchar temp[100];
+			ch::sprintf(temp, CH_TEXT("col: %llu, char: %llu"), buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
+			push_text(temp, x, y, ch::magenta);
+#endif
 			x = starting_x;
 			y += font_height;
 			line_number += 1;
@@ -443,4 +482,8 @@ void draw_gui() {
 	immediate_flush();
 
 	commands.count = 0;
+}
+
+void Vertical_Layout::row() {
+	at_y += row_height;
 }

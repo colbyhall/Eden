@@ -3,6 +3,19 @@
 #include <ch_stl/string.h>
 #include <ch_stl/math.h>
 
+struct Vertical_Layout {
+	f32 row_height;
+	f32 top_x;
+	f32 left_y;
+	f32 width;
+	f32 at_x;
+	f32 at_y;
+
+	Vertical_Layout(f32 _top_x, f32 _left_y, f32 _row_height) : top_x(_top_x), left_y(_left_y), row_height(_row_height), at_x(_top_x), at_y(_left_y) {}
+
+	void row();
+};
+
 CH_FORCEINLINE bool is_point_in_rect(ch::Vector2 p, f32 x0, f32 y0, f32 x1, f32 y1) {
 	return p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
 }

@@ -325,6 +325,10 @@ void init_draw() {
 	glDebugMessageCallback(gl_error_callback, 0);
 #endif
 
+#if CH_PLATFORM_WINDOWS
+	wglSwapIntervalEXT(false);
+#endif
+
 	const bool global_shader_loaded = load_shader_from_source(global_shader_source, &global_shader);
 	assert(global_shader_loaded);
 	glUseProgram(global_shader.program_id);
@@ -569,7 +573,7 @@ ch::Vector2 get_string_draw_size(const ch::String& s, const Font& font) {
 		if (y - starting_y > largest_y) largest_y = x - starting_y;
 	}
 
-	return ch::Vector2(largest_x, largest_y);
+	return ch::Vector2(largest_x, largest_y + font_height);
 }
 
 void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index /*= 9.f*/)

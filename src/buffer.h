@@ -18,6 +18,10 @@ struct Buffer {
 	ch::Path full_path;
 	ch::Array<usize> eol_table;
 
+	// @TODO(CHall): Find a better way to do this???
+	
+	ch::Array<usize> line_column_table;
+
 	bool disable_parse = false;
     bool syntax_dirty = true;
     ch::Array<parsing::Lexeme> lexemes;
@@ -33,7 +37,8 @@ struct Buffer {
 	void print_to(const tchar* fmt, ...);
 
 	void refresh_eol_table();
+	void refresh_line_column_table();
 
-	u64 get_index_from_line(u64 line);
-	u64 get_line_from_index(u64 index);
+	u64 get_index_from_line(u64 line) const;
+	u64 get_line_from_index(u64 index) const;
 };

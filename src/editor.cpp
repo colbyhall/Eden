@@ -40,6 +40,21 @@ Buffer* find_buffer(Buffer_ID id) {
 
 static void tick_editor(f32 dt) {
 	tick_views(dt);
+	
+	{
+		const ch::Vector2 viewport_size = the_window.get_viewport_size();
+		Vertical_Layout debug_layout((f32)viewport_size.ux - 300.f, 0.f, (f32)get_config().font_size + 5.f);
+		tchar temp[100];
+		ch::sprintf(temp, CH_TEXT("FPS: %f"), 1.f / dt);
+		gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
+		debug_layout.row();
+
+		for (const ch::Scoped_Timer& it : ch::scoped_timer_manager.entries) {
+			ch::sprintf(temp, CH_TEXT("%s: %f"), it.name, it.get_gap());
+			gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
+			debug_layout.row();
+		}
+	}
 }
 
 #if CH_PLATFORM_WINDOWS
@@ -105,7 +120,7 @@ int main() {
 
 	Buffer* buffer = create_buffer();
 	push_view(buffer->id);
-	push_view(messages_buffer->id);
+	// push_view(messages_buffer->id);
 
 
     // @Temporary: Load test file.
@@ -113,9 +128,10 @@ int main() {
     // My test file is upwards of 10 megabytes, so it's not checked into git.
     // In the future this will be superseded by a flie loading system; this is just
     // to test parsing speeds. -phillip 2019-09-17
+	if (false)
     {
         ch::File_Data fd = {};
-		const ch::Path path = CH_TEXT("../src/gui.cpp");
+		const ch::Path path = CH_TEXT("../test_files/10mb_file.h");
         if (ch::load_file_into_memory(path, &fd)) {
 			defer(fd.free());
 			buffer->gap_buffer.resize(fd.size); // Pre-allocate.
@@ -126,6 +142,7 @@ int main() {
 				buffer->gap_buffer.push(fd.data[i]);
 			}
 			buffer->refresh_eol_table();
+			buffer->refresh_line_column_table();
 		} else {
 			print_to_messages(CH_TEXT("Failed to find file %s"), path);
 		}
@@ -153,8 +170,14 @@ int main() {
 		ch::reset_arena_allocator(&temp_arena);
 
 		process_input();
-		tick_editor(dt);
-		draw_editor();
+		{
+			CH_SCOPED_TIMER(TICK_EDITOR);
+			tick_editor(dt);
+		}
+		{
+			CH_SCOPED_TIMER(DRAW_EDITOR);
+			draw_editor();
+		}
 		try_refresh_config();
 	}
 
