@@ -247,6 +247,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		const f32 old_x = x;
 		const f32 old_y = y;
 
+		if (!buffer.disable_parse)
         {
             // Obtain the current lexeme based on the current index
 

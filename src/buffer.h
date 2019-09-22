@@ -18,6 +18,7 @@ struct Buffer {
 	ch::Path full_path;
 	ch::Array<usize> eol_table;
 
+	bool disable_parse = false;
     bool syntax_dirty = true;
     ch::Array<parsing::Lexeme> lexemes;
     f64 lex_time = 0;
@@ -28,6 +29,8 @@ struct Buffer {
 
 	void add_char(u32 c, usize index);
 	void remove_char(usize index);
+
+	void print_to(const tchar* fmt, ...);
 
 	void refresh_eol_table();
 

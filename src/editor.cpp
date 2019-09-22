@@ -18,6 +18,7 @@ ch::Window the_window;
 
 const tchar* window_title = CH_TEXT("eden");
 Font the_font;
+Buffer* messages_buffer;
 
 ch::Hash_Table<Buffer_ID, Buffer> buffers(ch::get_heap_allocator());
 
@@ -42,10 +43,33 @@ static void tick_editor(f32 dt) {
 }
 
 #if CH_PLATFORM_WINDOWS
+enum  PROCESS_DPI_AWARENESS {
+	PROCESS_DPI_UNAWARE,
+	PROCESS_SYSTEM_DPI_AWARE,
+	PROCESS_PER_MONITOR_DPI_AWARE
+};
+
+using Set_Process_DPI_Awareness = HRESULT(*)(PROCESS_DPI_AWARENESS value);
+#endif
+
+#if CH_PLATFORM_WINDOWS
 int WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #else
 int main() {
 #endif
+
+#if CH_PLATFORM_WINDOWS
+	ch::Library shcore_lib;
+	if (ch::load_library(CH_TEXT("shcore.dll"), &shcore_lib)) {
+		defer(shcore_lib.free());
+		Set_Process_DPI_Awareness SetProcessDpiAwareness = shcore_lib.get_function<Set_Process_DPI_Awareness>(CH_TEXT("SetProcessDpiAwareness"));
+
+		if (SetProcessDpiAwareness) {
+			SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
+		}
+	}
+#endif
+
 	init_config();
 	const Config& config = get_config();
 
@@ -75,11 +99,15 @@ int main() {
 	init_draw();
 	init_input();
 
+	messages_buffer = create_buffer();
+	messages_buffer->disable_parse = true;
+	messages_buffer->print_to(CH_TEXT("Hello Sailor!\nWelcome to Eden\n"));
+
 	Buffer* buffer = create_buffer();
 	push_view(buffer->id);
-	push_view(buffer->id);
+	push_view(messages_buffer->id);
 
-#if 0
+
     // @Temporary: Load test file.
     // If you have a file in bin/test_files/test_stb.h, use this to auto-load the file.
     // My test file is upwards of 10 megabytes, so it's not checked into git.
@@ -87,21 +115,21 @@ int main() {
     // to test parsing speeds. -phillip 2019-09-17
     {
         ch::File_Data fd = {};
-        fd.allocator = ch::context_allocator; // Assign the allocator so we can free.
-        ch::load_file_into_memory(CH_TEXT("./test_files/test_stb.h"), &fd, fd.allocator);
-        defer(fd.free());
-        buffer->gap_buffer.resize(fd.size); // Pre-allocate.
-        usize j = 0;
-        for (usize i = 0; i < fd.size; i++) {
-            if (fd.data[i] == '\r') {
-                continue;
-            }
-            buffer->gap_buffer.insert(fd.data[i], j);
-            j++;
-        }
-        buffer->refresh_eol_table();
+		const ch::Path path = CH_TEXT("./test_files/test_stb.h");
+        if (ch::load_file_into_memory(path, &fd)) {
+			defer(fd.free());
+			buffer->gap_buffer.resize(fd.size); // Pre-allocate.
+			for (usize i = 0; i < fd.size; i++) {
+				if (fd.data[i] == '\r') {
+					continue;
+				}
+				buffer->gap_buffer.push(fd.data[i]);
+			}
+			buffer->refresh_eol_table();
+		} else {
+			print_to_messages(CH_TEXT("Failed to find file %s"), path);
+		}
     }
-#endif
 
 	// @TEMP(CHall): Load font and get size
 	{

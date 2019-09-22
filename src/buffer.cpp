@@ -1,5 +1,8 @@
 #include "buffer.h"
 
+#include <vadefs.h>
+#include <stdio.h>
+
 Buffer::Buffer() {
 	eol_table.allocator = ch::get_heap_allocator();
 	gap_buffer.allocator = ch::get_heap_allocator();
@@ -25,6 +28,25 @@ void Buffer::remove_char(usize index) {
 	gap_buffer.remove_at_index(index);
 
 	// @Speed(Chall): this is because we're lazy atm
+	refresh_eol_table();
+}
+
+void Buffer::print_to(const tchar* fmt, ...) {
+	tchar write_buffer[1024];
+
+	va_list args;
+	va_start(args, fmt);
+#if CH_PLATFORM_WINDOWS
+	const usize size = vsprintf(write_buffer, fmt, args);
+#else
+#error Needs sprintf
+#endif
+	va_end(args);
+
+	for (usize i = 0; i < size; i += 1) {
+		gap_buffer.push(write_buffer[i]);
+	}
+
 	refresh_eol_table();
 }
 

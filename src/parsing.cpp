@@ -352,7 +352,7 @@ void parse(Lexeme* l, Lexeme* end) {
 }
 
 void parse_cpp(Buffer* buf) {
-    if (!buf->syntax_dirty) return;
+    if (!buf->syntax_dirty || buf->disable_parse) return;
     buf->syntax_dirty = false;
     ch::Gap_Buffer<u32>& b = buf->gap_buffer;
     usize buffer_count = b.count();
