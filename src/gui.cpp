@@ -205,7 +205,6 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	const usize num_lines = buffer.eol_table.count;
 	const ch::Gap_Buffer<u32>& gap_buffer = buffer.gap_buffer;
 
-	// @NOTE(CHall): Draw line number quad
 	if (show_line_numbers) {
 		const u32 num_digits = ch::max(ch::get_num_digits(num_lines), (u32)2);
 		const f32 ln_x0 = x0;
@@ -221,7 +220,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	f32 y = starting_y;
 	u64 line_number = 1;
 
-	auto draw_cursor = [&](const Font_Glyph* g) {
+	auto draw_cursor = [&](const Font_Glyph* g, f32 x, f32 y) {
 		if (edit_mode) {
 			push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
 		} else {
@@ -238,10 +237,15 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
     const parsing::Lexeme* const lexemes_begin = buffer.lexemes.cbegin();
     const parsing::Lexeme* const lexemes_end = buffer.lexemes.cend();
     const parsing::Lexeme* lexeme = lexemes_begin;
+
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
+	
 	for (usize i = 0; i < gap_buffer.count(); i += 1) {
 		const u32 c = gap_buffer[i];
 		ch::Color color = config.foreground_color;
+
+		const f32 old_x = x;
+		const f32 old_y = y;
 
         {
             // Obtain the current lexeme based on the current index
@@ -338,7 +342,13 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			// @TODO(CHall): maybe draw some kind of carriage return symbol?
 		}
 
-		if (is_point_in_glyph(mouse_pos, g, x, y)) {
+		if (c == '\t') {
+			x += space_glyph->advance * config.tab_width;
+		} else {
+			x += g->advance;
+		}
+
+		if (is_point_in_rect(mouse_pos, old_x, old_y, x, y)) {
 			if (was_lmb_pressed) {
 				*cursor = i - 1;
 				*selection = *cursor;
@@ -349,17 +359,19 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 		const bool is_in_selection = (orig_cursor > orig_selection && (ssize)i >= orig_selection + 1 && (ssize)i < orig_cursor + 1) || (orig_cursor < orig_selection && (ssize)i < orig_selection + 1 && (ssize)i >= orig_cursor + 1);
 		if (is_in_selection && edit_mode) {
-			push_quad(x, y, x + g->advance, y + font_height, config.selection_color);
+			push_quad(old_x, old_y, x, old_y + font_height, config.selection_color);
 		}
 
 		const bool is_in_cursor = *cursor + 1 == i;
 		if (is_in_cursor) {
 			if (show_cursor || !edit_mode) {
-				draw_cursor(g);
+				draw_cursor(g, old_x, old_y);
 			}
 			
 			if (edit_mode && show_cursor) {
 				color = config.background_color;
+			} else if (edit_mode && is_in_selection) {
+				color = config.selected_text_color;
 			}
 		} 
 
@@ -367,20 +379,17 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			x = starting_x;
 			y += font_height;
 			line_number += 1;
-			if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
-			continue;
-		}
-
-		if (c == '\t') {
-			x += space_glyph->advance * config.tab_width;
+			if (show_line_numbers) {
+				push_line_number(line_number, num_lines, &x, y);
+			}
 			continue;
 		}
 
 		if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
 			
-		push_glyph(g, x, y, color);
-
-		x += g->advance;
+		if (!ch::is_whitespace(c)) {
+			push_glyph(g, old_x, old_y, color);
+		}
 
         // @TEMP(phil) this is necessary for large files, or else you will OOM on render commands.
         if (y > the_window.get_size().uy) {
@@ -401,14 +410,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
     }
 #endif
 
-#if LINE_COUNT_DEBUG
-	tchar temp[128];
-	ch::sprintf(temp, CH_TEXT("[Actual=%lu; EOL_Table=%lu]"), line_char_count, buffer.eol_table[line_number - 1]);
-	push_text(temp, x, y, ch::magenta);
-	line_char_count = 0;
-#endif
-
-	if (*cursor + 1 == gap_buffer.count() && (show_cursor || !edit_mode)) draw_cursor(space_glyph);
+	if (*cursor + 1 == gap_buffer.count() && (show_cursor || !edit_mode)) draw_cursor(space_glyph, x, y);
 
 	return *cursor != orig_cursor || *selection != orig_selection;
 }
