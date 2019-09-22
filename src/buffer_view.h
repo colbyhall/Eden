@@ -33,6 +33,7 @@ struct Buffer_View {
 	void set_focused();
 
 	void update_desired_column();
+	void ensure_cursor_in_view();
 
 	void on_char_entered(u32 c);
 	void on_key_pressed(u8 key);

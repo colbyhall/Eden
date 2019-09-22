@@ -89,6 +89,10 @@ void Buffer_View::update_desired_column() {
 	desired_column = (cursor + 1) - line_index;
 }
 
+void Buffer_View::ensure_cursor_in_view() {
+	// @TODO(CHall): Implement
+}
+
 void Buffer_View::on_char_entered(u32 c) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
@@ -102,6 +106,8 @@ void Buffer_View::on_char_entered(u32 c) {
 
 	reset_cursor_timer();
 
+	ensure_cursor_in_view();
+
     buffer->syntax_dirty = true;
 }
 
@@ -114,6 +120,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 	const bool alt_pressed = is_key_down(CH_KEY_ALT);
 
 	reset_cursor_timer();
+	ensure_cursor_in_view();
 	switch (key) {
 	case CH_KEY_ENTER:
 		// @TODO(CHall): Detect if nix or CRLF
@@ -271,8 +278,6 @@ void tick_views(f32 dt) {
 
 		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1)) {
 			view->target_scroll_y -= current_mouse_scroll_y;
-
-			if (view->target_scroll_y < 0.f) view->target_scroll_y = 0.f;
 		}
         
         parsing::parse_cpp(find_buffer(views[0]->the_buffer));
@@ -286,6 +291,10 @@ void tick_views(f32 dt) {
 
 		if (view->target_scroll_y > max_scroll_y) {
 			view->target_scroll_y = max_scroll_y;
+		}
+
+		if (view->target_scroll_y < 0.f) {
+			view->target_scroll_y = 0.f;
 		}
 
 		x += x1 - x0;

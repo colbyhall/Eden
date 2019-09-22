@@ -335,21 +335,15 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			g = unknown_glyph;
 		}
 
-		if (x + space_glyph->advance * 2 > x1 && c != ch::eol) {
-			x = starting_x;
-			y += font_height;
-
-			x += space_glyph->advance * (ch::get_num_digits(num_lines)) + line_number_padding;
-			// @TODO(CHall): maybe draw some kind of carriage return symbol?
-		}
-
 		if (c == '\t') {
 			x += space_glyph->advance * config.tab_width;
 		} else {
 			x += g->advance;
 		}
 
-		if (is_point_in_rect(mouse_pos, old_x, old_y, x, y)) {
+		const bool mouse_on_line = (c == ch::eol && mouse_pos.y >= old_y && mouse_pos.y <= old_y + font_height);
+		const bool mouse_past_eol = mouse_pos.x >= old_x;
+		if (is_point_in_rect(mouse_pos, old_x, old_y, x, old_y + font_height) || (mouse_on_line && mouse_past_eol)) {
 			if (was_lmb_pressed) {
 				*cursor = i - 1;
 				*selection = *cursor;
@@ -386,9 +380,17 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			continue;
 		}
 
+		if (x + space_glyph->advance * 2 > x1 && c != ch::eol) {
+			x = starting_x;
+			y += font_height;
+
+			x += space_glyph->advance * (ch::get_num_digits(num_lines)) + line_number_padding;
+			// @TODO(CHall): maybe draw some kind of carriage return symbol?
+		}
+
 		if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
 			
-		if (!ch::is_whitespace(c) && old_y > y0) {
+		if (!ch::is_whitespace(c) && old_y + font_height > y0) {
 			push_glyph(g, old_x, old_y, color);
 		}
 
