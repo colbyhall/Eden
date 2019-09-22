@@ -1,6 +1,6 @@
-workspace "YEET"
+workspace "eden"
     architecture "x64"
-    startproject "YEET"
+    startproject "eden"
     
     configurations
     {
@@ -16,7 +16,7 @@ workspace "YEET"
 	include "libs/ch_stl"
 
 
-project "YEET"
+project "eden"
     language "C++"
 	dependson "ch_stl"
 	kind "WindowedApp"

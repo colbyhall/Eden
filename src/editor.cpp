@@ -16,7 +16,7 @@
 
 ch::Window the_window;
 
-const tchar* window_title = CH_TEXT("YEET");
+const tchar* window_title = CH_TEXT("eden");
 Font the_font;
 
 ch::Hash_Table<Buffer_ID, Buffer> buffers(ch::get_heap_allocator());
