@@ -50,22 +50,25 @@ ssize Buffer_View::seek_dir(bool left) const {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
 
+	bool found_letter = false;
 	ssize result = cursor + (!left * 2);
 	if (left) {
 		for (; result > -1; result -= 1) {
 			const tchar c = buffer->gap_buffer[result];
-			if (ch::is_symbol(c) || ch::is_whitespace(c)) {
-				result -= 1;
+			if ((ch::is_symbol(c) || ch::is_whitespace(c)) && found_letter) {
 				break;
+			} else if (ch::is_letter(c)) {
+				found_letter = true;
 			}
 		}
-	}
-	else {
+	} else {
 		for (; result < (ssize)buffer->gap_buffer.count() - 1; result += 1) {
 			const tchar c = buffer->gap_buffer[result];
-			if (ch::is_symbol(c) || ch::is_whitespace(c)) {
+			if ((ch::is_symbol(c) || ch::is_whitespace(c)) && found_letter) {
 				result -= 1;
 				break;
+			} else if (ch::is_letter(c)) {
+				found_letter = true;
 			}
 		}
 	}
@@ -90,10 +93,6 @@ void Buffer_View::on_char_entered(u32 c) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
 
-	if (c == '\r') c = ch::eol;
-
-	if ((c < 32 || c > 126) && c != ch::eol) return;
-
 	remove_selection();
 	buffer->add_char(c, cursor + 1);
 	cursor += 1;
@@ -116,11 +115,22 @@ void Buffer_View::on_key_pressed(u8 key) {
 
 	reset_cursor_timer();
 	switch (key) {
+	case CH_KEY_ENTER:
+		// @TODO(CHall): Detect if nix or CRLF
+		remove_selection();
+		buffer->add_char('\n', cursor + 1);
+		cursor += 1;
+		selection = cursor;
+		update_desired_column();
+		buffer->syntax_dirty = true;
+		break;
 	case CH_KEY_BACKSPACE: 
+		if (has_selection()) {
+			remove_selection();
+		}
+
 		if (cursor > -1) {
-			if (has_selection()) {
-				remove_selection();
-			} else if (ctrl_pressed) {
+			if (ctrl_pressed) {
 				selection = seek_dir(true);
 				remove_selection();
 			} else {
@@ -134,10 +144,12 @@ void Buffer_View::on_key_pressed(u8 key) {
 		}
 		break;
 	case CH_KEY_DELETE:
+		if (has_selection()) {
+			remove_selection();
+		}
+
 		if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
-			if (has_selection()) {
-				remove_selection();
-			} else if (ctrl_pressed) {
+			if (ctrl_pressed) {
 				selection = seek_dir(false);
 				remove_selection();
 			} else {
@@ -197,7 +209,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 			const u64 line_index = buffer->get_index_from_line(target_line);
 			const u64 line_size = buffer->eol_table[target_line];
 			u64 new_index = line_index;
-			if (desired_column > line_size) {
+			if (desired_column >= line_size) {
 				new_index += line_size - 1;
 			} else {
 				new_index += desired_column;
@@ -213,7 +225,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 			const u64 line_index = buffer->get_index_from_line(target_line);
 			const u64 line_size = buffer->eol_table[target_line];
 			u64 new_index = line_index;
-			if (desired_column > line_size) {
+			if (desired_column >= line_size) {
 				new_index += line_size - 1;
 			}
 			else {
