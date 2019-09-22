@@ -393,10 +393,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
         // @Debug: Debug code to print the lexer speed in the corner.
         tchar temp[128];
         // @Cleanup: Massive @Hack here.
-	    ch::sprintf(temp, CH_TEXT("Lex: %.3f GB/s\nParse: %llu million lexemes/s\nTotal: %.3f GB/s"),
-            (f64)((buffer.gap_buffer.count()*4)/buffer.lex_time  /1024/1024/1024),
-            (u64)((buffer.lexemes.count)/buffer.parse_time/1000/1000),
-            (f64)((buffer.gap_buffer.count()*4)/(buffer.lex_time+buffer.parse_time)/1024/1024/1024));
+	    ch::sprintf(temp, CH_TEXT("Lex: %.3f GB/s (%.3f mloc/s)\nParse: %llu million lexemes/s (%.3f mloc/s)\nTotal: %.3f GB/s (%.3f mloc/s)"),
+            (f64)((buffer.gap_buffer.count()*4)/buffer.lex_time  /1024/1024/1024), (f64)((buffer.eol_table.count)/buffer.lex_time/1000/1000),
+            (u64)((buffer.lexemes.count)/buffer.parse_time/1000/1000), (f64)((buffer.eol_table.count)/buffer.parse_time/1000/1000),
+            (f64)((buffer.gap_buffer.count()*4)/(buffer.lex_time+buffer.parse_time)/1024/1024/1024), (f64)((buffer.eol_table.count)/(buffer.lex_time+buffer.parse_time)/1000/1000)
+        );
 	    push_text(temp, x0, y0, ch::magenta);
     }
 #endif
