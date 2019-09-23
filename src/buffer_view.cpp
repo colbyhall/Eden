@@ -251,6 +251,8 @@ void tick_views(f32 dt) {
 	const f32 viewport_height = (f32)viewport_size.uy;
 	const ch::Vector2 mouse_pos = current_mouse_position;
 
+    if (!viewport_width || !viewport_height) return;
+
 	const Config& config = get_config();
     
 	for (usize i = 0; i < views.count; i += 1) {

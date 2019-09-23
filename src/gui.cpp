@@ -232,6 +232,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	u64 line_number = 1;
 
 	const f32 width = x1 - x0;
+    assert(width > 0);
 
 	f32 line_number_quad_width = 0.f;
 	if (show_line_numbers) {
@@ -255,6 +256,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		f32 line_size_x = buffer.line_column_table[i] * space_glyph->advance;
 
 		while (line_size_x + space_glyph->advance * 2 > width - line_number_quad_width) {
+            // width needs to be more than zero
 			line_size_x -= width;
 			y += font_height;
 		}
