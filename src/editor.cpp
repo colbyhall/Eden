@@ -120,7 +120,7 @@ int main() {
 
 	Buffer* buffer = create_buffer();
 	push_view(buffer->id);
-	// push_view(messages_buffer->id);
+	//push_view(messages_buffer->id);
 
 
     // @Temporary: Load test file.
@@ -128,7 +128,7 @@ int main() {
     // My test file is upwards of 10 megabytes, so it's not checked into git.
     // In the future this will be superseded by a flie loading system; this is just
     // to test parsing speeds. -phillip 2019-09-17
-	if (false)
+	if (true)
     {
         ch::File_Data fd = {};
 		const ch::Path path = CH_TEXT("../test_files/10mb_file.h");
