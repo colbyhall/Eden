@@ -41,8 +41,8 @@ Buffer* find_buffer(Buffer_ID id) {
             int num_vertices_total;
 static void tick_editor(f32 dt) {
 	tick_views(dt);
-	
-	{
+#if 1//BUILD_DEBUG
+    {
 		const ch::Vector2 viewport_size = the_window.get_viewport_size();
 		Vertical_Layout debug_layout((f32)viewport_size.ux - 300.f, 0.f, (f32)get_config().font_size + 5.f);
 		tchar temp[100];
@@ -62,6 +62,7 @@ static void tick_editor(f32 dt) {
             debug_layout.row();
         }
 	}
+#endif
 }
 
 #if CH_PLATFORM_WINDOWS
@@ -72,6 +73,12 @@ enum  PROCESS_DPI_AWARENESS {
 };
 
 using Set_Process_DPI_Awareness = HRESULT(*)(PROCESS_DPI_AWARENESS value);
+
+extern "C"
+{
+	__declspec(dllexport) DWORD NvOptimusEnablement = 0x0;
+	__declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x0;
+}
 #endif
 
 #if CH_PLATFORM_WINDOWS
@@ -177,15 +184,15 @@ int main() {
 		ch::reset_arena_allocator(&temp_arena);
 
 		process_input();
-		{
-			CH_SCOPED_TIMER(TICK_EDITOR);
-			tick_editor(dt);
-		}
-		{
-			CH_SCOPED_TIMER(DRAW_EDITOR);
-			draw_editor();
-		}
+		tick_editor(dt);
+		draw_editor();
 		try_refresh_config();
+
+		if (!the_window.has_focus()) {
+#if CH_PLATFORM_WINDOWS
+			Sleep(100);
+#endif
+		}
 	}
 
 	shutdown_config();
