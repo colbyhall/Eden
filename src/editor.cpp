@@ -38,6 +38,7 @@ Buffer* find_buffer(Buffer_ID id) {
 	return buffers.find(id);
 }
 
+            int num_vertices_total;
 static void tick_editor(f32 dt) {
 	tick_views(dt);
 	
@@ -54,6 +55,12 @@ static void tick_editor(f32 dt) {
 			gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
 			debug_layout.row();
 		}
+        {
+            ch::sprintf(temp, CH_TEXT("%d vertices"), num_vertices_total);
+            num_vertices_total = 0;
+            gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
+            debug_layout.row();
+        }
 	}
 }
 

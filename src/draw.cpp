@@ -435,6 +435,8 @@ void immediate_vertex(f32 x, f32 y, const ch::Color& color, ch::Vector2 uv, f32 
 	vertex->uv = uv;
 	vertex->z_index = z_index;
 
+    extern int num_vertices_total;
+    num_vertices_total += 1;
 	imm_vertex_count += 1;
 }
 
