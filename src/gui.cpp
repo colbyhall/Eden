@@ -193,7 +193,7 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 	*x += text_draw_size.x + line_number_padding;
 }
 
-#define PARSE_SPEED_DEBUG 0
+#define PARSE_SPEED_DEBUG 1
 #define LINE_DEBUG 0
 
 bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 scroll_y, f32* out_max_scroll_y, f32 x0, f32 y0, f32 x1, f32 y1) {
@@ -232,6 +232,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	u64 line_number = 1;
 
 	const f32 width = x1 - x0;
+    assert(width > 0);
 
 	f32 line_number_quad_width = 0.f;
 	if (show_line_numbers) {
@@ -255,6 +256,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		f32 line_size_x = buffer.line_column_table[i] * space_glyph->advance;
 
 		while (line_size_x + space_glyph->advance * 2 > width - line_number_quad_width) {
+            // width needs to be more than zero
 			line_size_x -= width;
 			y += font_height;
 		}
@@ -281,7 +283,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		const f32 old_x = x;
 		const f32 old_y = y;
 
-		if (false)
+		if (!buffer.syntax_dirty && !buffer.disable_parse)
         {
             // Obtain the current lexeme based on the current index
 

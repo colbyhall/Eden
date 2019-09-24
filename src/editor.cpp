@@ -111,7 +111,7 @@ int main() {
 
 	Buffer* buffer = create_buffer();
 	push_view(buffer->id);
-	// push_view(messages_buffer->id);
+	//push_view(messages_buffer->id);
 
 
     // @Temporary: Load test file.

@@ -64,7 +64,10 @@ enum Char_Type : u8 {
 #pragma pack(push)
 #pragma pack(1)
 struct Lexeme {
-    const u32* i;
+    union {
+        char32_t* p; // JUST for debugging
+        const u32* i;
+    };
     u8 dfa;
 };
 #pragma pack(pop)

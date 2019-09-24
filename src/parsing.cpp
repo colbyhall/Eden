@@ -218,6 +218,10 @@ u64 toklen(Lexeme* l) {
     }
 }
 
+bool nested = false; // JUST for debugging
+
+void parse(Lexeme* l, Lexeme* end);
+
 Lexeme* skip_comments_in_line(Lexeme* l, Lexeme* end) {
     while (l < end && (l->dfa < DFA_NEWLINE || l->dfa == DFA_SLASH && l[1].dfa <= DFA_LINE_COMMENT)) {
         l++;
@@ -245,90 +249,67 @@ Lexeme* parse_preproc(Lexeme* l, Lexeme* end) {
             }
         } else if (l->dfa == DFA_IDENT) {
             l->dfa = DFA_MACRO;
+            l++;
         }
     }
+    Lexeme* preproc_begin = l;
     while (l < end && l->dfa != DFA_NEWLINE) {
         l++;
     }
+    nested = true;
+    parse(preproc_begin, l);
+    nested = false;
     return l;
 }
 Lexeme* next_token(Lexeme* l, Lexeme* end) {
 skip_more_comments:;
     l = skip_comments_in_line(l, end);
-    if (l->i[0] == '#') l = parse_preproc(l, end);
-    if (l->dfa == DFA_NEWLINE) {
+    if (l < end && l->dfa == DFA_NEWLINE) {
         l++;
+        if (l->i[0] == '#') {
+            assert(!nested);
+            l = parse_preproc(l, end);
+        }
         goto skip_more_comments;
     }
     return l;
 }
 
-struct Ident {
-    //Lexeme* start;
-    //Lexeme* end;
-    //operator bool() {
-    //    return end > start;
-    //}
-    //void assign(Lex_Dfa dfa) {
-    //    for (Lexeme* p = start; p < end; p++) {
-    //        p = next_token(p, end);
-    //        p->dfa = dfa;
-    //    }
-    //}
-    Lex_Dfa dfa;
-    Lexeme* end;
-    operator bool() { return dfa == DFA_IDENT; }
-    void assign(Lex_Dfa dfa) { if (*this) end[-1].dfa = dfa; }
-};
-Ident parse_ident(Lexeme* l, Lexeme* end) {
-    return {(Lex_Dfa)l->dfa, l + (l->dfa == DFA_IDENT)};
-    //Ident result;
-    //result.start = l;
-    //result.end = l;
-    //if (l->i[0] == ':' && l[1].i[0] == ':') {
-    //more_idents:;
-    //    l->dfa = DFA_IDENT;
-    //    l++;
-    //    l->dfa = DFA_IDENT;
-    //    l++;
-    //    l = next_token(l, end);
-    //}
-    //if (l->dfa == DFA_IDENT) {
-    //    l++;
-    //    result.end = l;
-    //    l = next_token(l, end);
-    //    if (l->i[0] == ':' && l[1].i[0] == ':') goto more_idents;
-    //}
-    //return result;
-}
-
 Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
-    if (Ident ident = parse_ident(l, end)) {
-        l = ident.end;
+    if (l->dfa == DFA_IDENT) {
+        Lexeme* ident = l;
+        l++;
         l = next_token(l, end);
         if (l->i[0] == '(') {
-            ident.assign(DFA_FUNCTION);
+            ident->dfa = DFA_FUNCTION;
         }
-        return l;
     }
     return l;
 }
 
 Lexeme* parse_stmt(Lexeme* l, Lexeme* end) {
 
-    Ident first_ident = parse_ident(l, end);
-    l = first_ident.end;
-    l = next_token(l, end);
-    if (Ident var_name = parse_ident(l, end)) {
-        first_ident.assign(DFA_TYPE);
-        Lexeme* lookahead = var_name.end;
-        lookahead = next_token(lookahead, end);
-        if (lookahead->i[0] == '(') {
-            var_name.assign(DFA_FUNCTION);
-            l = lookahead;
+    if (l->dfa == DFA_IDENT) {
+        Lexeme* last_ident = l;
+        while (l < end) {
+            if (l->i[0] == ':' && l[1].i[0] == ':') {
+                l++;
+                l++;
+                l = next_token(l, end);
+            }
+            if (l->dfa == DFA_IDENT) {
+                last_ident = l;
+            } else if (l->i[0] != '*' && l->i[0] != '&') {
+                break;
+            }
+            l->dfa = DFA_TYPE;
+            l++;
+            l = next_token(l, end);
         }
-    } else if (l->i[0] == '(') {
-        first_ident.assign(DFA_FUNCTION);
+        last_ident->dfa = DFA_IDENT;
+        if (l->i[0] == '(') {
+            last_ident->dfa = DFA_FUNCTION;
+        }
     }
     while (l < end && l->i[0] != ';'
                    && l->i[0] != ':'

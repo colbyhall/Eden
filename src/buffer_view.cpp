@@ -251,6 +251,8 @@ void tick_views(f32 dt) {
 	const f32 viewport_height = (f32)viewport_size.uy;
 	const ch::Vector2 mouse_pos = current_mouse_position;
 
+    if (!viewport_width || !viewport_height) return;
+
 	const Config& config = get_config();
     
 	for (usize i = 0; i < views.count; i += 1) {
@@ -275,6 +277,7 @@ void tick_views(f32 dt) {
 		const f32 y1 = viewport_height;
 
 		Buffer* the_buffer = find_buffer(view->the_buffer);
+        assert(the_buffer);
 
 		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1)) {
 			view->target_scroll_y -= current_mouse_scroll_y;
@@ -283,11 +286,13 @@ void tick_views(f32 dt) {
         parsing::parse_cpp(find_buffer(views[0]->the_buffer));
 
 		f32 max_scroll_y = 0.f;
-		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, view->current_scroll_y, &max_scroll_y, x0, y0, x1, y1)) {
-			view->reset_cursor_timer();
-			view->update_desired_column();
-			view->set_focused();
-		}
+        if (the_buffer) {
+		    if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == view, view->current_scroll_y, &max_scroll_y, x0, y0, x1, y1)) {
+		    	view->reset_cursor_timer();
+		    	view->update_desired_column();
+		    	view->set_focused();
+		    }
+        }
 
 		if (view->target_scroll_y > max_scroll_y) {
 			view->target_scroll_y = max_scroll_y;
