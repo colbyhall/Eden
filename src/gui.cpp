@@ -441,7 +441,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 #if PARSE_SPEED_DEBUG
     {
         // @Debug: Debug code to print the lexer speed in the corner.
-        tchar temp[128];
+        tchar temp[1024];
         // @Cleanup: Massive @Hack here.
 	    ch::sprintf(temp, CH_TEXT("Lex: %.3f GB/s (%dms: %.3f mloc/s)\nParse: %llu million lexemes/s (%dms: %.3f mloc/s)\nTotal: %.3f GB/s (%dms: %.3f mloc/s)"),
             (f64)((buffer.gap_buffer.count()*4)/buffer.lex_time  /1024/1024/1024), (int)(0.5f+1000*buffer.lex_time), (f64)((buffer.eol_table.count)/buffer.lex_time/1000/1000),
