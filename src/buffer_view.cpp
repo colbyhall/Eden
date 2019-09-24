@@ -270,6 +270,7 @@ void tick_views(f32 dt) {
 			view->show_cursor = !view->show_cursor;
 			view->cursor_blink_time = 0.f;
 		}
+		view->show_cursor = true; // @Temporary @Todo @Cleanup
 
 		const f32 x0 = x;
 		const f32 y0 = 0.f;

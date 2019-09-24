@@ -133,6 +133,7 @@ int main() {
 	messages_buffer->print_to(CH_TEXT("Hello Sailor!\nWelcome to Eden\n"));
 
 	Buffer* buffer = create_buffer();
+    buffer->disable_parse = true;
 	push_view(buffer->id);
 	//push_view(messages_buffer->id);
 
@@ -184,13 +185,13 @@ int main() {
 		ch::reset_arena_allocator(&temp_arena);
 
 		process_input();
-		tick_editor(dt);
+		tick_editor(1000);
 		draw_editor();
 		try_refresh_config();
 
 		if (!the_window.has_focus()) {
 #if CH_PLATFORM_WINDOWS
-			Sleep(100);
+			//Sleep(100);
 #endif
 		}
 	}

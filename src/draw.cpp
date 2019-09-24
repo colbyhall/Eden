@@ -326,7 +326,7 @@ void init_draw() {
 #endif
 
 #if CH_PLATFORM_WINDOWS
-	// wglSwapIntervalEXT(false);
+	wglSwapIntervalEXT(false);
 #endif
 
 	const bool global_shader_loaded = load_shader_from_source(global_shader_source, &global_shader);
