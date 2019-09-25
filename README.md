@@ -1,18 +1,20 @@
-# eden
+# Eden
+Eden is an in progress text editor being built open source.  
 
-## Project Information
-* Very much in progress
-* Uses [stb](https://github.com/nothings/stb) from [Sean Barrett](https://twitter.com/nothings)
-* Currently using [premake5](https://premake.github.io/download.html)
-* Todo list is [here](https://trello.com/b/nOWap4k8/yeet-production)
-* Currently supported on Windows with Linux, and Mac support coming soon
+## Goals
+* Ease of Use
+* Code Insight Tools
+* Moddable
+* High Performance
+* Low Memory Usage
+* Low CPU Usage
 
 ## Core Contributors
 * Colby Hall
 * Phillip Trudeau
 
 ## Dependencies
-* [stb](https://github.com/nothings/stb) from [Sean Barrett](https://twitter.com/nothings)
+* [stb libs](https://github.com/nothings/stb) from [Sean Barrett](https://twitter.com/nothings)
 * [premake5](https://premake.github.io/download.html)
 * [ch_stl](https://github.com/colbeyyy/ch_stl) from [Colby Hall](https://twitter.com/imcolbyhall) & Phillip Trudeau
 
