@@ -98,7 +98,7 @@ static ch::Vector2 push_text(const ch::String& text, f32 x, f32 y, const ch::Col
 	return get_string_draw_size(text, the_font);
 }
 
-static ch::Vector2 push_text(const tchar* tstr, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
+static ch::Vector2 push_text(const char* tstr, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
 	Render_Command rc;
 	rc.type = RT_Text;
 	rc.color = color;
@@ -185,8 +185,8 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 
 	const u8 spaces_needed = ch::get_num_digits(max_line_number) - ch::get_num_digits(current_line_number);
 
-	tchar temp_buffer[16];
-	ch::sprintf(temp_buffer, CH_TEXT("%llu"), current_line_number);
+	char temp_buffer[16];
+	ch::sprintf(temp_buffer, "%llu", current_line_number);
 
 	*x += space_glyph->advance * spaces_needed;
 	const ch::Vector2 text_draw_size = push_text(temp_buffer, *x, y, get_config().line_number_text_color);
@@ -408,7 +408,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 		if (c == ch::eol) {
 #if LINE_DEBUG
-			tchar temp[100];
+			char temp[100];
 			ch::sprintf(temp, CH_TEXT("col: %llu, char: %llu"), buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
 			push_text(temp, x, y, ch::magenta);
 #endif
@@ -441,9 +441,9 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 #if PARSE_SPEED_DEBUG
     {
         // @Debug: Debug code to print the lexer speed in the corner.
-        tchar temp[1024];
+        char temp[1024];
         // @Cleanup: Massive @Hack here.
-	    ch::sprintf(temp, CH_TEXT("Lex: %.3f GB/s (%dms: %.3f mloc/s)\nParse: %llu million lexemes/s (%dms: %.3f mloc/s)\nTotal: %.3f GB/s (%dms: %.3f mloc/s)"),
+	    ch::sprintf(temp, "Lex: %.3f GB/s (%dms: %.3f mloc/s)\nParse: %llu million lexemes/s (%dms: %.3f mloc/s)\nTotal: %.3f GB/s (%dms: %.3f mloc/s)",
             (f64)((buffer.gap_buffer.count()*4)/buffer.lex_time  /1024/1024/1024), (int)(0.5f+1000*buffer.lex_time), (f64)((buffer.eol_table.count)/buffer.lex_time/1000/1000),
             (u64)((buffer.lexemes.count)/buffer.parse_time/1000/1000), (int)(0.5f+1000*buffer.parse_time), (f64)((buffer.eol_table.count)/buffer.parse_time/1000/1000),
             (f64)((buffer.gap_buffer.count()*4)/(buffer.lex_time+buffer.parse_time)/1024/1024/1024), (int)(0.5f+1000*(buffer.lex_time + buffer.parse_time)), (f64)((buffer.eol_table.count)/(buffer.lex_time+buffer.parse_time)/1000/1000)

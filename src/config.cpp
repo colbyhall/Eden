@@ -8,7 +8,7 @@ static u64 loaded_config_last_save;
 
 Config default_config;
 
-static const ch::Path config_path = CH_TEXT(".yeetconfig");
+static const ch::Path config_path = ".edenconfig";
 
 const Config& get_config() {
 	if (!loaded_config) return default_config;
@@ -26,8 +26,8 @@ static bool parse_type<bool>(ch::String& v, bool* b) {
 	if (!v.count) return false;
 
 	v.to_lowercase();
-	if (v == CH_TEXT("1") || v == CH_TEXT("true")) *b = true;
-	else if (v == CH_TEXT("0") || v == CH_TEXT("false")) *b = false;
+	if (v == "1" || v == "true") *b = true;
+	else if (v == "0" || v == "false") *b = false;
 	else return false;
 
 	return true;

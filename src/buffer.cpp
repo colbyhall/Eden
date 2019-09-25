@@ -42,8 +42,8 @@ void Buffer::remove_char(usize index) {
 	refresh_line_column_table();
 }
 
-void Buffer::print_to(const tchar* fmt, ...) {
-	tchar write_buffer[1024];
+void Buffer::print_to(const char* fmt, ...) {
+	char write_buffer[1024];
 
 	va_list args;
 	va_start(args, fmt);

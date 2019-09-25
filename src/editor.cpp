@@ -16,7 +16,7 @@
 
 ch::Window the_window;
 
-const tchar* window_title = CH_TEXT("eden");
+const char* window_title = "eden";
 Font the_font;
 Buffer* messages_buffer;
 
@@ -45,18 +45,18 @@ static void tick_editor(f32 dt) {
     {
 		const ch::Vector2 viewport_size = the_window.get_viewport_size();
 		Vertical_Layout debug_layout((f32)viewport_size.ux - 300.f, 0.f, (f32)get_config().font_size + 5.f);
-		tchar temp[100];
-		ch::sprintf(temp, CH_TEXT("FPS: %f"), 1.f / dt);
+		char temp[100];
+		ch::sprintf(temp, "FPS: %f", 1.f / dt);
 		gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
 		debug_layout.row();
 
 		for (const ch::Scoped_Timer& it : ch::scoped_timer_manager.entries) {
-			ch::sprintf(temp, CH_TEXT("%s: %f"), it.name, it.get_gap());
+			ch::sprintf(temp, "%s: %f", it.name, it.get_gap());
 			gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
 			debug_layout.row();
 		}
         {
-            ch::sprintf(temp, CH_TEXT("%d vertices"), num_vertices_total);
+            ch::sprintf(temp, "%d vertices", num_vertices_total);
             num_vertices_total = 0;
             gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
             debug_layout.row();
@@ -89,9 +89,9 @@ int main() {
 
 #if CH_PLATFORM_WINDOWS
 	ch::Library shcore_lib;
-	if (ch::load_library(CH_TEXT("shcore.dll"), &shcore_lib)) {
+	if (ch::load_library("shcore.dll", &shcore_lib)) {
 		defer(shcore_lib.free());
-		Set_Process_DPI_Awareness SetProcessDpiAwareness = shcore_lib.get_function<Set_Process_DPI_Awareness>(CH_TEXT("SetProcessDpiAwareness"));
+		Set_Process_DPI_Awareness SetProcessDpiAwareness = shcore_lib.get_function<Set_Process_DPI_Awareness>("SetProcessDpiAwareness");
 
 		if (SetProcessDpiAwareness) {
 			SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
@@ -130,7 +130,7 @@ int main() {
 
 	messages_buffer = create_buffer();
 	messages_buffer->disable_parse = true;
-	messages_buffer->print_to(CH_TEXT("Hello Sailor!\nWelcome to Eden\n"));
+	messages_buffer->print_to("Hello Sailor!\nWelcome to Eden\n");
 
 	Buffer* buffer = create_buffer();
     buffer->disable_parse = true;
@@ -146,7 +146,7 @@ int main() {
 	if (true)
     {
         ch::File_Data fd = {};
-		const ch::Path path = CH_TEXT("../test_files/10mb_file.h");
+		const ch::Path path = "../test_files/10mb_file.h";
         if (ch::load_file_into_memory(path, &fd)) {
 			defer(fd.free());
 			buffer->gap_buffer.resize(fd.size); // Pre-allocate.
@@ -159,14 +159,14 @@ int main() {
 			buffer->refresh_eol_table();
 			buffer->refresh_line_column_table();
 		} else {
-			print_to_messages(CH_TEXT("Failed to find file %s"), path);
+			print_to_messages("Failed to find file %s", path);
 		}
     }
 
 	// @TEMP(CHall): Load font and get size
 	{
 		ch::Path p = ch::get_os_font_path();
-		p.append(CH_TEXT("consola.ttf"));
+		p.append("consola.ttf");
 		const bool loaded_font = load_font_from_path(p, &the_font);
 		assert(loaded_font);
 		the_font.size = get_config().font_size;

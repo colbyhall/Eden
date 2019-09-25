@@ -89,13 +89,13 @@ CH_FORCEINLINE ch::Vector2 draw_string(const ch::String& s, const Font& font, f3
 	return result;
 }
 
-CH_FORCEINLINE ch::Vector2 immediate_string(const tchar* s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
+CH_FORCEINLINE ch::Vector2 immediate_string(const char* s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
 	ch::String new_s;
-	new_s.data = (tchar*)s; // I'm psure this is undefined behavior and bad but oh well
+	new_s.data = (char*)s; // I'm psure this is undefined behavior and bad but oh well
 	new_s.count = ch::strlen(s);
 	return immediate_string(new_s, font, x, y, color, z_index);
 }
-CH_FORCEINLINE ch::Vector2 draw_string(const tchar* s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
+CH_FORCEINLINE ch::Vector2 draw_string(const char* s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index = 9.f) {
 	font.bind();
 	immediate_begin();
 	const ch::Vector2 result = immediate_string(s, font, x, y, color, z_index);
@@ -104,9 +104,9 @@ CH_FORCEINLINE ch::Vector2 draw_string(const tchar* s, const Font& font, f32 x, 
 }
 
 ch::Vector2 get_string_draw_size(const ch::String& s, const Font& font);
-CH_FORCEINLINE ch::Vector2 get_string_draw_size(const tchar* s, const Font& font) {
+CH_FORCEINLINE ch::Vector2 get_string_draw_size(const char* s, const Font& font) {
 	ch::String new_s;
-	new_s.data = (tchar*)s; // I'm psure this is undefined behavior and bad but oh well
+	new_s.data = (char*)s; // I'm psure this is undefined behavior and bad but oh well
 	new_s.count = ch::strlen(s);
 	return get_string_draw_size(new_s, font);
 }

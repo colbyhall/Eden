@@ -15,7 +15,7 @@ struct Key_Bind {
 };
 
 struct Action_Bind {
-	const tchar* name;
+	const char* name;
 	ch::Array<Key_Bind> keys;
 };
 

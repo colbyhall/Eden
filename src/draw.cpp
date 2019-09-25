@@ -296,7 +296,7 @@ static bool load_shader_from_source(const GLchar* source, Shader* out_shader) {
 
 static void gl_error_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
 	if (severity != GL_DEBUG_SEVERITY_NOTIFICATION) {
-		ch::std_out << CH_TEXT("GL CALLBACK: ") << message << ch::eol;
+		ch::std_out << "GL CALLBACK: " << message << ch::eol;
 	}
 }
 

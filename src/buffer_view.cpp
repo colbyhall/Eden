@@ -54,7 +54,7 @@ ssize Buffer_View::seek_dir(bool left) const {
 	ssize result = cursor + (!left * 2);
 	if (left) {
 		for (; result > -1; result -= 1) {
-			const tchar c = buffer->gap_buffer[result];
+			const char c = buffer->gap_buffer[result];
 			if ((ch::is_symbol(c) || ch::is_whitespace(c)) && found_letter) {
 				break;
 			} else if (ch::is_letter(c)) {
@@ -63,7 +63,7 @@ ssize Buffer_View::seek_dir(bool left) const {
 		}
 	} else {
 		for (; result < (ssize)buffer->gap_buffer.count() - 1; result += 1) {
-			const tchar c = buffer->gap_buffer[result];
+			const char c = buffer->gap_buffer[result];
 			if ((ch::is_symbol(c) || ch::is_whitespace(c)) && found_letter) {
 				result -= 1;
 				break;
