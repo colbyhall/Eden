@@ -11,7 +11,6 @@ workspace "eden"
 	targetdir ("bin")
     objdir ("bin")
     debugdir ("bin")
-	characterset("ASCII")
 
 	include "libs/ch_stl"
 
