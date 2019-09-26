@@ -212,7 +212,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 	auto draw_cursor = [&](const Font_Glyph* g, f32 x, f32 y) {
 		if (edit_mode) {
-			push_quad(x, y, x + g->advance, y + font_height, config.cursor_color);
+			push_quad(x, y, x + 2, y + font_height, config.cursor_color);
 		}
 		else {
 			push_border_quad(x, y, x + g->advance, y + font_height, 1.f, config.cursor_color);
@@ -223,7 +223,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	const ssize orig_selection = *selection;
 
 	const usize num_lines = buffer.eol_table.count;
-	const ch::Gap_Buffer<u32>& gap_buffer = buffer.gap_buffer;
+	const ch::Gap_Buffer<u8>& gap_buffer = buffer.gap_buffer;
 
 	const f32 starting_x = x0;
 	const f32 starting_y = y0 - scroll_y;
@@ -289,7 +289,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
             while (lexeme + 1 < lexemes_end &&
                    // @TEMPORARY @HACK @@@
-                   ((ch::Gap_Buffer<u32>&)gap_buffer).get_index_as_cursor(i + 1) - 1 >= (const u32*)lexeme[1].i
+                   ((ch::Gap_Buffer<u8>&)gap_buffer).get_index_as_cursor(i + 1) - 1 >= (const u8*)lexeme[1].i
                    ) {
                 lexeme++;
                 //push_glyph(the_font['_'], x, y, ch::magenta); // @Debug
@@ -305,9 +305,13 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             ch::Color numlit = {0.5f, 0.5f, 1.0f, 1.0f};
             ch::Color type = {0.0f, 0.7f, 0.9f, 1.0f};
             ch::Color keyword = {1.0f, 1.0f, 1.0f, 1.0f};
+            ch::Color param = {1.0f, 0.6f, 0.125f, 1.0f};
             switch (lexeme->dfa) {
             case parsing::DFA_FUNCTION:
                 color = preproc;
+                break;
+            case parsing::DFA_PARAM:
+                color = param;
                 break;
             case parsing::DFA_KEYWORD:
                 color = keyword;
@@ -399,11 +403,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 				draw_cursor(g, old_x, old_y);
 			}
 			
-			if (edit_mode && show_cursor) {
-				color = config.background_color;
-			} else if (edit_mode && is_in_selection) {
-				color = config.selected_text_color;
-			}
+			//if (edit_mode && show_cursor) {
+			//	color = config.background_color;
+			//} else if (edit_mode && is_in_selection) {
+			//	color = config.selected_text_color;
+			//}
 		} 
 
 		if (c == ch::eol) {
@@ -429,7 +433,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			// @TODO(CHall): maybe draw some kind of carriage return symbol?
 		}
 
-		if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
+		//if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
 			
 		if (!ch::is_whitespace(c) && old_y + font_height > y0) {
 			push_glyph(g, old_x, old_y, color);
@@ -444,9 +448,9 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
         char temp[1024];
         // @Cleanup: Massive @Hack here.
 	    ch::sprintf(temp, "Lex: %.3f GB/s (%dms: %.3f mloc/s)\nParse: %llu million lexemes/s (%dms: %.3f mloc/s)\nTotal: %.3f GB/s (%dms: %.3f mloc/s)",
-            (f64)((buffer.gap_buffer.count()*4)/buffer.lex_time  /1024/1024/1024), (int)(0.5f+1000*buffer.lex_time), (f64)((buffer.eol_table.count)/buffer.lex_time/1000/1000),
+            (f64)((buffer.gap_buffer.count())/buffer.lex_time  /1024/1024/1024), (int)(0.5f+1000*buffer.lex_time), (f64)((buffer.eol_table.count)/buffer.lex_time/1000/1000),
             (u64)((buffer.lexemes.count)/buffer.parse_time/1000/1000), (int)(0.5f+1000*buffer.parse_time), (f64)((buffer.eol_table.count)/buffer.parse_time/1000/1000),
-            (f64)((buffer.gap_buffer.count()*4)/(buffer.lex_time+buffer.parse_time)/1024/1024/1024), (int)(0.5f+1000*(buffer.lex_time + buffer.parse_time)), (f64)((buffer.eol_table.count)/(buffer.lex_time+buffer.parse_time)/1000/1000)
+            (f64)((buffer.gap_buffer.count())/(buffer.lex_time+buffer.parse_time)/1024/1024/1024), (int)(0.5f+1000*(buffer.lex_time + buffer.parse_time)), (f64)((buffer.eol_table.count)/(buffer.lex_time+buffer.parse_time)/1000/1000)
         );
 	    push_text(temp, x0, y0, ch::magenta);
     }

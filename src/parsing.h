@@ -39,6 +39,7 @@ enum Lex_Dfa : u8 {
     DFA_TYPE,
     DFA_KEYWORD,
     DFA_FUNCTION,
+    DFA_PARAM,
 };
 
 // This is an enum for categorizing C++ source code characters.
@@ -64,10 +65,7 @@ enum Char_Type : u8 {
 #pragma pack(push)
 #pragma pack(1)
 struct Lexeme {
-    union {
-        char32_t* p; // JUST for debugging
-        const u32* i;
-    };
+    const u8* i;
     u8 dfa;
 };
 #pragma pack(pop)

@@ -14,7 +14,7 @@ CH_FORCEINLINE u64 hash(Buffer_ID id) {
 
 struct Buffer {
 	Buffer_ID id;
-	ch::Gap_Buffer<u32> gap_buffer;
+	ch::Gap_Buffer<u8> gap_buffer;
 	ch::Path full_path;
 	ch::Array<usize> eol_table;
 

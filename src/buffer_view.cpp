@@ -258,8 +258,6 @@ void tick_views(f32 dt) {
 	for (usize i = 0; i < views.count; i += 1) {
 		Buffer_View* view = views[i];
 
-		view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
-
 		u32 blink_time;
 		if (!ch::get_caret_blink_time(&blink_time)) {
 			view->cursor_blink_time = 0.f;
@@ -284,6 +282,8 @@ void tick_views(f32 dt) {
 			view->target_scroll_y -= current_mouse_scroll_y;
 		}
         
+		view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
+
         parsing::parse_cpp(find_buffer(views[0]->the_buffer));
 
 		f32 max_scroll_y = 0.f;

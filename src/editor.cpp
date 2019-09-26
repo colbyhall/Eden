@@ -133,7 +133,6 @@ int main() {
 	messages_buffer->print_to("Hello Sailor!\nWelcome to Eden\n");
 
 	Buffer* buffer = create_buffer();
-    buffer->disable_parse = true;
 	push_view(buffer->id);
 	//push_view(messages_buffer->id);
 
