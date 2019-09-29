@@ -147,6 +147,9 @@ int main() {
         ch::File_Data fd = {};
 		const ch::Path path = "../test_files/10mb_file.h";
         if (ch::load_file_into_memory(path, &fd)) {
+#if BUILD_DEBUG
+            fd.size = 16*4096; // @Temporary
+#endif
 			defer(fd.free());
 			buffer->gap_buffer.resize(fd.size); // Pre-allocate.
 			for (usize i = 0; i < fd.size; i++) {

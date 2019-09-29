@@ -66,7 +66,7 @@ enum Char_Type : u8 {
 #pragma pack(1)
 struct Lexeme {
     const u8* i;
-    u8 dfa;
+    Lex_Dfa dfa;
 };
 #pragma pack(pop)
 
