@@ -67,6 +67,11 @@ enum Char_Type : u8 {
 struct Lexeme {
     const u8* i;
     Lex_Dfa dfa;
+    u8 cached_first;
+    const u8 c() const {
+        return cached_first;
+        //return i[0];
+    }
 };
 #pragma pack(pop)
 
