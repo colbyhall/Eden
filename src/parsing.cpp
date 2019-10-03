@@ -317,9 +317,7 @@ static Lexeme* parse_preproc(Lexeme* l, Lexeme* end) {
         }
     }
     Lexeme* preproc_begin = l;
-    while (l < end && l->dfa != DFA_NEWLINE) {
-        l++;
-    }
+    while (l < end && l->dfa != DFA_NEWLINE) l++;
     nested = true;
     parse(preproc_begin, l);
     nested = false;
