@@ -18,7 +18,7 @@ void Buffer_View::set_cursor(ssize new_cursor) {
 
 	const bool shift_down = is_key_down(CH_KEY_SHIFT);
 	if (!shift_down) {
-		selection = cursor;	
+		selection = cursor;
 	}
 }
 
@@ -131,7 +131,7 @@ void Buffer_View::on_key_pressed(u8 key) {
 		update_desired_column();
 		buffer->syntax_dirty = true;
 		break;
-	case CH_KEY_BACKSPACE: 
+	case CH_KEY_BACKSPACE:
 		if (has_selection()) {
 			remove_selection();
 		}
@@ -254,7 +254,7 @@ void tick_views(f32 dt) {
     if (!viewport_width || !viewport_height) return;
 
 	const Config& config = get_config();
-    
+
 	for (usize i = 0; i < views.count; i += 1) {
 		Buffer_View* view = views[i];
 
@@ -278,10 +278,11 @@ void tick_views(f32 dt) {
 		Buffer* the_buffer = find_buffer(view->the_buffer);
         assert(the_buffer);
 
-		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1)) {
+		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1) &&
+			!(view->target_scroll_y == 0.f && current_mouse_scroll_y > 0.f)) {
 			view->target_scroll_y -= current_mouse_scroll_y;
 		}
-        
+
 		view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
 
         parsing::parse_cpp(find_buffer(views[0]->the_buffer));
