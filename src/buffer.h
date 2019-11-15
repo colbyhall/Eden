@@ -27,6 +27,7 @@ struct Buffer {
     ch::Array<parsing::Lexeme> lexemes;
     f64 lex_time = 0;
     f64 parse_time = 0;
+    u64 lex_parse_count = 0;
 
 	Buffer();
 	Buffer(Buffer_ID _id);

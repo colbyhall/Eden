@@ -446,11 +446,34 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
     {
         // @Debug: Debug code to print the lexer speed in the corner.
         char temp[1024];
-        // @Cleanup: Massive @Hack here.
-	    ch::sprintf(temp, "Lex: %.3f GB/s (%dms: %.3f mloc/s)\nParse: %llu million lexemes/s (%dms: %.3f mloc/s)\nTotal: %.3f GB/s (%dms: %.3f mloc/s)",
-            (f64)((buffer.gap_buffer.count())/buffer.lex_time  /1024/1024/1024), (int)(0.5f+1000*buffer.lex_time), (f64)((buffer.eol_table.count)/buffer.lex_time/1000/1000),
-            (u64)((buffer.lexemes.count)/buffer.parse_time/1000/1000), (int)(0.5f+1000*buffer.parse_time), (f64)((buffer.eol_table.count)/buffer.parse_time/1000/1000),
-            (f64)((buffer.gap_buffer.count())/(buffer.lex_time+buffer.parse_time)/1024/1024/1024), (int)(0.5f+1000*(buffer.lex_time + buffer.parse_time)), (f64)((buffer.eol_table.count)/(buffer.lex_time+buffer.parse_time)/1000/1000)
+        // All cleaned up :)
+
+        u64 num_chars = buffer.gap_buffer.count();
+        u64 num_lexemes = buffer.lexemes.count;
+        u64 num_lines = buffer.eol_table.count;
+
+        f64 gibi = 1024 * 1024 * 1024;
+        f64 million = 1000 * 1000;
+
+        f64 lex_time = buffer.lex_time / buffer.lex_parse_count;
+        f64 parse_time = buffer.parse_time / buffer.lex_parse_count;
+        f64 total_time = lex_time + parse_time;
+
+	    ch::sprintf(temp,
+            "Lex: %.3f GB/s (%dms: %.2f mloc/s)\n"
+            "Parse: %llu million lexemes/s (%dms: %.2f mloc/s)\n"
+            "Total: %.3f GB/s (%dms: %.2f mloc/s)",
+            num_chars / lex_time / gibi,
+            (int)(0.5f + 1000 * lex_time),
+            num_lines / lex_time / million,
+
+            (u64)(num_lexemes / parse_time / million),
+            (int)(0.5f + 1000 * parse_time),
+            num_lines / parse_time / million,
+
+            num_chars / total_time / gibi,
+            (int)(0.5f + 1000 * total_time),
+            num_lines / total_time / million
         );
 	    push_text(temp, x0, y0, ch::magenta);
     }

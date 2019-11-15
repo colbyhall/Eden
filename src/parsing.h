@@ -1,13 +1,13 @@
 #pragma once
-#include <ch_stl\types.h>
+#include <ch_stl/types.h>
 
 struct Buffer;
 
 // C++ lexing/parsing tools.
 namespace parsing {
 // This is the actual DFA state machine. It's not perfect,
-// but I (phillip) can get it to run at 1.25GB/s on a 3.6 GHz machine
-// with 1600 MHz DDR3 RAM and, as of writing, YEET's UTF32 gap buffer.
+// but I (phillip) can get it to run at 13mloc/s on a 3.6 GHz machine
+// with 1600 MHz DDR3 RAM and, as of writing, YEET's UTF-8 gap buffer.
 // It does as little as it can; it tries not to *parse* C++, only lex it.
 // This means it just scans comments and string/number literals (mostly).
 // It doesn't even recognize keywords, it just treats all identifiers alike.
@@ -49,16 +49,16 @@ enum Lex_Dfa : u8 {
 // Strictly speaking, a real lexer would also process digraphs,
 // but digraphs are rarely used. Trigraphs are never used.
 enum Char_Type : u8 {
-    WHITE       = DFA_NUM_STATES * 0,
-    NEWLINE     = DFA_NUM_STATES * 1, // '\r' '\n'
-    IDENT       = DFA_NUM_STATES * 2, // '$' '@'-'Z' '_'-'z'
-    DOUBLEQUOTE = DFA_NUM_STATES * 3, // '"'
-    SINGLEQUOTE = DFA_NUM_STATES * 4, // '\''
-    DIGIT       = DFA_NUM_STATES * 5, // '0'-'9'
-    SLASH       = DFA_NUM_STATES * 6, // '/'
-    STAR        = DFA_NUM_STATES * 7, // '*'
-    BS          = DFA_NUM_STATES * 8, // '\\'
-    OP          = DFA_NUM_STATES * 9,
+    WHITE      ,
+    NEWLINE    , // '\r' '\n'
+    IDENT      , // '$' '@'-'Z' '_'-'z'
+    DOUBLEQUOTE, // '"'
+    SINGLEQUOTE, // '\''
+    DIGIT      , // '0'-'9'
+    SLASH      , // '/'
+    STAR       , // '*'
+    BS         , // '\\'
+    OP         ,
     NUM_CHAR_TYPES,
 };
 
@@ -66,7 +66,7 @@ enum Char_Type : u8 {
 #pragma pack(1)
 struct Lexeme {
     const u8* i;
-    Lex_Dfa dfa;
+    u8 dfa;
     u8 cached_first;
     const u8 c() const {
         return cached_first;
