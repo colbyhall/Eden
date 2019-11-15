@@ -139,8 +139,7 @@ int main() {
 
     // @Temporary: Load test file.
     // If you have a file in bin/test_files/test_stb.h, use this to auto-load the file.
-    // My test file is upwards of 10 megabytes, so it's not checked into git.
-    // In the future this will be superseded by a flie loading system; this is just
+    // In the future this will be superseded by a file loading system; this is just
     // to test parsing speeds. -phillip 2019-09-17
 	if (true)
     {

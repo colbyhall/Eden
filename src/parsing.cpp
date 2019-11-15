@@ -4,30 +4,47 @@
 
 namespace parsing {
 // This is a column-reduction table to map 128 ASCII values to a 11-input space.
+// The values in this table are premultiplied with the number of DFA states
+// to save one multiply when indexing the state transition table.
+#define P (DFA_NUM_STATES)
 static const u8 char_type[] = {
-    WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, NEWLINE,
-    WHITE, WHITE, NEWLINE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE,
-    WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE,
-    OP, DOUBLEQUOTE, OP, IDENT, OP, OP, SINGLEQUOTE, OP, OP, STAR,
-    OP, OP, OP, OP, SLASH, DIGIT, DIGIT, DIGIT, DIGIT, DIGIT, DIGIT,
-    DIGIT, DIGIT, DIGIT, DIGIT, OP, OP, OP, OP, OP, OP, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, OP, BS, OP, OP, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, OP, OP, OP, OP, WHITE,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
-    IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT, IDENT,
+    WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P,
+    WHITE*P, WHITE*P, NEWLINE*P, WHITE*P, WHITE*P, NEWLINE*P, WHITE*P, WHITE*P,
+    WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P,
+    WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P, WHITE*P,
+    WHITE*P, OP*P, DOUBLEQUOTE*P, OP*P, IDENT*P, OP*P, OP*P, SINGLEQUOTE*P,
+    OP*P, OP*P, STAR*P, OP*P, OP*P, OP*P, OP*P, SLASH*P,
+    DIGIT*P, DIGIT*P, DIGIT*P, DIGIT*P, DIGIT*P, DIGIT*P, DIGIT*P, DIGIT*P,
+    DIGIT*P, DIGIT*P, OP*P, OP*P, OP*P, OP*P, OP*P, OP*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, OP*P, BS*P, OP*P, OP*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, OP*P, OP*P, OP*P, OP*P, WHITE*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
+    IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P, IDENT*P,
 };
 // This is a state transition table for the deterministic finite
 // automaton (DFA) lexer. Overtop this DFA runs a block-comment scanner.
+// This table is written in column-major format, because it allows for a
+// premultiplied column index as mentioned above.
 static const u8 lex_table[] = {
     // WHITE
     DFA_BLOCK_COMMENT, // DFA_BLOCK_COMMENT
@@ -191,129 +208,9 @@ static const u8 lex_table[] = {
     DFA_OP,            // DFA_NUMLIT
 };
 
-static bool table_initialized = false;
-static u8 char_type_premultiplied[256];
-
-static u16 lex_table4[DFA_NUM_STATES * NUM_CHAR_TYPES * NUM_CHAR_TYPES * NUM_CHAR_TYPES * NUM_CHAR_TYPES];
-static u32 char_type4_0[256];
-static u16 char_type4_1[256];
-static u16 char_type4_2[256];
-
-void init_tables() {
-    for (int i = 0; i < 256; i += 1) {
-        char_type_premultiplied[i] = char_type[i] * DFA_NUM_STATES;
-
-        char_type4_0[i] = char_type[i] * DFA_NUM_STATES * NUM_CHAR_TYPES * NUM_CHAR_TYPES * NUM_CHAR_TYPES;
-        char_type4_1[i] = char_type[i] * DFA_NUM_STATES * NUM_CHAR_TYPES * NUM_CHAR_TYPES;
-        char_type4_2[i] = char_type[i] * DFA_NUM_STATES * NUM_CHAR_TYPES;
-    }
-    
-    for (int i = 0; i < DFA_NUM_STATES; i += 1) {
-        const u8 dfa = i;
-        for (int j = 0; j < NUM_CHAR_TYPES; j += 1) {
-            for (int k = 0; k < NUM_CHAR_TYPES; k += 1) {
-                for (int l = 0; l < NUM_CHAR_TYPES; l += 1) {
-                    for (int m = 0; m < NUM_CHAR_TYPES; m += 1) {
-                        u8 dfa0 = lex_table[dfa + j * DFA_NUM_STATES];
-                        u8 dfa1 = lex_table[dfa0 + k * DFA_NUM_STATES];
-                        u8 dfa2 = lex_table[dfa1 + l * DFA_NUM_STATES];
-                        u8 dfa3 = lex_table[dfa2 + m * DFA_NUM_STATES];
-                        u16 result = dfa0 | (dfa1 << 4) | (dfa2 << 8) | (dfa3 << 12);
-                        if (result == dfa * 0x1111) {
-                            result = 0xffff;
-                        }
-                        if (dfa0 == dfa) {
-                            result |= 0x000f;
-                        }
-                        if (dfa1 == dfa0) {
-                            result |= 0x00f0;
-                        }
-                        if (dfa2 == dfa1) {
-                            result |= 0x0f00;
-                        }
-                        if (dfa3 == dfa2) {
-                            result |= 0xf000;
-                        }
-                        result = ~result;
-                        lex_table4[i +
-                                   j * DFA_NUM_STATES * NUM_CHAR_TYPES * NUM_CHAR_TYPES * NUM_CHAR_TYPES +
-                                   k * DFA_NUM_STATES * NUM_CHAR_TYPES * NUM_CHAR_TYPES +
-                                   l * DFA_NUM_STATES * NUM_CHAR_TYPES +
-                                   m * DFA_NUM_STATES] = result;
-                    }
-                }
-            }
-        }
-    }
-}
 u8 lex(u8 dfa, const u8* p, const u8* const end, Lexeme*& lexemes) {
-#define BYTES 4
-    while (p < end && ((u64)p % BYTES != 0)) {
-        u8 new_dfa = lex_table[dfa + char_type_premultiplied[*p]];
-        if (new_dfa != dfa) {
-            lexemes->i = p;
-            lexemes->dfa = (Lex_Dfa)new_dfa;
-            lexemes->cached_first = *p;
-            lexemes++;
-            dfa = new_dfa;
-        }
-        p++;
-    }
-    assert((u64)p % BYTES == 0);
-    const u8* const end_aligned = (const u8*)((u64)end / BYTES * BYTES);
-    while (p < end_aligned) {
-    #if BYTES == 1
-        u8 new_dfa = lex_table[dfa + char_type_premultiplied[*p]];
-        if (new_dfa != dfa) {
-            lexemes->i = p;
-            lexemes->dfa = new_dfa;
-            lexemes->cached_first = *p;
-            lexemes++;
-            dfa = new_dfa;
-        }
-        p++;
-    #elif BYTES == 4
-        int ch0 = char_type4_0[p[0]];
-        int ch1 = char_type4_1[p[1]];
-        int ch2 = char_type4_2[p[2]];
-        int ch3 = char_type_premultiplied[p[3]];
-        u16 new_dfa = lex_table4[dfa + ch0 + ch1 + ch2 + ch3];
-        if (new_dfa) {
-            if (new_dfa & 15) {
-                lexemes->i = p;
-                lexemes->dfa = ~new_dfa & 15;
-                lexemes->cached_first = *p;
-                lexemes++;
-                dfa = ~new_dfa & 15;
-            }
-            if (new_dfa >> 4 & 15) {
-                lexemes->i = p + 1;
-                lexemes->dfa = ~(new_dfa >> 4) & 15;
-                lexemes->cached_first = p[1];
-                lexemes++;
-                dfa = ~(new_dfa >> 4) & 15;
-            }
-            if (new_dfa >> 8 & 15) {
-                lexemes->i = p + 2;
-                lexemes->dfa = ~(new_dfa >> 8) & 15;
-                lexemes->cached_first = p[2];
-                lexemes++;
-                dfa = ~(new_dfa >> 8) & 15;
-            }
-            new_dfa = ~new_dfa;
-            if (new_dfa >> 12 != 15) {
-                lexemes->i = p + 3;
-                lexemes->dfa = new_dfa >> 12;
-                lexemes->cached_first = p[3];
-                lexemes++;
-                dfa = new_dfa >> 12;
-            }
-        }
-        p += 4;
-    #endif
-    }
     while (p < end) {
-        u8 new_dfa = lex_table[dfa + char_type_premultiplied[*p]];
+        u8 new_dfa = lex_table[dfa + char_type[*p]];
         if (new_dfa != dfa) {
             lexemes->i = p;
             lexemes->dfa = (Lex_Dfa)new_dfa;
@@ -1053,19 +950,6 @@ void parse_cpp(Buffer* buf) {
     ch::Gap_Buffer<u8>& b = buf->gap_buffer;
     usize buffer_count = b.count();
 
-    //{
-    //    // buffer start should at least be 8 byte aligned
-    //    assert((u64)b.data % 8 == 0);
-    //    // align gap to 4 bytes to simplify multi-byte lexing
-    //    usize index_of_gap = b.gap - b.data;
-    //    index_of_gap &= ~7ull;
-    //    b.move_gap_to_index(index_of_gap); // @Volatile: this ONLY works because index_of_gap <= gap.
-    //}
-    if (!table_initialized) {
-        init_tables();
-        table_initialized = true;
-    }
-
     // Three extra lexemes:
     // One extra lexeme at the front.
     // One at the back to indicate buffer end to the parser, pointing to safe
@@ -1080,6 +964,7 @@ void parse_cpp(Buffer* buf) {
         {
             lex_seeker->i = b.data;
             lex_seeker->dfa = (Lex_Dfa)lexer;
+            lex_seeker->cached_first = b.data[0];
             lex_seeker++;
         }
         
@@ -1097,16 +982,19 @@ void parse_cpp(Buffer* buf) {
             b.move_gap_to_index(lexeme_at_gap->i - b.data);
             assert(lexeme_at_gap->i == b.gap);
             lexeme_at_gap->i += b.gap_size;
+            // lexeme_at_gap->cached_first should definitely not have changed.
         }
 
         {
             assert(lex_seeker < buf->lexemes.begin() + buf->lexemes.allocated);
             lex_seeker->dfa = DFA_NUM_STATES;
             lex_seeker->i = lexeme_sentinel_buffer; // So the parser can safely read from here.
+            lex_seeker->cached_first = lex_seeker->i[0];
             lex_seeker++;
             assert(lex_seeker < buf->lexemes.begin() + buf->lexemes.allocated);
             lex_seeker->dfa = DFA_NUM_STATES;
             lex_seeker->i = b.data + b.allocated; // So the parser knows the real end position.
+            lex_seeker->cached_first = 0;
             lex_seeker++;
         }
         buf->lexemes.count = lex_seeker - buf->lexemes.begin();
@@ -1118,10 +1006,9 @@ void parse_cpp(Buffer* buf) {
         parse(buf->lexemes.begin(), buf->lexemes.end() - 2);
         parse_time += ch::get_time_in_seconds();
         buf->lexemes.end()[-2] = buf->lexemes.end()[-1];
+        buf->lexemes.count -= 1;
         buf->lex_time += lex_time;
-        //buf->lex_time /= 2;
         buf->parse_time += parse_time;
-        //buf->parse_time /= 2;
         buf->lex_parse_count++;
     }
 }

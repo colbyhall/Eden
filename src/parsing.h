@@ -62,18 +62,14 @@ enum Char_Type : u8 {
     NUM_CHAR_TYPES,
 };
 
-#pragma pack(push)
-#pragma pack(1)
 struct Lexeme {
     const u8* i;
     u8 dfa;
     u8 cached_first;
     const u8 c() const {
         return cached_first;
-        //return i[0];
     }
 };
-#pragma pack(pop)
 
 void parse_cpp(Buffer* b);
 
