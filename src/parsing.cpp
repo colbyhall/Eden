@@ -244,30 +244,6 @@ static const u64 chunk_mask[] = {
     0xffffffffffffffffull,
 };
 
-#define C_KEYWORDS(X) \
-    X(do) \
-    X(if) \
-    X(for) \
-    X(else) \
-    X(const) \
-    X(union) \
-    X(while) \
-    X(define) \
-    X(extern) \
-    X(return) \
-    X(sizeof) \
-    X(static) \
-    X(struct) \
-    X(switch) \
-    X(include) \
-    X(typedef) \
-
-#define C_KW_DECL(name) C##name,
-enum C_Keyword {
-    NOT_KEYWORD,
-    C_KEYWORDS(C_KW_DECL)
-};
-
 #define KW_CHUNK_(s, offset, I)                                                \
     ((I) + offset < (sizeof(s) - 1)                                            \
          ? (u64)(s)[(I) + offset] << (u64)((I)*8ull)                           \
@@ -281,9 +257,6 @@ enum C_Keyword {
 
 #define KW_CHUNK0(s) KW_CHUNK__(s, 0)
 #define KW_CHUNK1(s) KW_CHUNK__(s, 8)
-#define KW_CASE_RETURN(x)                                                      \
-    case KW_CHUNK0(#x):                                                        \
-        return C##x;
 
 #define KW_CHUNK(x) KW_CHUNK0(x)
 
@@ -320,96 +293,6 @@ enum C_Keyword {
         case 8: switch (Load8(swchp)) { default: goto def; { for8; } } break;  \
         }                                                                      \
     } while (0);
-
-C_Keyword match_token(Lexeme *l) {
-#if 1
-    switch_on_token(l,
-        {
-            return NOT_KEYWORD;
-        },
-        {
-            KW_CASE_RETURN(if);
-            KW_CASE_RETURN(do);
-        },
-        {
-            KW_CASE_RETURN(for);
-        },
-        {
-            KW_CASE_RETURN(else);
-        },
-        {
-            KW_CASE_RETURN(const);
-            KW_CASE_RETURN(union);
-            KW_CASE_RETURN(while);
-        },
-        {
-            KW_CASE_RETURN(define);
-            KW_CASE_RETURN(extern);
-            KW_CASE_RETURN(return);
-            KW_CASE_RETURN(sizeof);
-            KW_CASE_RETURN(static);
-            KW_CASE_RETURN(struct);
-            KW_CASE_RETURN(switch);
-        },
-        {
-            KW_CASE_RETURN(include);
-            KW_CASE_RETURN(typedef);
-        },
-    )
-#elif 0
-    switch (u64 len = toklen(l)) {
-    default:
-        return NOT_KEYWORD;
-    case 2:
-        switch (Load2(l->i)) {
-            KW_CASE_RETURN(if);
-            KW_CASE_RETURN(do);
-        }
-        return NOT_KEYWORD;
-    case 3:
-        switch (Load3(l->i)) {
-            KW_CASE_RETURN(for);
-        }
-        return NOT_KEYWORD;
-    case 4:
-        switch (Load4(l->i)) {
-            KW_CASE_RETURN(else);
-        }
-        return NOT_KEYWORD;
-    case 5:
-        switch (Load5(l->i)) {
-            KW_CASE_RETURN(const);
-            KW_CASE_RETURN(union);
-            KW_CASE_RETURN(while);
-        }
-        return NOT_KEYWORD;
-    case 6:
-        switch (Load6(l->i)) {
-            KW_CASE_RETURN(define);
-            KW_CASE_RETURN(extern);
-            KW_CASE_RETURN(return );
-            KW_CASE_RETURN(sizeof);
-            KW_CASE_RETURN(static);
-            KW_CASE_RETURN(struct);
-            KW_CASE_RETURN(switch);
-        }
-        return NOT_KEYWORD;
-    case 7:
-        switch (Load7(l->i)) {
-            KW_CASE_RETURN(include);
-            KW_CASE_RETURN(typedef);
-        }
-        return NOT_KEYWORD;
-    }
-#else
-    u64 len = toklen(l);
-    if (len < 2 || len > 8) return NOT_KEYWORD;
-    switch (*(u64*)l->i & chunk_mask[len]) {
-        C_KEYWORDS(KW_CASE);
-    }
-#endif
-    return NOT_KEYWORD;
-}
 
 static Lexeme* skip_comments_in_line(Lexeme* l, Lexeme* end) {
     while (l < end && (l->dfa < DFA_NEWLINE || l->dfa == DFA_SLASH && l[1].dfa <= DFA_LINE_COMMENT)) l++;
@@ -650,13 +533,13 @@ static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
         }
         l = next_token(l, end);
     }
-    /*switch_on_token(l,,,,,,
+    switch_on_token(l,,,,,,
     case KW_CHUNK("sizeof"): {
             l++;
             l = next_token(l, end);
             l = parse_expr(l, end);
         }
-        break,,);*/
+        break,,);
     if (l->c() == '~' ||
         l->c() == '!' ||
         l->c() == '&' ||
@@ -768,67 +651,83 @@ static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
 
 static Lexeme* parse_param(Lexeme* l, Lexeme* end) { return parse_stmt(l, end, DFA_PARAM); }
 
-static Lexeme* parse_stmt(Lexeme* l, Lexeme* end, Lex_Dfa var_name_type) {
-    if (l->dfa != DFA_IDENT) return parse_exprs_til_semi(l, end);
-    switch (match_token(l)) {
-    default: {
-        l->dfa = DFA_TYPE;
-        l++;
-        l = next_token(l, end);
-    } break;
-    case Ctypedef: {
-        l++;
-        l = next_token(l, end);
-        return parse_stmt(l, end, DFA_TYPE);
-    } break;
-    case Creturn: {
-        l++;
-        l = next_token(l, end);
-        return parse_exprs_til_semi(l, end);
-    } break;
-    case Cdo: {
-        l++;
-        l = next_token(l, end);
-        return parse_stmt(l, end);
-    } break;
-    case Cif:
-    case Cswitch:
-    case Cwhile:
-    case Cfor: {
-        l++;
-        l = next_token(l, end);
-        if (l->c() == '(') {
-            l = parse_stmt_parens(l, end);
-            if (l->c() == ')') {
-                l++;
-                l = next_token(l, end);
-            }
-        }
-        return parse_stmt(l, end);
-    } break;
-    case Celse: {
-        l++;
-        l = next_token(l, end);
-        return parse_stmt(l, end);
-    } break;
-    case Cstruct:
-    case Cunion: {
-        l++;
-        l = next_token(l, end);
-        if (l->dfa == DFA_IDENT) {
-            l->dfa = DFA_TYPE;
+static Lexeme* parse_if_switch_while_for(Lexeme* l, Lexeme* end) {
+    l++;
+    l = next_token(l, end);
+    if (l->c() == '(') {
+        l = parse_stmt_parens(l, end);
+        if (l->c() == ')') {
             l++;
             l = next_token(l, end);
         }
-        if (l->c() == '{') {
-            l = parse_braces(l, end);
-            if (l->c() == '}') {
-                l++;
-                l = next_token(l, end);
-            }
-        }
-    } break;
     }
+    return parse_stmt(l, end);
+}                            
+static Lexeme* parse_struct_union(Lexeme* l, Lexeme* end) {
+    l++;
+    l = next_token(l, end);
+    if (l->dfa == DFA_IDENT) {
+        l->dfa = DFA_TYPE;
+        l++;
+        l = next_token(l, end);
+    }
+    if (l->c() == '{') {
+        l = parse_braces(l, end);
+        if (l->c() == '}') {
+            l++;
+            l = next_token(l, end);
+        }
+    }
+    return l;
+}
+
+static Lexeme* parse_stmt(Lexeme* l, Lexeme* end, Lex_Dfa var_name_type) {
+    if (l->dfa != DFA_IDENT) return parse_exprs_til_semi(l, end);
+    switch_on_token(l,
+        {
+            l->dfa = DFA_TYPE;
+            l++;
+            l = next_token(l, end);
+        } break;,
+        case KW_CHUNK("if"): {
+            return parse_if_switch_while_for(l, end);
+        } break;
+        case KW_CHUNK("do"): {
+            l++;
+            l = next_token(l, end);
+            return parse_stmt(l, end);
+        } break;,
+        case KW_CHUNK("for"): {
+            return parse_if_switch_while_for(l, end);
+        } break;,
+        case KW_CHUNK("else"): {
+            l++;
+            l = next_token(l, end);
+            return parse_stmt(l, end);
+        } break;,
+        case KW_CHUNK("union"): {
+            l = parse_struct_union(l, end);
+        } break;
+        case KW_CHUNK("while"): {
+            return parse_if_switch_while_for(l, end);
+        } break;,
+        case KW_CHUNK("return"): {
+            l++;
+            l = next_token(l, end);
+            return parse_exprs_til_semi(l, end);
+        } break;
+        case KW_CHUNK("struct"): {
+            l = parse_struct_union(l, end);
+        } break;
+        case KW_CHUNK("switch"): {
+            return parse_if_switch_while_for(l, end);
+        } break;,
+        case KW_CHUNK("typedef"): {
+            l++;
+            l = next_token(l, end);
+            return parse_stmt(l, end, DFA_TYPE);
+        } break;,
+    );
     bool is_likely_function = false;
 more_decls:
     bool seen_closing_paren = false;
@@ -896,7 +795,7 @@ more_decls:
     if (last && last->dfa != DFA_FUNCTION) last->dfa = var_name_type;
     if (l < end) {
         if (var_name_type != DFA_PARAM) {
-            //assert(at_token(l, end));
+            assert(at_token(l, end));
             l = next_token(l, end);
             if (is_likely_function && l->c() == '{') {
                 l = parse_braces(l, end);
