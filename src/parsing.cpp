@@ -238,12 +238,6 @@ u64 toklen(Lexeme* l) {
 
 void parse(Lexeme* l, Lexeme* end);
 
-static const u64 chunk_mask[] = {
-    0x0000000000000000ull, 0x00000000000000ffull, 0x000000000000ffffull, 0x0000000000ffffffull,
-    0x00000000ffffffffull, 0x000000ffffffffffull, 0x0000ffffffffffffull, 0x00ffffffffffffffull,
-    0xffffffffffffffffull,
-};
-
 #define KW_CHUNK_(s, offset, I)                                                \
     ((I) + offset < (sizeof(s) - 1)                                            \
          ? (u64)(s)[(I) + offset] << (u64)((I)*8ull)                           \
@@ -376,7 +370,8 @@ static bool at_token(Lexeme* l, Lexeme* end) {
 // 5. <> - Greater than/less than: least important.
 
 static Lexeme* parse_stmt(Lexeme* l, Lexeme* end, Lex_Dfa var_name = DFA_IDENT);
-static Lexeme* parse_braces(Lexeme* l, Lexeme* end) {
+static Lexeme* parse_expr(Lexeme* l, Lexeme* end);
+static Lexeme* parse_stmt_braces(Lexeme* l, Lexeme* end) {
     assert(l < end);
     assert(l->c() == '{');
     l++;
@@ -396,6 +391,27 @@ static Lexeme* parse_braces(Lexeme* l, Lexeme* end) {
     }
     return l;
 }
+static Lexeme* parse_expr_braces(Lexeme* l, Lexeme* end) {
+    assert(l < end);
+    assert(l->c() == '{');
+    l++;
+    l = next_token(l, end);
+    while (l < end) {
+        l = parse_expr(l, end);
+        if (l->c() == ',' ||
+            l->c() == ']' ||
+            l->c() == ';' ||
+            l->c() == ')') {
+            l++;
+        }
+        if (l->c() == '}') {
+            break;
+        }
+        l = next_token(l, end);
+    }
+    return l;
+}
+
 static Lexeme* parse_stmt_parens(Lexeme* l, Lexeme* end) {
     assert(l < end);
     assert(l->c() == '(');
@@ -513,11 +529,13 @@ static Lexeme* parse_params(Lexeme* l, Lexeme* end) {
     return l;
 }
 
+static Lexeme* parse_struct_union(Lexeme* l, Lexeme* end);
+
 static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
     //assert(l < end);
     if (!(l < end)) return l;
     if (l->c() == '#') {
-        if (l[1].i[0] == '#') {
+        if (l[1].c() == '#') {
             l->dfa = DFA_IDENT;
             l++;
             l->dfa = DFA_IDENT;
@@ -533,13 +551,18 @@ static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
         }
         l = next_token(l, end);
     }
-    switch_on_token(l,,,,,,
-    case KW_CHUNK("sizeof"): {
+    switch_on_token(l,,,,,
+        case KW_CHUNK("union"): {
+            l = parse_struct_union(l, end);
+        } break;,
+        case KW_CHUNK("sizeof"): {
             l++;
             l = next_token(l, end);
             l = parse_expr(l, end);
-        }
-        break,,);
+        } break;
+        case KW_CHUNK("struct"): {
+            l = parse_struct_union(l, end);
+        } break;,,);
     if (l->c() == '~' ||
         l->c() == '!' ||
         l->c() == '&' ||
@@ -551,7 +574,7 @@ static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
         return parse_expr(l, end);
     }
     if (l->c() == '{') {
-        l = parse_braces(l, end);
+        l = parse_expr_braces(l, end);
         if (l->c() == '}') {
             l++;
             l = next_token(l, end);
@@ -568,18 +591,18 @@ static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
             l++;
             l = next_token(l, end);
         }
-        if (l->c() == '(') {
+        if (l->c() == '(') { // lambda parameter list
             l = parse_params(l, end);
             if (l->c() == ')') {
                 l++;
                 l = next_token(l, end);
             }
-            if (l->c() == '{') {
-                l = parse_braces(l, end);
-                if (l->c() == '}') {
-                    l++;
-                    l = next_token(l, end);
-                }
+        }
+        if (l->c() == '{') { // lambda body
+            l = parse_stmt_braces(l, end);
+            if (l->c() == '}') {
+                l++;
+                l = next_token(l, end);
             }
         }
     } else if (l->dfa == DFA_IDENT) {
@@ -595,7 +618,7 @@ static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
             }
         } else if (l->c() == '{') {
             ident->dfa = DFA_TYPE;
-            l = parse_braces(l, end);
+            l = parse_expr_braces(l, end);
             if (l->c() == '}') {
                 l++;
                 l = next_token(l, end);
@@ -672,7 +695,7 @@ static Lexeme* parse_struct_union(Lexeme* l, Lexeme* end) {
         l = next_token(l, end);
     }
     if (l->c() == '{') {
-        l = parse_braces(l, end);
+        l = parse_stmt_braces(l, end);
         if (l->c() == '}') {
             l++;
             l = next_token(l, end);
@@ -682,7 +705,12 @@ static Lexeme* parse_struct_union(Lexeme* l, Lexeme* end) {
 }
 
 static Lexeme* parse_stmt(Lexeme* l, Lexeme* end, Lex_Dfa var_name_type) {
-    if (l->dfa != DFA_IDENT) return parse_exprs_til_semi(l, end);
+    //if (l->c() == '{') {
+    //    return parse_stmt_braces(l, end);
+    //}
+    if (l->dfa != DFA_IDENT) {
+        return parse_exprs_til_semi(l, end);
+    }
     switch_on_token(l,
         {
             l->dfa = DFA_TYPE;
@@ -795,10 +823,10 @@ more_decls:
     if (last && last->dfa != DFA_FUNCTION) last->dfa = var_name_type;
     if (l < end) {
         if (var_name_type != DFA_PARAM) {
-            assert(at_token(l, end));
+            //assert(at_token(l, end));
             l = next_token(l, end);
             if (is_likely_function && l->c() == '{') {
-                l = parse_braces(l, end);
+                l = parse_stmt_braces(l, end);
                 if (l->c() == '}') {
                     l++;
                     l = next_token(l, end);

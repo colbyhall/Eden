@@ -66,9 +66,7 @@ struct Lexeme {
     const u8* i;
     u8 dfa;
     u8 cached_first;
-    const u8 c() const {
-        return cached_first;
-    }
+    CH_FORCEINLINE u8 c() const { return cached_first; }
 };
 
 void parse_cpp(Buffer* b);

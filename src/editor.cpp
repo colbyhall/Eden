@@ -153,7 +153,7 @@ int main() {
 		const ch::Path path = "../test_files/10mb_file.h";
         if (ch::load_file_into_memory(path, &fd)) {
 #if BUILD_DEBUG
-            fd.size = 16*4096; // @Temporary
+            //fd.size = 16*4096; // @Temporary
 #endif
 			defer(fd.free());
 			buffer->gap_buffer.resize(fd.size); // Pre-allocate.
@@ -192,13 +192,15 @@ int main() {
 		ch::reset_arena_allocator(&temp_arena);
 
 		process_input();
-		tick_editor(1000);
+		tick_editor(dt);
 		draw_editor();
 		try_refresh_config();
 
+        ch::get_time_in_seconds();
+
 		if (!the_window.has_focus()) {
 #if CH_PLATFORM_WINDOWS
-			//Sleep(100);
+			ch::sleep(100);
 #endif
 		}
 	}

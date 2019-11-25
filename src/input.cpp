@@ -76,7 +76,7 @@ void process_input() {
 	ch::mem_zero(keys_pressed, sizeof(keys_pressed));
 	current_mouse_scroll_y = 0.f;
 
-	ch::wait_events();
+	//ch::wait_events();
 	ch::poll_events();
 
 	ch::Vector2 u32_mouse_pos;
