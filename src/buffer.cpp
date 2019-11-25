@@ -3,6 +3,7 @@
 #include <vadefs.h>
 #include <stdio.h>
 #include "config.h"
+#include <stdarg.h>
 
 static usize get_char_column_size(u32 c) {
 	if (c == '\t') return get_config().tab_width;

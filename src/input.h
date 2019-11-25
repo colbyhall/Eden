@@ -2,6 +2,7 @@
 
 #include <ch_stl/input.h>
 #include <ch_stl/math.h>
+#include <ch_stl/array.h>
 
 extern ch::Vector2 last_mouse_position;
 extern ch::Vector2 current_mouse_position;

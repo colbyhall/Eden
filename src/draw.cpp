@@ -59,7 +59,7 @@ bool load_font_from_path(const ch::Path& path, Font* out_font) {
 	}
 	font.atlas_area = atlas_area;
 
-	glGenTextures(ARRAYSIZE(font.atlas_ids), font.atlas_ids);
+	glGenTextures(Font::num_atlases, font.atlas_ids);
 	
 	*out_font = font;
 

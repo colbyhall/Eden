@@ -30,8 +30,10 @@ struct Font {
 	f32 descent;
 	f32 line_gap;
 
-	Font_Atlas atlases[129];
-	GLuint atlas_ids[ARRAYSIZE(Font::atlases)];
+	static const usize num_atlases = 129;
+
+	Font_Atlas atlases[num_atlases];
+	GLuint atlas_ids[num_atlases];
 
 	s32* codepoints;
 	u32 num_glyphs;

@@ -74,10 +74,16 @@ enum  PROCESS_DPI_AWARENESS {
 
 using Set_Process_DPI_Awareness = HRESULT(*)(PROCESS_DPI_AWARENESS value);
 
-extern "C"
-{
+using HICON = HANDLE;
+#define WM_SETICON 0x80
+#define ICON_BIG 1
+
+extern "C" {
 	__declspec(dllexport) DWORD NvOptimusEnablement = 0x0;
 	__declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x0;
+
+	DLL_IMPORT HICON WINAPI LoadIconA(HINSTANCE, LPCSTR);
+	DLL_IMPORT LRESULT WINAPI SendMessageA(HWND, UINT, WPARAM, LPARAM);
 }
 #endif
 
@@ -110,9 +116,9 @@ int main() {
 		const bool window_created = ch::create_gl_window(window_title, width, height, 0, &the_window);
 		assert(window_created);
 #if CH_PLATFORM_WINDOWS
-		HICON the_icon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
+		HICON the_icon = LoadIconA(GetModuleHandleA(NULL), MAKEINTRESOURCEA(IDI_ICON1));
 		assert(the_icon);
-		SendMessage((HWND)the_window.os_handle, WM_SETICON, ICON_BIG, (LPARAM)the_icon);
+		SendMessageA((HWND)the_window.os_handle, WM_SETICON, ICON_BIG, (LPARAM)the_icon);
 #endif
 	}
 	const bool is_gl_current = ch::make_current(the_window);
