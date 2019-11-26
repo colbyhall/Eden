@@ -5,10 +5,14 @@
 
 extern ch::Window the_window;
 extern struct Font the_font;
-extern Buffer* messages_buffer;
+extern Buffer_ID messages_buffer;
 
-Buffer* create_buffer();
+Buffer_ID create_buffer();
 bool remove_buffer(Buffer_ID id);
 Buffer* find_buffer(Buffer_ID id);
 
-#define print_to_messages(fmt, ...) messages_buffer->print_to(fmt, __VA_ARGS__)
+inline Buffer* get_messages_buffer() {
+    return find_buffer(messages_buffer);
+}
+
+#define print_to_messages(fmt, ...) get_messages_buffer()->print_to(fmt, __VA_ARGS__)

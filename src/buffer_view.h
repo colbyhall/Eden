@@ -5,13 +5,13 @@
 const f32 min_width_ratio = 0.2f;
 
 struct Buffer_View {
-	Buffer_ID the_buffer;
+	Buffer_ID the_buffer = 0;
 	f32 width_ratio = 0.5f;
 
 	ssize cursor = -1;
 	ssize selection = -1;
 
-	u64 desired_column;
+	u64 desired_column = 0;
 
 	f32 current_scroll_y = 0.f;
 	f32 target_scroll_y = 0.f;
@@ -30,8 +30,6 @@ struct Buffer_View {
 	void remove_selection();
 	ssize seek_dir(bool left) const;
 
-	void set_focused();
-
 	void update_desired_column();
 	void ensure_cursor_in_view();
 
@@ -45,4 +43,3 @@ usize push_view(Buffer_ID the_buffer);
 usize insert_view(Buffer_ID the_buffer, usize index);
 bool remove_view(usize view_index);
 Buffer_View* get_view(usize index);
-ssize get_view_index(Buffer_View* view);

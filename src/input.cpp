@@ -8,7 +8,7 @@ bool exit_requested = false;
 bool is_mouse_over;
 bool was_mouse_over;
 
-extern Buffer_View* focused_view;
+extern Buffer_View* get_focused_view();
 
 ch::Vector2 last_mouse_position;
 ch::Vector2 current_mouse_position;
@@ -23,6 +23,10 @@ static const usize MAX_KEYS = 256;
 static bool keys_down[MAX_KEYS];
 static bool keys_pressed[MAX_KEYS];
 static bool keys_released[MAX_KEYS];
+
+extern "C" {
+    DLL_IMPORT BOOL WINAPI KillTimer(HWND hWnd, UINT_PTR nIDEvent);
+}
 
 void init_input() {
 	the_window.on_exit_requested = [](const ch::Window& window) {
@@ -42,7 +46,7 @@ void init_input() {
 	the_window.on_key_pressed = [](const ch::Window& window, u8 key) {
 		keys_down[key] = true;
 		keys_pressed[key] = true;
-		if (focused_view) focused_view->on_key_pressed(key);
+		if (get_focused_view()) get_focused_view()->on_key_pressed(key);
 	};
 
 	the_window.on_key_released = [](const ch::Window& window, u8 key) {
@@ -51,11 +55,11 @@ void init_input() {
 	};
 
 	the_window.on_char_entered = [](const ch::Window& window, u32 c) {
-		if (focused_view) focused_view->on_char_entered(c);
+		if (get_focused_view()) get_focused_view()->on_char_entered(c);
 	};
 
 	the_window.on_resize = [](const ch::Window& window) {
-		on_window_resize_config();
+        on_window_resize_config();
 	};
 
 	the_window.on_maximized = [](const ch::Window& window) {

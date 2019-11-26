@@ -10,7 +10,8 @@ static usize get_char_column_size(u32 c) {
 	return 1;
 }
 
-Buffer::Buffer() {
+Buffer::Buffer() : id{0} {
+    line_column_table.allocator = ch::get_heap_allocator();
 	eol_table.allocator = ch::get_heap_allocator();
 	gap_buffer.allocator = ch::get_heap_allocator();
 
@@ -18,10 +19,21 @@ Buffer::Buffer() {
 }
 
 Buffer::Buffer(Buffer_ID _id) : id(_id) {
+    line_column_table.allocator = ch::get_heap_allocator();
 	eol_table.allocator = ch::get_heap_allocator();
 	gap_buffer.allocator = ch::get_heap_allocator();
 
 	eol_table.push(0);
+}
+
+void Buffer::clear() {
+    gap_buffer.gap = gap_buffer.data;
+    gap_buffer.gap_size = gap_buffer.allocated;
+    eol_table.count = 0;
+    //line_column_table = 0; // @TODO: this calls an operator= overload for an array constructor with the `usize amount` parameter. Bad/leaky abstraction
+    line_column_table.count = 0;
+    syntax_dirty = true;
+    lexemes.count = 0;
 }
 
 void Buffer::add_char(u32 c, usize index) {
@@ -125,4 +137,20 @@ u64 Buffer::get_line_from_index(u64 index) const {
 	}
 
 	return eol_table.count - 1;
+}
+
+u64 Buffer::get_wrapped_line_from_index(u64 index, u64 max_line_width) const {
+    assert(max_line_width > 0);
+	assert(index <= gap_buffer.count());
+
+    u64 num_lines = 0;
+
+	u64 current_index = 0;
+	for (usize i = 0; i < eol_table.count; i++) {
+		current_index += eol_table[i];
+        num_lines += line_column_table[i] / max_line_width + 1;
+		if (current_index > index) break;
+	}
+
+	return num_lines;
 }

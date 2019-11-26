@@ -32,6 +32,8 @@ struct Buffer {
 	Buffer();
 	Buffer(Buffer_ID _id);
 
+    void clear();
+
 	void add_char(u32 c, usize index);
 	void remove_char(usize index);
 
@@ -42,4 +44,5 @@ struct Buffer {
 
 	u64 get_index_from_line(u64 line) const;
 	u64 get_line_from_index(u64 index) const;
+    u64 get_wrapped_line_from_index(u64 index, u64 max_line_width) const;
 };

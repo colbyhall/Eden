@@ -178,12 +178,9 @@ static bool is_point_in_glyph(ch::Vector2 p, const Font_Glyph* g, f32 x, f32 y) 
 static const f32 line_number_padding = 3.f;
 
 static void push_line_number(u64 current_line_number, u64 max_line_number, f32* x, f32 y) {
-	// @NOTE(CHall): Quick and easy way to get the min alignment
-	if (max_line_number < 10) max_line_number = 10;
-
 	const Font_Glyph* space_glyph = the_font[' '];
 
-	const u8 spaces_needed = ch::get_num_digits(max_line_number) - ch::get_num_digits(current_line_number);
+	const u8 spaces_needed = (ch::get_num_digits(max_line_number) + 1) - ch::get_num_digits(current_line_number);
 
 	char temp_buffer[16];
 	ch::sprintf(temp_buffer, "%llu", current_line_number);
@@ -235,9 +232,15 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
     assert(width > 0);
 
 	f32 line_number_quad_width = 0.f;
+
+    const u32 line_number_columns = ch::get_num_digits(num_lines) + 1;
+
+    if (line_number_columns * space_glyph->advance >= width) {
+        show_line_numbers = false;
+    }
+
 	if (show_line_numbers) {
-		const u32 num_digits = ch::max(ch::get_num_digits(num_lines), (u32)2);
-		line_number_quad_width = (num_digits * space_glyph->advance) + line_number_padding;
+		line_number_quad_width = (line_number_columns * space_glyph->advance) + line_number_padding;
 		const f32 ln_x0 = x0;
 		const f32 ln_y0 = y0;
 		const f32 ln_x1 = ln_x0 + line_number_quad_width;
@@ -429,7 +432,9 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			x = starting_x;
 			y += font_height;
 
-			x += space_glyph->advance * (ch::get_num_digits(num_lines)) + line_number_padding;
+			if (show_line_numbers) {
+                x += space_glyph->advance * (ch::get_num_digits(num_lines) + 1) + line_number_padding;
+            }
 			// @TODO(CHall): maybe draw some kind of carriage return symbol?
 		}
 
@@ -443,7 +448,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	}
 
 #if PARSE_SPEED_DEBUG
-    {
+    if (!buffer.syntax_dirty && !buffer.disable_parse) {
         // @Debug: Debug code to print the lexer speed in the corner.
         char temp[1024];
         // All cleaned up :)

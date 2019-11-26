@@ -18,16 +18,16 @@ ch::Window the_window;
 
 const char* window_title = "eden";
 Font the_font;
-Buffer* messages_buffer;
+Buffer_ID messages_buffer;
 
 ch::Hash_Table<Buffer_ID, Buffer> buffers(ch::get_heap_allocator());
 
 static Buffer_ID last_id = 0;
 
-Buffer* create_buffer() {
+Buffer_ID create_buffer() {
 	const Buffer_ID id = last_id++;
 	const usize index = buffers.push(id, Buffer(id));
-	return &buffers[index];
+	return id;
 }
 
 bool remove_buffer(Buffer_ID id) {
@@ -39,7 +39,7 @@ Buffer* find_buffer(Buffer_ID id) {
 }
 
             int num_vertices_total;
-static void tick_editor(f32 dt) {
+void tick_editor(f32 dt) {
 	tick_views(dt);
 #if 1//BUILD_DEBUG
     {
@@ -84,6 +84,10 @@ extern "C" {
 
 	DLL_IMPORT HICON WINAPI LoadIconA(HINSTANCE, LPCSTR);
 	DLL_IMPORT LRESULT WINAPI SendMessageA(HWND, UINT, WPARAM, LPARAM);
+
+    using TIMERPROC = void(*)(HWND Arg1, UINT Arg2, UINT_PTR Arg3, DWORD Arg4);
+    DLL_IMPORT UINT_PTR WINAPI SetTimer(HWND hWnd, UINT_PTR nIDEvent, UINT uElapse, TIMERPROC lpTimerFunc);
+    DLL_IMPORT BOOL WINAPI KillTimer(HWND hWnd, UINT_PTR nIDEvent);
 }
 #endif
 
@@ -126,21 +130,29 @@ int main() {
 
 	if (config.was_maximized) the_window.maximize();
 
-	the_window.on_sizing = [](const ch::Window& window) {
-		tick_editor(0.f);
-		draw_editor();
-	};
+    extern ch::Array<Buffer_View> views;
+
+    the_window.on_sizing = [](const ch::Window& window) {
+        for (usize i = 0; i < views.count; i++) {
+            views[i].ensure_cursor_in_view();
+        }
+        tick_editor(1.0f);
+	    draw_editor();
+    };
 
 	init_draw();
 	init_input();
 
 	messages_buffer = create_buffer();
-	messages_buffer->disable_parse = true;
-	messages_buffer->print_to("Hello Sailor!\nWelcome to Eden\n");
+	get_messages_buffer()->disable_parse = true;
+	get_messages_buffer()->print_to("Hello Sailor!\nWelcome to Eden\n");
 
-	Buffer* buffer = create_buffer();
-	push_view(buffer->id);
-	//push_view(messages_buffer->id);
+	Buffer_ID buffer = create_buffer();
+	push_view(buffer);
+	//push_view(get_messages_buffer()->id); // for testing :)
+    //push_view(buffer);
+	//push_view(get_messages_buffer()->id);
+    //for (auto&&v:views)v.width_ratio=0.25f;
 
 
     // @Temporary: Load test file.
@@ -153,18 +165,19 @@ int main() {
 		const ch::Path path = "../test_files/10mb_file.h";
         if (ch::load_file_into_memory(path, &fd)) {
 #if BUILD_DEBUG
-            //fd.size = 16*4096; // @Temporary
+            fd.size = 16*4096; // @Temporary
 #endif
 			defer(fd.free());
-			buffer->gap_buffer.resize(fd.size); // Pre-allocate.
+            Buffer* b = find_buffer(buffer);
+			b->gap_buffer.resize(fd.size); // Pre-allocate.
 			for (usize i = 0; i < fd.size; i++) {
 				if (fd.data[i] == '\r') {
 					continue;
 				}
-				buffer->gap_buffer.push(fd.data[i]);
+				b->gap_buffer.push(fd.data[i]);
 			}
-			buffer->refresh_eol_table();
-			buffer->refresh_line_column_table();
+			b->refresh_eol_table();
+			b->refresh_line_column_table();
 		} else {
 			print_to_messages("Failed to find file %s", path);
 		}
@@ -184,7 +197,8 @@ int main() {
 	ch::context_allocator = temp_arena;
 
 	the_window.set_visibility(true);
-	f64 last_frame_time = ch::get_time_in_seconds();
+	
+    f64 last_frame_time = ch::get_time_in_seconds();
 	while (!is_exit_requested()) {
 		const f64 current_time = ch::get_time_in_seconds();
 		const f32 dt = (f32)(current_time - last_frame_time);

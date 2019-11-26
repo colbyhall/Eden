@@ -118,9 +118,9 @@ static bool parse_config(const ch::File_Data& fd, Config* config) {
 		line.advance(index);
 		line.eat_whitespace();
 		ch::String value = line;
+
 #define FIND_AND_PARSE(t, n, v) if (var_name == #n) parse_type<t>(value, &config->n);
-		CONFIG_VAR(FIND_AND_PARSE);
-#undef FIND_AND_PARSE
+        CONFIG_VAR(FIND_AND_PARSE);
 	}
 
 	return true;
@@ -134,7 +134,6 @@ static void export_config(const Config& config, const ch::Path& path = config_pa
 
 #define EXPORT_VARS(t, n, v) f << #n << ' ' << (t)config.n << ch::eol;
 	CONFIG_VAR(EXPORT_VARS);
-#undef EXPORT_VARS
 
 	f.set_end_of_file();
 	f.close();

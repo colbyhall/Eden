@@ -18,10 +18,10 @@ macro(u32, last_window_width, 1920) \
 macro(u32, last_window_height, 1080) \
 macro(bool, was_maximized, false)
 
-struct Config {
 #define PUSH_VARS(t, n, v) t n = v;
+
+struct Config {
 CONFIG_VAR(PUSH_VARS);
-#undef PUSH_VARS
 };
 
 extern Config default_config;
