@@ -8,7 +8,8 @@ project "lua"
 	files
 	{
 		"**.h",
-		"**.c"
+		"**.c",
+		"**.hpp"
 	}
 
 	excludes
