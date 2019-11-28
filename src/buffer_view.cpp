@@ -158,6 +158,21 @@ void Buffer_View::on_char_entered(u32 c) {
     buffer->syntax_dirty = true;
 }
 
+static u64 seek_end_of_line(Buffer* b, u64 begin) {
+    u64 i = begin;
+    while (i >= 0 && i < b->gap_buffer.count() && b->gap_buffer[i] != ch::eol) {
+        i += 1;
+    }
+    return i;
+}
+static u64 seek_begin_of_line(Buffer* b, u64 begin) {
+    u64 i = begin;
+    while (i >= 0 && i < b->gap_buffer.count() && b->gap_buffer[i] != ch::eol) {
+        i -= 1;
+    }
+    return i;
+}
+
 void Buffer_View::on_key_pressed(u8 key) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
@@ -169,6 +184,19 @@ void Buffer_View::on_key_pressed(u8 key) {
 	reset_cursor_timer();
 	defer(ensure_cursor_in_view());
 	switch (key) {
+    case CH_KEY_K: {
+        if (ctrl_pressed) {
+		    remove_selection();
+		    selection = cursor;
+
+            cursor = seek_end_of_line(buffer, cursor + 1) - 1;
+
+            remove_selection();
+
+		    update_desired_column();
+		    buffer->syntax_dirty = true;
+        }
+	} break;
 	case CH_KEY_ENTER:
 		// @TODO(CHall): Detect if nix or CRLF
 		remove_selection();
@@ -198,10 +226,8 @@ void Buffer_View::on_key_pressed(u8 key) {
 		}
 		break;
 	case CH_KEY_DELETE:
-		if (has_selection()) {
-			remove_selection();
-		}
-
+		remove_selection();
+		
 		if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
 			if (ctrl_pressed) {
 				selection = seek_dir(false);
@@ -283,21 +309,11 @@ void Buffer_View::on_key_pressed(u8 key) {
 		}
 	} break;
     case CH_KEY_HOME: {
-        u64 i = cursor;
-        while (i >= 0 && i < buffer->gap_buffer.count()
-               && buffer->gap_buffer[i] != ch::eol) {
-            i -= 1;
-        }
-        set_cursor(i);
+        set_cursor(seek_begin_of_line(buffer, cursor));
 		update_desired_column();
     } break;
     case CH_KEY_END: {
-        u64 i = cursor + 1;
-        while (i >= 0 && i < buffer->gap_buffer.count()
-               && buffer->gap_buffer[i] != ch::eol) {
-            i += 1;
-        }
-        set_cursor(i - 1);
+        set_cursor(seek_end_of_line(buffer, cursor + 1) - 1);
 		update_desired_column();
     } break;
     case CH_KEY_PRIOR: {
