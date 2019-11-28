@@ -309,12 +309,21 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
             ch::Color type = {0.0f, 0.7f, 0.9f, 1.0f};
             ch::Color keyword = {1.0f, 1.0f, 1.0f, 1.0f};
             ch::Color param = {1.0f, 0.6f, 0.125f, 1.0f};
+            ch::Color label = op;
             switch (lexeme->dfa) {
             case parsing::DFA_FUNCTION:
-                color = preproc;
+                if (parsing::is_keyword(lexeme)) {
+                    color = keyword;
+                } else {
+                    color = preproc;
+                }
                 break;
             case parsing::DFA_PARAM:
-                color = param;
+                if (parsing::is_keyword(lexeme)) {
+                    color = keyword;
+                } else {
+                    color = param;
+                }
                 break;
             case parsing::DFA_KEYWORD:
                 color = keyword;
@@ -349,6 +358,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
                 }
                 break;
             case parsing::DFA_IDENT:
+                if (parsing::is_keyword(lexeme)) {
+                    color = keyword;
+                } else {
+                    
+                }
                 break;
             case parsing::DFA_OP:
             case parsing::DFA_OP2:
@@ -367,8 +381,16 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
                 }
                 break;
             case parsing::DFA_TYPE:
-                color = type;
+                if (parsing::is_keyword(lexeme)) {
+                    color = keyword;
+                } else {
+                    color = type;
+                }
                 break;
+            case parsing::DFA_LABEL:
+                color = label;
+                break;
+            default: ch_debug_trap;
             }
         }
 

@@ -16,7 +16,7 @@
 
 ch::Window the_window;
 
-const char* window_title = "eden";
+const wchar_t* window_title = L"eden"; // @Hack.
 Font the_font;
 Buffer_ID messages_buffer;
 
@@ -117,7 +117,7 @@ int main() {
 	{
 		const u32 width = config.last_window_width;
 		const u32 height = config.last_window_height;
-		const bool window_created = ch::create_gl_window(window_title, width, height, 0, &the_window);
+		const bool window_created = ch::create_gl_window((char*)window_title, width, height, 0, &the_window); // @Hack: (char*)
 		assert(window_created);
 #if CH_PLATFORM_WINDOWS
 		HICON the_icon = LoadIconA(GetModuleHandleA(NULL), MAKEINTRESOURCEA(IDI_ICON1));

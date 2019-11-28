@@ -227,7 +227,7 @@ const u8* temp_parser_gap;
 u64 temp_parser_gap_size;
 
 static const u8 lexeme_sentinel_buffer[16];
-u64 toklen(Lexeme* l) {
+u64 toklen(const Lexeme* l) {
     const u8* next_i = l[1].i;
     if (next_i == lexeme_sentinel_buffer) next_i = l[2].i;
     if (next_i == temp_parser_gap + temp_parser_gap_size) next_i = temp_parser_gap;
@@ -274,7 +274,7 @@ void parse(Lexeme* l, Lexeme* end);
 // Still, it's got a speed advantage, and speed is paramount.
 #define switch_on_token(l_, fordef, for2, for3, for4, for5, for6, for7, for8)  \
     do {                                                                       \
-        Lexeme *switch_on_token_lexeme = (l_);                                 \
+        const Lexeme *switch_on_token_lexeme = (l_);                           \
         const u8* swchp = switch_on_token_lexeme->i;                           \
         switch (u64 len = toklen(switch_on_token_lexeme)) {                    \
         default: def: { fordef; } break;                                       \
@@ -287,6 +287,19 @@ void parse(Lexeme* l, Lexeme* end);
         case 8: switch (Load8(swchp)) { default: goto def; { for8; } } break;  \
         }                                                                      \
     } while (0);
+
+#include "parsing_cpp_keywords.h"
+bool is_keyword(const Lexeme* l) {
+#define IS_KEYWORD_CASE(name) case KW_CHUNK(#name): return true;
+    switch_on_token(l, return false,
+        CPP_KEYWORDS_2(IS_KEYWORD_CASE),
+        CPP_KEYWORDS_3(IS_KEYWORD_CASE),
+        CPP_KEYWORDS_4(IS_KEYWORD_CASE),
+        CPP_KEYWORDS_5(IS_KEYWORD_CASE),
+        CPP_KEYWORDS_6(IS_KEYWORD_CASE),
+        CPP_KEYWORDS_7(IS_KEYWORD_CASE),
+        CPP_KEYWORDS_8(IS_KEYWORD_CASE));
+}
 
 static Lexeme* skip_comments_in_line(Lexeme* l, Lexeme* end) {
     while (l < end && (l->dfa < DFA_NEWLINE || l->dfa == DFA_SLASH && l[1].dfa <= DFA_LINE_COMMENT)) l++;
@@ -779,11 +792,43 @@ static Lexeme* parse_stmt(Lexeme* l, Lexeme* end, Lex_Dfa var_name_type) {
     if (l->dfa != DFA_IDENT) {
         return parse_exprs_til_semi(l, end);
     }
+    Lexeme* first = l;
     switch_on_token(l,
         {
             l->dfa = DFA_TYPE;
             l++;
             l = next_token(l, end);
+            if (var_name_type == DFA_IDENT) {
+                // Ad-hoc heuristic: Quickly scan ahead and check if this is definitely an expression.
+                switch (l->c()) {
+                    case '~':
+                    case '!':
+                    case '#':
+                    case '%':
+                    case '^':
+                    case '-':
+                    case '+':
+                    case '=':
+                    case '[':
+                    case '{':
+                    case ']':
+                    case '}':
+                    case '|':
+                    case ';':
+                    case '"':
+                    case ',':
+                    case '.':
+                    case '>':
+                    case '/':
+                        first->dfa = DFA_IDENT;
+                        return parse_exprs_til_semi(l, end);
+                    case ':':
+                        first->dfa = DFA_LABEL; 
+                        l++;
+                        l = next_token(l, end);
+                        return parse_stmt(l, end);
+                }
+            }
         } break;,
         case KW_CHUNK("if"): {
             return parse_if_switch_while_for(l, end);

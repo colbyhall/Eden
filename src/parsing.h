@@ -40,6 +40,7 @@ enum Lex_Dfa : u8 {
     DFA_KEYWORD,
     DFA_FUNCTION,
     DFA_PARAM,
+    DFA_LABEL,
 };
 
 // This is an enum for categorizing C++ source code characters.
@@ -69,6 +70,7 @@ struct Lexeme {
     CH_FORCEINLINE u8 c() const { return cached_first; }
 };
 
+bool is_keyword(const Lexeme* l);
 void parse_cpp(Buffer* b);
 
 } // namespace parsing
