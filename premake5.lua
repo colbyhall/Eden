@@ -13,11 +13,12 @@ workspace "eden"
     debugdir ("bin")
 
 	include "libs/ch_stl"
+	include "libs/lua"
 
 
 project "eden"
     language "C++"
-	dependson "ch_stl"
+	dependson { "ch_stl", "lua" }
 	kind "WindowedApp"
 
 	defines
@@ -34,7 +35,7 @@ project "eden"
     includedirs
     {
         "src/**",
-        "libs/"
+        "libs/",
     }
 
     links
@@ -43,7 +44,8 @@ project "eden"
         "user32",
         "kernel32",
 		"shlwapi",
-		"bin/ch_stl"
+		"bin/ch_stl",
+		"bin/lua"
     }
 
     filter "configurations:Debug"
