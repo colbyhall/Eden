@@ -672,6 +672,59 @@ static Lexeme* parse_expr(Lexeme* l, Lexeme* end) {
     return l;
 }
 
+static Lexeme* parse_type(Lexeme* l, Lexeme* end) {
+    if (l->dfa == DFA_IDENT) {
+        l->dfa = DFA_TYPE;
+        l++;
+        l = next_token(l, end);
+        if (l->c() == '<') {
+            do {
+                l++;
+                l = next_token(l, end);
+                l = parse_type(l, end);
+            } while (l->c() == ',');
+            if (l->c() == '>') {
+                l++;
+                l = next_token(l, end);
+            }
+        }
+        while (l < end) {
+            if (l->c() == '*' ||
+                l->c() == '&') {
+                l->dfa = DFA_TYPE;
+                l++;
+                l = next_token(l, end);
+            } else if (l->c() == '[') {
+                l = parse_expr_sqr(l, end);
+                if (l->c() == ']') {
+                    l++;
+                    l = next_token(l, end);
+                }
+            } else if (l->c() == '(') {
+                do {
+                    l++;
+                    l = next_token(l, end);
+                    l = parse_type(l, end);
+                } while (l->c() == ',');
+                if (l->c() == ')') {
+                    l++;
+                    l = next_token(l, end);
+                }
+            } else {
+                break;
+            }
+            if (l->c() == ';' ||
+                l->c() == '}' ||
+                l->c() == ')' ||
+                l->c() == ']' ||
+                l->c() == '>') {
+                break;
+            }
+        }
+    }
+    return l;
+}
+
 static Lexeme* parse_param(Lexeme* l, Lexeme* end) { return parse_stmt(l, end, DFA_PARAM); }
 
 static Lexeme* parse_if_switch_while_for(Lexeme* l, Lexeme* end) {
@@ -700,6 +753,21 @@ static Lexeme* parse_struct_union(Lexeme* l, Lexeme* end) {
             l++;
             l = next_token(l, end);
         }
+    }
+    return l;
+}
+static Lexeme* parse_using(Lexeme* l, Lexeme* end) {
+    l++;
+    l = next_token(l, end);
+    if (l->dfa == DFA_IDENT) {
+        l->dfa = DFA_TYPE;
+        l++;
+        l = next_token(l, end);
+    }
+    if (l->c() == '=') {
+        l++;
+        l = next_token(l, end);
+        l = parse_type(l, end);
     }
     return l;
 }
@@ -738,6 +806,9 @@ static Lexeme* parse_stmt(Lexeme* l, Lexeme* end, Lex_Dfa var_name_type) {
         } break;
         case KW_CHUNK("while"): {
             return parse_if_switch_while_for(l, end);
+        } break;
+        case KW_CHUNK("using"): {
+            return parse_using(l, end);
         } break;,
         case KW_CHUNK("return"): {
             l++;
