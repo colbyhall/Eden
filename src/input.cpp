@@ -1,14 +1,11 @@
 #include "input.h"
 #include "editor.h"
 #include "buffer_view.h"
-#include "config.h"
+#include "actions.h"
 
-bool exit_requested = false;
+#include <ch_stl/hash_table.h>
 
-bool is_mouse_over;
-bool was_mouse_over;
-
-extern Buffer_View* get_focused_view();
+static bool exit_requested = false;
 
 ch::Vector2 last_mouse_position;
 ch::Vector2 current_mouse_position;
@@ -19,13 +16,40 @@ static bool mb_down[MAX_MB];
 static bool mb_pressed[MAX_MB];
 static bool mb_released[MAX_MB];
 
-static const usize MAX_KEYS = 256;
-static bool keys_down[MAX_KEYS];
-static bool keys_pressed[MAX_KEYS];
-static bool keys_released[MAX_KEYS];
+static bool shift_down = false;
+static bool ctrl_down = false;
+static bool alt_down = false;
 
-extern "C" {
-    DLL_IMPORT BOOL WINAPI KillTimer(HWND hWnd, UINT_PTR nIDEvent);
+static ch::Hash_Table<Key_Bind, Action_Func> action_table;
+
+bool bind_action(const Key_Bind binding, Action_Func action) {
+	assert(action);
+
+	Action_Func* const found_action = nullptr;//  action_table.find(binding);
+	if (found_action) {
+		*found_action = action;
+		return true;
+	}
+
+	action_table.push(binding, action);
+	return false;
+}
+
+bool unbind_action(const Key_Bind binding) {
+	return action_table.remove(binding);
+}
+
+bool has_action_binding(const Key_Bind binding) {
+	return action_table.contains(binding);
+}
+
+bool remove_all_bindings() {
+	if (action_table.buckets.count) {
+		action_table.free();
+		return true;
+	}
+
+	return false;
 }
 
 void init_input() {
@@ -44,47 +68,70 @@ void init_input() {
 	};
 
 	the_window.on_key_pressed = [](const ch::Window& window, u8 key) {
-		keys_down[key] = true;
-		keys_pressed[key] = true;
-		if (get_focused_view()) get_focused_view()->on_key_pressed(key);
+		switch (key) {
+		case CH_KEY_SHIFT:
+			shift_down = true;
+			break;
+		case CH_KEY_CONTROL:
+			ctrl_down = true;
+			break;
+		case CH_KEY_ALT:
+			alt_down = true;
+			break;
+		default:
+			const Key_Bind current_binding = { shift_down, ctrl_down, alt_down, key };
+
+			Action_Func* const action = action_table.find(current_binding);
+			if (action && *action) {
+				(*action)();
+			}
+			break;
+		}
 	};
 
 	the_window.on_key_released = [](const ch::Window& window, u8 key) {
-		keys_down[key] = false;
-		keys_released[key] = true;
+		switch (key) {
+		case CH_KEY_SHIFT:
+			shift_down = false;		
+			break;
+		case CH_KEY_CONTROL:
+			ctrl_down = false;
+			break;
+		case CH_KEY_ALT:
+			alt_down = false;
+			break;
+		}
 	};
 
 	the_window.on_char_entered = [](const ch::Window& window, u32 c) {
 		if (get_focused_view()) get_focused_view()->on_char_entered(c);
 	};
 
-	the_window.on_resize = [](const ch::Window& window) {
-        on_window_resize_config();
-	};
-
-	the_window.on_maximized = [](const ch::Window& window) {
-		on_window_maximized_config();
-	};
-
 	the_window.on_mouse_wheel_scrolled = [](const ch::Window& window, f32 delta) {
 		current_mouse_scroll_y = delta;
 	};
+
+	setup_default_bindings();
+}
+
+void setup_default_bindings() {
+	bind_action({ false, false, false, CH_KEY_BACKSPACE }, backspace);
+	bind_action({ true, false, false, CH_KEY_BACKSPACE }, backspace);
+
+	bind_action({ false, false, false, CH_KEY_ENTER }, newline);
+	bind_action({ true, false, false, CH_KEY_ENTER }, newline);
 }
 
 void process_input() {
 	last_mouse_position = current_mouse_position;
-	was_mouse_over = is_mouse_over;
 	ch::mem_zero(mb_pressed, sizeof(mb_pressed));
 	ch::mem_zero(mb_released, sizeof(mb_released));
-	ch::mem_zero(keys_released, sizeof(keys_released));
-	ch::mem_zero(keys_pressed, sizeof(keys_pressed));
 	current_mouse_scroll_y = 0.f;
 
-	//ch::wait_events();
 	ch::poll_events();
 
 	ch::Vector2 u32_mouse_pos;
-	is_mouse_over = the_window.get_mouse_position(&u32_mouse_pos);
+	the_window.get_mouse_position(&u32_mouse_pos);
 	current_mouse_position.x = (f32)u32_mouse_pos.ux;
 	current_mouse_position.y = (f32)u32_mouse_pos.uy;
 }
@@ -103,16 +150,4 @@ bool was_mouse_button_pressed(u8 mb) {
 
 bool was_mouse_button_released(u8 mb) {
 	return mb_released[mb];
-}
-
-bool is_key_down(u8 key) {
-	return keys_down[key];
-}
-
-bool was_key_pressed(u8 key) {
-	return keys_pressed[key];
-}
-
-bool was_key_released(u8 key) {
-	return keys_released[key];
 }

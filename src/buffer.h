@@ -7,11 +7,17 @@
 #include "parsing.h"
 
 using Buffer_ID = usize;
+const usize invalid_buffer_id = 0;
 
 CH_FORCEINLINE u64 hash(Buffer_ID id) {
 	return ch::fnv1_hash(&id, sizeof(Buffer_ID));
 }
 
+/**
+ * Wrapper around gap buffer that keeps cached data about the contents of the gap buffer
+ *
+ * @see ch:Gap_Buffer
+ */
 struct Buffer {
 	Buffer_ID id;
 	ch::Gap_Buffer<u8> gap_buffer;
@@ -32,7 +38,11 @@ struct Buffer {
 	Buffer();
 	Buffer(Buffer_ID _id);
 
-    void clear();
+	/** Empties the gap buffer and resets all cached state. */
+    void empty();
+
+	/** Frees all dynamic memory. */
+	void free();
 
 	void add_char(u32 c, usize index);
 	void remove_char(usize index);
@@ -46,3 +56,22 @@ struct Buffer {
 	u64 get_line_from_index(u64 index) const;
     u64 get_wrapped_line_from_index(u64 index, u64 max_line_width) const;
 };
+
+/** Creates a new buffer and @returns the new buffer's id. */
+Buffer_ID create_buffer();
+
+/** 
+ * Finds the buffer via Buffer_ID. 
+ *
+ * @param id is the buffer's id we're trying to find. 
+ * @returns a pointer to the actual buffer. 
+ */
+Buffer* find_buffer(Buffer_ID id);
+
+/** 
+ * Removes the buffer with the id given. 
+ *
+ * @param id is the buffer's id we're trying to remove.
+ * @returns true if the buffer was removed. 
+ */
+bool remove_buffer(Buffer_ID id);

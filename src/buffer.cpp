@@ -1,8 +1,10 @@
 #include "buffer.h"
 
+#include "config.h"
+
+#include <ch_stl/hash_table.h>
 #include <vadefs.h>
 #include <stdio.h>
-#include "config.h"
 #include <stdarg.h>
 
 static usize get_char_column_size(u32 c) {
@@ -26,14 +28,20 @@ Buffer::Buffer(Buffer_ID _id) : id(_id) {
 	eol_table.push(0);
 }
 
-void Buffer::clear() {
+void Buffer::empty() {
     gap_buffer.gap = gap_buffer.data;
     gap_buffer.gap_size = gap_buffer.allocated;
     eol_table.count = 0;
-    //line_column_table = 0; // @TODO: this calls an operator= overload for an array constructor with the `usize amount` parameter. Bad/leaky abstraction
     line_column_table.count = 0;
     syntax_dirty = true;
     lexemes.count = 0;
+}
+
+void Buffer::free() {
+	gap_buffer.free();
+	eol_table.free();
+	line_column_table.free();
+	lexemes.free();
 }
 
 void Buffer::add_char(u32 c, usize index) {
@@ -60,11 +68,7 @@ void Buffer::print_to(const char* fmt, ...) {
 
 	va_list args;
 	va_start(args, fmt);
-#if CH_PLATFORM_WINDOWS
 	const usize size = vsprintf(write_buffer, fmt, args);
-#else
-#error Needs sprintf
-#endif
 	va_end(args);
 
 	for (usize i = 0; i < size; i += 1) {
@@ -153,4 +157,30 @@ u64 Buffer::get_wrapped_line_from_index(u64 index, u64 max_line_width) const {
 	}
 
 	return num_lines;
+}
+
+static ch::Hash_Table<Buffer_ID, Buffer> the_buffers;
+static Buffer_ID last_buffer_id = 0;
+
+Buffer_ID create_buffer() {
+	last_buffer_id += 1;
+	
+	the_buffers.push(last_buffer_id, Buffer(last_buffer_id));
+
+	return last_buffer_id;
+}
+
+Buffer* find_buffer(Buffer_ID id) {
+	return the_buffers.find(id);
+}
+
+bool remove_buffer(Buffer_ID id) {
+	Buffer* const buffer = find_buffer(id);
+	if (buffer) {
+		buffer->free();
+		the_buffers.remove(id);
+		return true;
+	}
+	
+	return false;
 }

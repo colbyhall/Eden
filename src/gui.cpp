@@ -1,9 +1,13 @@
 #include "gui.h"
 #include "editor.h"
+#include "buffer.h"
 #include "draw.h"
 #include "input.h"
 #include "config.h"
-#include "ch_stl/time.h"
+
+#include "parsing.h"
+
+#include <ch_stl/time.h>
 
 enum Render_Type {
 	RT_Quad,

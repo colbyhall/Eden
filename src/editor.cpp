@@ -5,6 +5,7 @@
 #include "input.h"
 #include "buffer_view.h"
 #include "config.h"
+#include "buffer.h"
 
 #include <ch_stl/opengl.h>
 #include <ch_stl/time.h>
@@ -18,27 +19,9 @@ ch::Window the_window;
 
 const wchar_t* window_title = L"eden"; // @Hack.
 Font the_font;
-Buffer_ID messages_buffer;
 
-ch::Hash_Table<Buffer_ID, Buffer> buffers(ch::get_heap_allocator());
+int num_vertices_total;
 
-static Buffer_ID last_id = 0;
-
-Buffer_ID create_buffer() {
-	const Buffer_ID id = last_id++;
-	const usize index = buffers.push(id, Buffer(id));
-	return id;
-}
-
-bool remove_buffer(Buffer_ID id) {
-	return buffers.remove(id);
-}
-
-Buffer* find_buffer(Buffer_ID id) {
-	return buffers.find(id);
-}
-
-            int num_vertices_total;
 void tick_editor(f32 dt) {
 	tick_views(dt);
 #if 1//BUILD_DEBUG
@@ -79,9 +62,6 @@ using HICON = HANDLE;
 #define ICON_BIG 1
 
 extern "C" {
-	__declspec(dllexport) DWORD NvOptimusEnablement = 0x0;
-	__declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x0;
-
 	DLL_IMPORT HICON WINAPI LoadIconA(HINSTANCE, LPCSTR);
 	DLL_IMPORT LRESULT WINAPI SendMessageA(HWND, UINT, WPARAM, LPARAM);
 
@@ -130,12 +110,7 @@ int main() {
 
 	if (config.was_maximized) the_window.maximize();
 
-    extern ch::Array<Buffer_View> views;
-
     the_window.on_sizing = [](const ch::Window& window) {
-        for (usize i = 0; i < views.count; i++) {
-            views[i].ensure_cursor_in_view();
-        }
         tick_editor(1.0f);
 	    draw_editor();
     };
@@ -143,16 +118,8 @@ int main() {
 	init_draw();
 	init_input();
 
-	messages_buffer = create_buffer();
-	get_messages_buffer()->disable_parse = true;
-	get_messages_buffer()->print_to("Hello Sailor!\nWelcome to Eden\n");
-
 	Buffer_ID buffer = create_buffer();
 	push_view(buffer);
-	//push_view(get_messages_buffer()->id); // for testing :)
-    //push_view(buffer);
-	//push_view(get_messages_buffer()->id);
-    //for (auto&&v:views)v.width_ratio=0.25f;
 
 
     // @Temporary: Load test file.
@@ -178,8 +145,6 @@ int main() {
 			}
 			b->refresh_eol_table();
 			b->refresh_line_column_table();
-		} else {
-			print_to_messages("Failed to find file %s", path);
 		}
     }
 
@@ -213,9 +178,7 @@ int main() {
         ch::get_time_in_seconds();
 
 		if (!the_window.has_focus()) {
-#if CH_PLATFORM_WINDOWS
 			ch::sleep(100);
-#endif
 		}
 	}
 

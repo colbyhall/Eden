@@ -34,12 +34,14 @@ struct Buffer_View {
 	void ensure_cursor_in_view();
 
 	void on_char_entered(u32 c);
-	void on_key_pressed(u8 key);
 };
 
 void tick_views(f32 dt);
+
+Buffer_View* get_focused_view();
 
 usize push_view(Buffer_ID the_buffer);
 usize insert_view(Buffer_ID the_buffer, usize index);
 bool remove_view(usize view_index);
 Buffer_View* get_view(usize index);
+

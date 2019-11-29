@@ -6,15 +6,8 @@
 
 #include <ch_stl/math.h>
 
-ch::Array<Buffer_View> views;
-usize focused_view;
-Buffer_View *get_focused_view() {
-    if (views.count > 0) {
-        assert(focused_view < views.count);
-        return &views[focused_view];
-    }
-    return nullptr;
-}
+static ch::Array<Buffer_View> views;
+static usize focused_view;
 
 void ensure_all_cursors_visible() {
     for (usize i = 0; i < views.count; i++) {
@@ -51,11 +44,7 @@ void Buffer_View::set_cursor(ssize new_cursor) {
 	assert(new_cursor >= -1 && new_cursor < (ssize)buffer->gap_buffer.count());
 
 	cursor = new_cursor;
-
-	const bool shift_down = is_key_down(CH_KEY_SHIFT);
-	if (!shift_down) {
-		selection = cursor;
-	}
+	selection = new_cursor;
 }
 
 void Buffer_View::remove_selection() {
@@ -125,13 +114,15 @@ void Buffer_View::ensure_cursor_in_view() {
     Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
 
+	return;
+
     u64 max_line_width = get_view_columns((f32)the_window.get_viewport_size().ux, this - views.begin()); // @Hack: this "self-contained view acting only on itself" abstraction is bad
 
     f32 view_height = (f32)the_window.get_viewport_size().uy;
     f32 font_height = (f32)the_font.size;
 
     f32 cursor_y = (buffer->get_wrapped_line_from_index(cursor + 1, max_line_width)) * font_height; // @Todo: need to compute the exact value for wrapped line scrolling
-    print_to_messages("%llu\n", max_line_width);
+    // print_to_messages("%llu\n", max_line_width);
 
     if (target_scroll_y > cursor_y - font_height * 2) {
 	    target_scroll_y = cursor_y - font_height * 2;
@@ -171,199 +162,6 @@ static u64 seek_begin_of_line(Buffer* b, u64 begin) {
         i -= 1;
     }
     return i;
-}
-
-void Buffer_View::on_key_pressed(u8 key) {
-	Buffer* buffer = find_buffer(the_buffer);
-	assert(buffer);
-
-	const bool ctrl_pressed = is_key_down(CH_KEY_CONTROL);
-	const bool shift_pressed = is_key_down(CH_KEY_SHIFT);
-	const bool alt_pressed = is_key_down(CH_KEY_ALT);
-
-	reset_cursor_timer();
-	defer(ensure_cursor_in_view());
-	switch (key) {
-    case CH_KEY_K: {
-        if (ctrl_pressed) {
-		    remove_selection();
-		    selection = cursor;
-
-            cursor = seek_end_of_line(buffer, cursor + 1) - 1;
-
-            remove_selection();
-
-		    update_desired_column();
-		    buffer->syntax_dirty = true;
-        }
-	} break;
-	case CH_KEY_ENTER:
-		// @TODO(CHall): Detect if nix or CRLF
-		remove_selection();
-		buffer->add_char('\n', cursor + 1);
-		cursor += 1;
-		selection = cursor;
-		update_desired_column();
-		buffer->syntax_dirty = true;
-		break;
-	case CH_KEY_BACKSPACE:
-		if (has_selection()) {
-			remove_selection();
-		}
-
-		if (cursor > -1) {
-			if (ctrl_pressed) {
-				selection = seek_dir(true);
-				remove_selection();
-			} else {
-				buffer->remove_char(cursor);
-				cursor -= 1;
-				selection = cursor;
-			}
-
-            buffer->syntax_dirty = true;
-			update_desired_column();
-		}
-		break;
-	case CH_KEY_DELETE:
-		remove_selection();
-		
-		if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
-			if (ctrl_pressed) {
-				selection = seek_dir(false);
-				remove_selection();
-			} else {
-				buffer->remove_char(cursor + 1);
-			}
-
-            buffer->syntax_dirty = true;
-			update_desired_column();
-		}
-		break;
-	case CH_KEY_LEFT:
-		if (alt_pressed) {
-            if (focused_view > 0) {
-                focused_view -= 1;
-            }
-		} else {
-			if (cursor > -1) {
-				if (ctrl_pressed) {
-					set_cursor(seek_dir(true));
-				} else {
-					set_cursor(cursor - 1);
-				}
-			} else {
-				set_cursor(cursor);
-			}
-			update_desired_column();
-		}
-		break;
-	case CH_KEY_RIGHT:
-		if (alt_pressed) {
-            if (focused_view < views.count - 1) {
-			    focused_view += 1;
-            }
-		} else {
-			if (cursor < (ssize)buffer->gap_buffer.count() - 1) {
-				if (ctrl_pressed) {
-					set_cursor(seek_dir(false));
-				} else {
-					set_cursor(cursor + 1);
-				}
-			} else {
-				set_cursor(cursor);
-			}
-			update_desired_column();
-		}
-		break;
-	case CH_KEY_UP: {
-		const u64 current_line = buffer->get_line_from_index(cursor + 1);
-		if (current_line > 0) {
-			const u64 target_line = current_line - 1;
-			const u64 line_index = buffer->get_index_from_line(target_line);
-			const u64 line_size = buffer->eol_table[target_line];
-			u64 new_index = line_index;
-			if (desired_column >= line_size) {
-				new_index += line_size - 1;
-			} else {
-				new_index += desired_column;
-			}
-			set_cursor(new_index - 1);
-		}
-
-	} break;
-	case CH_KEY_DOWN: {
-		const u64 current_line = buffer->get_line_from_index(cursor + 1);
-		if (current_line < buffer->eol_table.count - 1) {
-			const u64 target_line = current_line + 1;
-			const u64 line_index = buffer->get_index_from_line(target_line);
-			const u64 line_size = buffer->eol_table[target_line];
-			u64 new_index = line_index;
-			if (desired_column >= line_size) {
-				new_index += line_size - 1;
-			}
-			else {
-				new_index += desired_column;
-			}
-			set_cursor(new_index - 1);
-		}
-	} break;
-    case CH_KEY_HOME: {
-        set_cursor(seek_begin_of_line(buffer, cursor));
-		update_desired_column();
-    } break;
-    case CH_KEY_END: {
-        set_cursor(seek_end_of_line(buffer, cursor + 1) - 1);
-		update_desired_column();
-    } break;
-    case CH_KEY_PRIOR: {
-        f32 view_height = (f32)the_window.get_viewport_size().uy;
-        f32 font_height = (f32)the_font.size;
-
-        u64 num_lines_to_seek = (u64)(view_height / font_height * 0.9375);
-
-        const u64 current_line = buffer->get_line_from_index(cursor + 1);
-		s64 target_line = (s64)current_line - num_lines_to_seek;
-		if (target_line <= 0) {
-            target_line = 0;
-        }
-        {
-			const u64 line_index = buffer->get_index_from_line(target_line);
-			const u64 line_size = buffer->eol_table[target_line];
-			u64 new_index = line_index;
-			if (desired_column >= line_size) {
-				new_index += line_size - 1;
-			} else {
-				new_index += desired_column;
-			}
-			set_cursor(new_index - 1);
-		}
-    } break;
-    case CH_KEY_NEXT: {
-        f32 view_height = (f32)the_window.get_viewport_size().uy;
-        f32 font_height = (f32)the_font.size;
-
-        u64 num_lines_to_seek = (u64)(view_height / font_height * 0.9375);
-
-        const u64 current_line = buffer->get_line_from_index(cursor + 1);
-		u64 target_line = current_line + num_lines_to_seek;
-		if (target_line > buffer->eol_table.count - 1) {
-            target_line = buffer->eol_table.count - 1;
-        }
-        {
-			const u64 line_index = buffer->get_index_from_line(target_line);
-			const u64 line_size = buffer->eol_table[target_line];
-			u64 new_index = line_index;
-			if (desired_column >= line_size) {
-				new_index += line_size - 1;
-			}
-			else {
-				new_index += desired_column;
-			}
-			set_cursor(new_index - 1);
-		}
-    } break;
-	}
 }
 
 void tick_views(f32 dt) {
@@ -430,6 +228,14 @@ void tick_views(f32 dt) {
 	}
 }
 
+Buffer_View* get_focused_view() {
+	if (views.count > 0) {
+		assert(focused_view < views.count);
+		return &views[focused_view];
+	}
+	return nullptr;
+}
+
 usize push_view(Buffer_ID the_buffer) {
 	Buffer_View view = {};
 	view.the_buffer = the_buffer;
@@ -453,7 +259,3 @@ bool remove_view(usize view_index) {
 Buffer_View* get_view(usize index) {
 	return &views[index];
 }
-
-//ssize get_view_index(Buffer_View* view) {
-//	return views.find(*view);
-//}

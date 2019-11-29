@@ -3,7 +3,7 @@
 #include <ch_stl/math.h>
 
 #define CONFIG_VAR(macro) \
-macro(u16, font_size, 24) \
+macro(u16, font_size, 36) \
 macro(ch::Color, background_color, 0x052329FF) \
 macro(ch::Color, foreground_color, 0xD6B58DFF) \
 macro(ch::Color, cursor_color, 0x81E38EFF) \
