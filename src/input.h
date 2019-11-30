@@ -9,14 +9,22 @@ extern ch::Vector2 last_mouse_position;
 extern ch::Vector2 current_mouse_position;
 extern f32 current_mouse_scroll_y;
 
+enum Key_Bind_Modifier {
+	KBM_None  = 0,
+	KBM_Shift = 1,
+	KBM_Ctrl  = 1 << 1,
+	KBM_Alt   = 1 << 2
+};
+
 struct Key_Bind {
-	bool shift_down;
-	bool ctrl_down;
-	bool alt_down;
+	u8 modifier_flags;
 	u32 key;
 
+	Key_Bind() : modifier_flags(0), key(0) {}
+	Key_Bind(u8 _modifier_flags, u32 _key) : modifier_flags(_modifier_flags), key(_key) {}
+
 	CH_FORCEINLINE bool operator==(const Key_Bind bind) const {
-		return shift_down == bind.shift_down && ctrl_down == bind.ctrl_down && alt_down == bind.alt_down && key == bind.key;
+		return modifier_flags == bind.modifier_flags && key == bind.key;
 	}
 };
 

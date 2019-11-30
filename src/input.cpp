@@ -16,16 +16,14 @@ static bool mb_down[MAX_MB];
 static bool mb_pressed[MAX_MB];
 static bool mb_released[MAX_MB];
 
-static bool shift_down = false;
-static bool ctrl_down = false;
-static bool alt_down = false;
+static u8 current_key_modifiers = KBM_None;
 
 static ch::Hash_Table<Key_Bind, Action_Func> action_table;
 
 bool bind_action(const Key_Bind binding, Action_Func action) {
 	assert(action);
 
-	Action_Func* const found_action = nullptr;//  action_table.find(binding);
+	Action_Func* const found_action = action_table.find(binding);
 	if (found_action) {
 		*found_action = action;
 		return true;
@@ -70,16 +68,16 @@ void init_input() {
 	the_window.on_key_pressed = [](const ch::Window& window, u8 key) {
 		switch (key) {
 		case CH_KEY_SHIFT:
-			shift_down = true;
+			current_key_modifiers |= KBM_Shift;
 			break;
 		case CH_KEY_CONTROL:
-			ctrl_down = true;
+			current_key_modifiers |= KBM_Ctrl;
 			break;
 		case CH_KEY_ALT:
-			alt_down = true;
+			current_key_modifiers |= KBM_Alt;
 			break;
 		default:
-			const Key_Bind current_binding = { shift_down, ctrl_down, alt_down, key };
+			const Key_Bind current_binding(current_key_modifiers, key);
 
 			Action_Func* const action = action_table.find(current_binding);
 			if (action && *action) {
@@ -92,19 +90,22 @@ void init_input() {
 	the_window.on_key_released = [](const ch::Window& window, u8 key) {
 		switch (key) {
 		case CH_KEY_SHIFT:
-			shift_down = false;		
+			current_key_modifiers &= ~KBM_Shift;		
 			break;
 		case CH_KEY_CONTROL:
-			ctrl_down = false;
+			current_key_modifiers &= ~KBM_Ctrl;
 			break;
 		case CH_KEY_ALT:
-			alt_down = false;
+			current_key_modifiers &= ~KBM_Alt;
 			break;
 		}
 	};
 
 	the_window.on_char_entered = [](const ch::Window& window, u32 c) {
-		if (get_focused_view()) get_focused_view()->on_char_entered(c);
+		Buffer_View* const focused_view = get_focused_view();
+		if (focused_view) {
+			focused_view->on_char_entered(c);
+		}
 	};
 
 	the_window.on_mouse_wheel_scrolled = [](const ch::Window& window, f32 delta) {
@@ -115,11 +116,11 @@ void init_input() {
 }
 
 void setup_default_bindings() {
-	bind_action({ false, false, false, CH_KEY_BACKSPACE }, backspace);
-	bind_action({ true, false, false, CH_KEY_BACKSPACE }, backspace);
+	bind_action(Key_Bind(KBM_None, CH_KEY_BACKSPACE), backspace);
+	bind_action(Key_Bind(KBM_Shift, CH_KEY_BACKSPACE), backspace);
 
-	bind_action({ false, false, false, CH_KEY_ENTER }, newline);
-	bind_action({ true, false, false, CH_KEY_ENTER }, newline);
+	bind_action(Key_Bind(KBM_None, CH_KEY_ENTER), newline);
+	bind_action(Key_Bind(KBM_Shift, CH_KEY_ENTER), newline);
 }
 
 void process_input() {
