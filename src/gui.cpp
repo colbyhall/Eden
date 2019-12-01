@@ -194,7 +194,7 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 	*x += text_draw_size.x + line_number_padding;
 }
 
-#define PARSE_SPEED_DEBUG 1
+#define PARSE_SPEED_DEBUG 0
 #define LINE_DEBUG 0
 
 bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 scroll_y, f32* out_max_scroll_y, f32 x0, f32 y0, f32 x1, f32 y1) {

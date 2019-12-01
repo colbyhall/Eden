@@ -1,4 +1,4 @@
-#include "editor.h"
+﻿#include "editor.h"
 #include "draw.h"
 #include "buffer.h"
 #include "gui.h"
@@ -22,9 +22,13 @@ Font the_font;
 
 int num_vertices_total;
 
+#define DEBUG_PERF 0
+#define DEBUG_UTF8_FILE 1
+#define DEBUG_LARGE_FILE 0
+
 void tick_editor(f32 dt) {
 	tick_views(dt);
-#if 1//BUILD_DEBUG
+#if DEBUG_PERF
     {
 		const ch::Vector2 viewport_size = the_window.get_viewport_size();
 		Vertical_Layout debug_layout((f32)viewport_size.ux - 300.f, 0.f, (f32)get_config().font_size + 5.f);
@@ -121,32 +125,33 @@ int main() {
 	Buffer_ID buffer = create_buffer();
 	push_view(buffer);
 
-
-    // @Temporary: Load test file.
-    // If you have a file in bin/test_files/test_stb.h, use this to auto-load the file.
-    // In the future this will be superseded by a file loading system; this is just
-    // to test parsing speeds. -phillip 2019-09-17
-	if (true)
+#if DEBUG_UTF8_FILE || DEBUG_LARGE_FILE
     {
-        ch::File_Data fd = {};
+        ch::File_Data fd;
+#if DEBUG_UTF8_FILE
+		const ch::Path path = "../test_files/utf8_test_file.txt";
+#else
 		const ch::Path path = "../test_files/10mb_file.h";
-        if (ch::load_file_into_memory(path, &fd)) {
-#if BUILD_DEBUG
-            fd.size = 16*4096; // @Temporary
 #endif
+        if (ch::load_file_into_memory(path, &fd)) {
 			defer(fd.free());
-            Buffer* b = find_buffer(buffer);
-			b->gap_buffer.resize(fd.size); // Pre-allocate.
+
+            Buffer* const b = find_buffer(buffer);
+			b->gap_buffer.resize(fd.size);
+			
 			for (usize i = 0; i < fd.size; i++) {
 				if (fd.data[i] == '\r') {
 					continue;
 				}
 				b->gap_buffer.push(fd.data[i]);
 			}
+			
 			b->refresh_eol_table();
 			b->refresh_line_column_table();
 		}
     }
+#endif
+
 
 	// @TEMP(CHall): Load font and get size
 	{
