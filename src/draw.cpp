@@ -511,7 +511,7 @@ ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y
 
 	for (usize i = 0; i < s.count; i++) {
 		if (s[i] == ch::eol) {
-			y += font_height;
+			y += font_height + font.line_gap;
 			x = original_x;
 			continue;
 		}
@@ -555,7 +555,7 @@ ch::Vector2 get_string_draw_size(const ch::String& s, const Font& font) {
 
 	for (usize i = 0; i < s.count; i++) {
 		if (s[i] == ch::eol) {
-			y += font_height;
+			y += font_height + font.line_gap;
 			x = starting_x;
 			continue;
 		}

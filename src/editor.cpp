@@ -23,8 +23,8 @@ Font the_font;
 int num_vertices_total;
 
 #define DEBUG_PERF 0
-#define DEBUG_UTF8_FILE 1
-#define DEBUG_LARGE_FILE 0
+#define DEBUG_UTF8_FILE 0
+#define DEBUG_LARGE_FILE 1
 
 void tick_editor(f32 dt) {
 	tick_views(dt);
@@ -137,6 +137,9 @@ int main() {
 			defer(fd.free());
 
             Buffer* const b = find_buffer(buffer);
+#if DEBUG_UTF8_FILE
+			b->disable_parse = true;
+#endif
 			b->gap_buffer.resize(fd.size);
 			
 			for (usize i = 0; i < fd.size; i++) {

@@ -213,7 +213,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 	auto draw_cursor = [&](const Font_Glyph* g, f32 x, f32 y) {
 		if (edit_mode) {
-			push_quad(x, y, x + 2, y + font_height, config.cursor_color);
+			push_quad(x, y, x + g->advance, y + font_height + the_font.line_gap, config.cursor_color);
 		}
 		else {
 			push_border_quad(x, y, x + g->advance, y + font_height, 1.f, config.cursor_color);
@@ -253,6 +253,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	}
 
 	usize starting_index = 0;
+#if 0
 	for (usize i = 0; i < buffer.line_column_table.count; i += 1) {
 		if (y > -font_height) {
 			starting_index = buffer.get_index_from_line(i);
@@ -270,6 +271,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 		y += font_height;
 	}
+#endif
 
 	if (*cursor + 1 > (ssize)gap_buffer.count()) {
 		*cursor = gap_buffer.count() - 1;
@@ -283,8 +285,8 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	
-	for (usize i = starting_index; i < gap_buffer.count(); i += 1) {
-		const u32 c = gap_buffer[i];
+	for (ch::UTF8_Iterator it((const char*)gap_buffer.data + starting_index, gap_buffer.count()); it.can_advance(); it.advance()) {
+		const u32 c = it.get();
 		ch::Color color = config.foreground_color;
 
 		const f32 old_x = x;
@@ -296,7 +298,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
             while (lexeme + 1 < lexemes_end &&
                    // @TEMPORARY @HACK @@@
-                   ((ch::Gap_Buffer<u8>&)gap_buffer).get_index_as_cursor(i + 1) - 1 >= (const u8*)lexeme[1].i
+                   ((ch::Gap_Buffer<u8>&)gap_buffer).get_index_as_cursor(it.index + 1) - 1 >= (const u8*)lexeme[1].i
                    ) {
                 lexeme++;
                 //push_glyph(the_font['_'], x, y, ch::magenta); // @Debug
@@ -410,20 +412,22 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			x += g->advance;
 		}
 
+		const usize i = it.index;
+
 		const bool mouse_on_line = (c == ch::eol && mouse_pos.y >= old_y && mouse_pos.y <= old_y + font_height);
 		const bool mouse_past_eol = mouse_pos.x >= old_x;
 		if (is_point_in_rect(mouse_pos, old_x, old_y, x, old_y + font_height) || (mouse_on_line && mouse_past_eol)) {
 			if (was_lmb_pressed) {
-				*cursor = i - 1;
+				*cursor = it.index - 1;
 				*selection = *cursor;
 			} else if (is_lmb_down) {
-				*cursor = i - 1;
+				*cursor = it.index - 1;
 			}
 		}
 
 		const bool is_in_selection = (orig_cursor > orig_selection && (ssize)i >= orig_selection + 1 && (ssize)i < orig_cursor + 1) || (orig_cursor < orig_selection && (ssize)i < orig_selection + 1 && (ssize)i >= orig_cursor + 1);
 		if (is_in_selection && edit_mode) {
-			push_quad(old_x, old_y, x, old_y + font_height, config.selection_color);
+			push_quad(old_x, old_y, x, old_y + font_height + the_font.line_gap, config.selection_color);
 		}
 
 		const bool is_in_cursor = *cursor + 1 == i;
@@ -431,22 +435,20 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			if (show_cursor || !edit_mode) {
 				draw_cursor(g, old_x, old_y);
 			}
-			
-			//if (edit_mode && show_cursor) {
-			//	color = config.background_color;
-			//} else if (edit_mode && is_in_selection) {
-			//	color = config.selected_text_color;
-			//}
-		} 
+
+			if (is_in_cursor && show_cursor) {
+				color = config.background_color;
+			}
+		}
 
 		if (c == ch::eol) {
 #if LINE_DEBUG
 			char temp[100];
-			ch::sprintf(temp, CH_TEXT("col: %llu, char: %llu"), buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
+			ch::sprintf(temp, "col: %llu, char: %llu", buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
 			push_text(temp, x, y, ch::magenta);
 #endif
 			x = starting_x;
-			y += font_height;
+			y += font_height + the_font.line_gap;
 			line_number += 1;
 			if (show_line_numbers) {
 				push_line_number(line_number, num_lines, &x, y);
@@ -455,8 +457,11 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		}
 
 		if (x + space_glyph->advance * 2 > x1 && c != ch::eol) {
+			const Font_Glyph* return_g = the_font[0x21B5];
+			push_glyph(g, old_x, old_y, color);
+
 			x = starting_x;
-			y += font_height;
+			y += font_height + the_font.line_gap;
 
 			if (show_line_numbers) {
                 x += space_glyph->advance * (ch::get_num_digits(num_lines) + 1) + line_number_padding;
@@ -464,7 +469,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			// @TODO(CHall): maybe draw some kind of carriage return symbol?
 		}
 
-		//if (is_in_selection && !is_in_cursor) color = config.selected_text_color;
+		if (is_in_selection && (!is_in_cursor || !show_cursor)) color = config.selected_text_color;
 			
 		if (!ch::is_whitespace(c) && old_y + font_height > y0) {
 			push_glyph(g, old_x, old_y, color);
