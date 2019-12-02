@@ -414,9 +414,9 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 		const usize i = it.index;
 
-		const bool mouse_on_line = (c == ch::eol && mouse_pos.y >= old_y && mouse_pos.y <= old_y + font_height);
+		const bool mouse_on_line = (c == ch::eol && mouse_pos.y >= old_y && mouse_pos.y <= old_y + font_height + the_font.line_gap);
 		const bool mouse_past_eol = mouse_pos.x >= old_x;
-		if (is_point_in_rect(mouse_pos, old_x, old_y, x, old_y + font_height) || (mouse_on_line && mouse_past_eol)) {
+		if (is_point_in_rect(mouse_pos, old_x, old_y, x, old_y + font_height + the_font.line_gap) || (mouse_on_line && mouse_past_eol)) {
 			if (was_lmb_pressed) {
 				*cursor = it.index - 1;
 				*selection = *cursor;
