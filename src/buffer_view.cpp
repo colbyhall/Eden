@@ -157,19 +157,23 @@ void tick_views(f32 dt) {
     if (!viewport_width || !viewport_height) return;
 
 	const Config& config = get_config();
+	u32 blink_time;
+	ch::get_caret_blink_time(&blink_time);
 
 	for (usize i = 0; i < views.count; i += 1) {
-		Buffer_View* view = &views[i];
+		Buffer_View* const view = &views[i];
+		Buffer* const the_buffer = find_buffer(view->the_buffer);
+		assert(the_buffer);
 
-		u32 blink_time;
-		if (!ch::get_caret_blink_time(&blink_time)) {
+		if (!blink_time) {
 			view->cursor_blink_time = 0.f;
 			view->show_cursor = true;
-		}
-		view->cursor_blink_time += dt;
-		if (view->cursor_blink_time > (f32)blink_time / 1000.f) {
-			view->show_cursor = !view->show_cursor;
-			view->cursor_blink_time = 0.f;
+		} else {
+			view->cursor_blink_time += dt;
+			if (view->cursor_blink_time > (f32)blink_time / 1000.f) {
+				view->show_cursor = !view->show_cursor;
+				view->cursor_blink_time = 0.f;
+			}
 		}
 
 		const f32 x0 = x;
@@ -177,30 +181,19 @@ void tick_views(f32 dt) {
 		const f32 x1 = x0 + get_view_width(viewport_width, i);
 		const f32 y1 = viewport_height;
 
-		Buffer* the_buffer = find_buffer(view->the_buffer);
-        assert(the_buffer);
-
-		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1) &&
-			!(view->target_scroll_y == 0.f && current_mouse_scroll_y > 0.f)) {
-			view->target_scroll_y -= current_mouse_scroll_y;
-		}
+		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1) && !(view->target_scroll_y == 0.f && current_mouse_scroll_y > 0.f)) view->target_scroll_y -= current_mouse_scroll_y;
 
 		view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
 
         parsing::parse_cpp(find_buffer(view->the_buffer));
 
-		f32 max_scroll_y = 0.f;
-        if (the_buffer) {
-		    if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == i, view->current_scroll_y, &max_scroll_y, x0, y0, x1, y1)) {
-		    	view->reset_cursor_timer();
-		    	view->update_desired_column();
-                focused_view = i;
-		    }
-        }
-
-		if (view->target_scroll_y > max_scroll_y) {
-			view->target_scroll_y = max_scroll_y;
+		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == i, view->current_scroll_y, x0, y0, x1, y1)) {
+		    view->reset_cursor_timer();
+		    view->update_desired_column();
+            focused_view = i;
 		}
+
+		// @TODO(CHall): Calculate max buffer size
 
 		if (view->target_scroll_y < 0.f) {
 			view->target_scroll_y = 0.f;
