@@ -24,7 +24,7 @@ int num_vertices_total;
 
 #define DEBUG_PERF 0
 #define DEBUG_UTF8_FILE 0
-#define DEBUG_LARGE_FILE 0
+#define DEBUG_LARGE_FILE 1
 
 void tick_editor(f32 dt) {
 	tick_views(dt);

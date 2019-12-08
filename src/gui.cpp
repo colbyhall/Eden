@@ -254,7 +254,6 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 	}
 
 	usize starting_index = 0;
-#if 0
 	for (usize i = 0; i < buffer.line_column_table.count; i += 1) {
 		if (y > -font_height) {
 			starting_index = buffer.get_index_from_line(i);
@@ -272,7 +271,6 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 
 		y += font_height;
 	}
-#endif
 
 	if (*cursor > gap_buffer.count()) {
 		*cursor = gap_buffer.count();
@@ -286,7 +284,7 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	
-	for (ch::UTF8_Iterator it(gap_buffer, gap_buffer.count()); it.can_advance(); it.advance()) {
+	for (ch::UTF8_Iterator it(gap_buffer, gap_buffer.count(), starting_index); it.can_advance(); it.advance()) {
 		const u32 c = it.get();
 		ch::Color color = config.foreground_color;
 
