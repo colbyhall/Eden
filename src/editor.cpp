@@ -23,8 +23,8 @@ Font the_font;
 int num_vertices_total;
 
 #define DEBUG_PERF 0
-#define DEBUG_UTF8_FILE 0
-#define DEBUG_LARGE_FILE 1
+#define DEBUG_UTF8_FILE 1
+#define DEBUG_LARGE_FILE 0
 
 void tick_editor(f32 dt) {
 	tick_views(dt);
@@ -127,31 +127,16 @@ int main() {
 
 #if DEBUG_UTF8_FILE || DEBUG_LARGE_FILE
     {
-        ch::File_Data fd;
+        Buffer* const b = find_buffer(buffer);
 #if DEBUG_UTF8_FILE
 		const ch::Path path = "../test_files/utf8_test_file.txt";
 #else
 		const ch::Path path = "../test_files/10mb_file.h";
 #endif
-        if (ch::load_file_into_memory(path, &fd)) {
-			defer(fd.free());
-
-            Buffer* const b = find_buffer(buffer);
+		b->load_file_into_buffer(path);
 #if DEBUG_UTF8_FILE
-			b->disable_parse = true;
+		b->disable_parse = true;
 #endif
-			b->gap_buffer.resize(fd.size);
-			
-			for (usize i = 0; i < fd.size; i++) {
-				if (fd.data[i] == '\r') {
-					continue;
-				}
-				b->gap_buffer.push(fd.data[i]);
-			}
-			
-			b->refresh_eol_table();
-			b->refresh_line_column_table();
-		}
     }
 #endif
 

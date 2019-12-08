@@ -54,21 +54,21 @@ void Buffer_View::remove_selection() {
 	assert(buffer);
 
 	if (cursor > selection) {
-		for (ssize i = cursor; i > selection; i--) {
+		for (usize i = cursor; i > selection; i--) {
 			buffer->gap_buffer.remove_at_index(i);
 		}
 		cursor = selection;
 	}
 	else {
-		for (ssize i = selection; i > cursor; i--) {
-			if (i < (ssize)buffer->gap_buffer.count()) {
+		for (usize i = selection; i > cursor; i--) {
+			if (i < buffer->gap_buffer.count()) {
 				buffer->gap_buffer.remove_at_index(i);
 			}
 		}
 		selection = cursor;
 	}
 
-	buffer->refresh_eol_table();
+	buffer->refresh_line_tables();
 }
 
 ssize Buffer_View::seek_dir(bool left) const {
@@ -105,9 +105,9 @@ void Buffer_View::update_desired_column() {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
 
-	const u64 current_line = buffer->get_line_from_index(cursor + 1);
+	const u64 current_line = buffer->get_line_from_index(cursor);
 	const u64 line_index = buffer->get_index_from_line(current_line);
-	desired_column = (cursor + 1) - line_index;
+	desired_column = (cursor) - line_index;
 }
 
 void Buffer_View::ensure_cursor_in_view() {
@@ -121,7 +121,7 @@ void Buffer_View::ensure_cursor_in_view() {
     f32 view_height = (f32)the_window.get_viewport_size().uy;
     f32 font_height = (f32)the_font.size;
 
-    f32 cursor_y = (buffer->get_wrapped_line_from_index(cursor + 1, max_line_width)) * font_height; // @Todo: need to compute the exact value for wrapped line scrolling
+    f32 cursor_y = (buffer->get_wrapped_line_from_index(cursor, max_line_width)) * font_height; // @Todo: need to compute the exact value for wrapped line scrolling
     // print_to_messages("%llu\n", max_line_width);
 
     if (target_scroll_y > cursor_y - font_height * 2) {
@@ -135,33 +135,16 @@ void Buffer_View::on_char_entered(u32 c) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
 
+	// @NOTE(CHall): Needs to ensure we're doing the correct encoding with push
+
 	remove_selection();
-	buffer->add_char(c, cursor + 1);
+	buffer->add_char(c, cursor);
 	cursor += 1;
 	selection = cursor;
 
 	update_desired_column();
-
 	reset_cursor_timer();
-
-	defer(ensure_cursor_in_view());
-
     buffer->syntax_dirty = true;
-}
-
-static u64 seek_end_of_line(Buffer* b, u64 begin) {
-    u64 i = begin;
-    while (i >= 0 && i < b->gap_buffer.count() && b->gap_buffer[i] != ch::eol) {
-        i += 1;
-    }
-    return i;
-}
-static u64 seek_begin_of_line(Buffer* b, u64 begin) {
-    u64 i = begin;
-    while (i >= 0 && i < b->gap_buffer.count() && b->gap_buffer[i] != ch::eol) {
-        i -= 1;
-    }
-    return i;
 }
 
 void tick_views(f32 dt) {

@@ -195,9 +195,10 @@ static void push_line_number(u64 current_line_number, u64 max_line_number, f32* 
 }
 
 #define PARSE_SPEED_DEBUG 0
-#define LINE_DEBUG 0
+#define LINE_SIZE_DEBUG 0
+#define EOL_DEBUG 1
 
-bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 scroll_y, f32* out_max_scroll_y, f32 x0, f32 y0, f32 x1, f32 y1) {
+bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show_cursor, bool show_line_numbers, bool edit_mode, f32 scroll_y, f32* out_max_scroll_y, f32 x0, f32 y0, f32 x1, f32 y1) {
 	CH_SCOPED_TIMER(GUI_BUFFER);
 	const ch::Vector2 mouse_pos = current_mouse_position;
 	const bool was_lmb_pressed = was_mouse_button_pressed(CH_MOUSE_LEFT);
@@ -220,8 +221,8 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		}
 	};
 
-	const ssize orig_cursor = *cursor;
-	const ssize orig_selection = *selection;
+	const usize orig_cursor = *cursor;
+	const usize orig_selection = *selection;
 
 	const usize num_lines = buffer.eol_table.count;
 	const ch::Gap_Buffer<u8>& gap_buffer = buffer.gap_buffer;
@@ -273,8 +274,8 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 	}
 #endif
 
-	if (*cursor + 1 > (ssize)gap_buffer.count()) {
-		*cursor = gap_buffer.count() - 1;
+	if (*cursor > gap_buffer.count()) {
+		*cursor = gap_buffer.count();
 		*selection = *cursor;
 	}
 
@@ -285,7 +286,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	
-	for (ch::UTF8_Iterator it((const char*)gap_buffer.data + starting_index, gap_buffer.count()); it.can_advance(); it.advance()) {
+	for (ch::UTF8_Iterator it(gap_buffer, gap_buffer.count()); it.can_advance(); it.advance()) {
 		const u32 c = it.get();
 		ch::Color color = config.foreground_color;
 
@@ -408,29 +409,33 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 		if (c == '\t') {
 			x += space_glyph->advance * config.tab_width;
+		} else if (c == '\n' || c == '\r') {
+			x += space_glyph->advance;			
+			g = space_glyph;
 		} else {
 			x += g->advance;
 		}
 
 		const usize i = it.index;
 
-		const bool mouse_on_line = (c == ch::eol && mouse_pos.y >= old_y && mouse_pos.y <= old_y + font_height + the_font.line_gap);
+		const bool mouse_on_line = ((c == '\n' || c == '\r' || it.is_on_last()) && mouse_pos.y >= old_y && mouse_pos.y <= old_y + font_height + the_font.line_gap);
 		const bool mouse_past_eol = mouse_pos.x >= old_x;
 		if (is_point_in_rect(mouse_pos, old_x, old_y, x, old_y + font_height + the_font.line_gap) || (mouse_on_line && mouse_past_eol)) {
+			const usize new_cursor = it.is_on_last() ? it.index + 1 : it.index;
 			if (was_lmb_pressed) {
-				*cursor = it.index - 1;
+				*cursor = new_cursor;
 				*selection = *cursor;
 			} else if (is_lmb_down) {
-				*cursor = it.index - 1;
+				*cursor = new_cursor;
 			}
 		}
 
-		const bool is_in_selection = (orig_cursor > orig_selection && (ssize)i >= orig_selection + 1 && (ssize)i < orig_cursor + 1) || (orig_cursor < orig_selection && (ssize)i < orig_selection + 1 && (ssize)i >= orig_cursor + 1);
+		const bool is_in_selection = (orig_cursor > orig_selection && i >= orig_selection && i < orig_cursor) || (orig_cursor < orig_selection && i < orig_selection && i >= orig_cursor);
 		if (is_in_selection && edit_mode) {
 			push_quad(old_x, old_y, x, old_y + font_height + the_font.line_gap, config.selection_color);
 		}
 
-		const bool is_in_cursor = *cursor + 1 == i;
+		const bool is_in_cursor = *cursor == i;
 		if (is_in_cursor) {
 			if (show_cursor || !edit_mode) {
 				draw_cursor(g, old_x, old_y);
@@ -441,12 +446,36 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			}
 		}
 
-		if (c == ch::eol) {
-#if LINE_DEBUG
-			char temp[100];
-			ch::sprintf(temp, "col: %llu, char: %llu", buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
-			push_text(temp, x, y, ch::magenta);
+		if (c == '\r' || c == '\n') {
+			if (c == '\r' && it.can_advance()) {
+				const u32 peek_c = it.peek();
+				if (peek_c == '\n') {
+					it.advance();
+#if EOL_DEBUG
+					const ch::Vector2 nl_size = push_text("\\r\\n ", old_x, old_y, ch::magenta);
+					x += nl_size.x;
 #endif
+				}
+#if EOL_DEBUG
+				else {
+					const ch::Vector2 cr_size = push_text("\\r ", old_x, old_y, ch::magenta);
+					x += cr_size.x;
+				}
+#endif
+			} 
+#if EOL_DEBUG
+			else {
+				const ch::Vector2 nl_size = push_text("\\n ", old_x, old_y, ch::magenta);
+				x += nl_size.x;
+			}
+#endif
+
+#if LINE_SIZE_DEBUG
+			char temp[100];
+			ch::sprintf(temp, "col: %lu, bytes: %lu", buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
+			push_text(temp, x, y, ch::magenta);
+#endif;
+
 			x = starting_x;
 			y += font_height + the_font.line_gap;
 			line_number += 1;
@@ -456,7 +485,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			continue;
 		}
 
-		if (x + space_glyph->advance * 2 > x1 && c != ch::eol) {
+		if (x + space_glyph->advance * 2 > x1) {
 			const Font_Glyph* return_g = the_font[0x21B5];
 			push_glyph(g, old_x, old_y, color);
 
@@ -466,7 +495,6 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 			if (show_line_numbers) {
                 x += space_glyph->advance * (ch::get_num_digits(num_lines) + 1) + line_number_padding;
             }
-			// @TODO(CHall): maybe draw some kind of carriage return symbol?
 		}
 
 		if (is_in_selection && (!is_in_cursor || !show_cursor)) color = config.selected_text_color;
@@ -476,6 +504,20 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 		}
 
 		if (y > y1) break;
+		
+#if LINE_SIZE_DEBUG || EOL_DEBUG
+		if (it.is_on_last()) {
+#if EOL_DEBUG
+			ch::Vector2 eos_size = push_text("0 ", x, y, ch::magenta);
+			x += eos_size.x;
+#endif
+#if LINE_SIZE_DEBUG
+			char temp[100];
+			ch::sprintf(temp, "col: %lu, bytes: %lu", buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
+			push_text(temp, x, y, ch::magenta);
+#endif
+		}
+#endif
 	}
 
 #if PARSE_SPEED_DEBUG
@@ -517,7 +559,7 @@ bool gui_buffer(const Buffer& buffer, ssize* cursor, ssize* selection, bool show
 
 	*out_max_scroll_y = y - starting_y;
 
-	if (*cursor + 1 == gap_buffer.count() && (show_cursor || !edit_mode)) draw_cursor(space_glyph, x, y);
+	if (*cursor == gap_buffer.count() && (show_cursor || !edit_mode)) draw_cursor(space_glyph, x, y);
 
 	return *cursor != orig_cursor || *selection != orig_selection || (was_lmb_pressed && is_point_in_rect(mouse_pos, x0, y0, x1, y1));
 }

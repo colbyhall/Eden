@@ -8,8 +8,8 @@ struct Buffer_View {
 	Buffer_ID the_buffer = 0;
 	f32 width_ratio = 0.5f;
 
-	ssize cursor = -1;
-	ssize selection = -1;
+	usize cursor = 0;
+	usize selection = 0;
 
 	u64 desired_column = 0;
 
