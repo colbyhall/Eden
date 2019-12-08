@@ -284,7 +284,7 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 
 	if (show_line_numbers) push_line_number(line_number, num_lines, &x, y);
 	
-	for (ch::UTF8_Iterator it(gap_buffer, gap_buffer.count(), starting_index); it.can_advance(); it.advance()) {
+	for (ch::UTF8_Iterator<const ch::Gap_Buffer<u8>> it(gap_buffer, gap_buffer.count(), starting_index); it.can_advance(); it.advance()) {
 		const u32 c = it.get();
 		ch::Color color = config.foreground_color;
 

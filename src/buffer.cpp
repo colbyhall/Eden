@@ -43,7 +43,7 @@ bool Buffer::load_file_into_buffer(const ch::Path& path) {
 	u32 num_clrf = 0;
 	u32 last_eol = 0;
 	u32 col_count = 0;
-	for (ch::UTF8_Iterator it(gap_buffer, gap_buffer.count()); it.can_advance(); it.advance()) {
+	for (ch::UTF8_Iterator<ch::Gap_Buffer<u8>> it(gap_buffer, gap_buffer.count()); it.can_advance(); it.advance()) {
 		const u32 c = it.get();
 
 		col_count += get_char_column_size(c);
@@ -133,7 +133,7 @@ void Buffer::refresh_line_tables() {
 
 	u32 last_eol = 0;
 	u32 col_count = 0;
-	for (ch::UTF8_Iterator it(gap_buffer, gap_buffer.count()); it.can_advance(); it.advance()) {
+	for (ch::UTF8_Iterator<ch::Gap_Buffer<u8>> it(gap_buffer, gap_buffer.count()); it.can_advance(); it.advance()) {
 		const u32 c = it.get();
 
 		col_count += get_char_column_size(c);
