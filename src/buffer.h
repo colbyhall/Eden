@@ -56,7 +56,7 @@ struct Buffer {
 	ch::Gap_Buffer<u8> gap_buffer;
 
 	/** Absolute path to the file this buffer will save to. */
-	ch::Path full_path;
+	ch::Path absolute_path;
 
 	/** Name used for powerline display and buffer lookup. */
 	ch::String name;

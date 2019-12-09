@@ -77,9 +77,8 @@ bool Buffer::load_file_into_buffer(const ch::Path& path) {
 		line_ending = LE_CRLF;
 	}
 
-	// @TODO(CHall): Ensure that is full path
-	f.get_full_path(&full_path);
-	const ch::String filename = full_path.get_filename(true);
+	f.get_absolute_path(&absolute_path);
+	const ch::String filename = absolute_path.get_filename(true);
 
 	if (name) name.free();
 	name = filename.copy(ch::get_heap_allocator());
@@ -88,10 +87,10 @@ bool Buffer::load_file_into_buffer(const ch::Path& path) {
 }
 
 bool Buffer::save_file_to_path() {
-	if (!full_path) return false;
+	if (!absolute_path) return false;
 
 	ch::File f;
-	if (!f.open(full_path, ch::FO_Write | ch::FO_Binary)) return false;
+	if (!f.open(absolute_path, ch::FO_Write | ch::FO_Binary)) return false;
 
 	// Move gap to the end
 	gap_buffer.move_gap_to_index(gap_buffer.count());
