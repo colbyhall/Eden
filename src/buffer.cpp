@@ -7,8 +7,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-static u32 get_char_column_size(u32 c) {
+u32 get_char_column_size(u32 c) {
 	if (c == '\t') return get_config().tab_width;
+	if (c == ch::utf8_bom) return 0;
 	return 1;
 }
 
@@ -20,7 +21,7 @@ Buffer::Buffer(Buffer_ID _id) : id(_id) {
 	eol_table.push(0);
 	line_column_table.push(0);
 
-	name = ch::make_stack_string("empty buffer");
+	name = ch::make_stack_string("*scratch*");
 }
 
 bool Buffer::load_file_into_buffer(const ch::Path& path) {

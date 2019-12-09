@@ -9,13 +9,13 @@
 static ch::Array<Buffer_View> views;
 static usize focused_view;
 
-void ensure_all_cursors_visible() {
+static void ensure_all_cursors_visible() {
     for (usize i = 0; i < views.count; i++) {
         views[i].ensure_cursor_in_view();
     }
 }
 
-f32 get_view_width(f32 viewport_width, usize i) {
+static f32 get_view_width(f32 viewport_width, usize i) {
     if (i < views.count - 1) {
         return viewport_width * views[i].width_ratio;
     } else {
@@ -26,7 +26,8 @@ f32 get_view_width(f32 viewport_width, usize i) {
         return viewport_width * (1 - sum_of_widths);
     }
 }
-u64 get_view_columns(f32 viewport_width, usize i) {
+
+static u64 get_view_columns(f32 viewport_width, usize i) {
     Buffer_View* view = &views[i];
     Buffer* buffer = find_buffer(view->the_buffer);
 	assert(buffer);
@@ -36,15 +37,6 @@ u64 get_view_columns(f32 viewport_width, usize i) {
     //    result -= (ch::get_num_digits(buffer->eol_table.count) + 1);
     //}
     return result;
-}
-
-void Buffer_View::set_cursor(ssize new_cursor) {
-	Buffer* buffer = find_buffer(the_buffer);
-	assert(buffer);
-	assert(new_cursor >= -1 && new_cursor < (ssize)buffer->gap_buffer.count());
-
-	cursor = new_cursor;
-	selection = new_cursor;
 }
 
 void Buffer_View::remove_selection() {
@@ -71,43 +63,22 @@ void Buffer_View::remove_selection() {
 	buffer->refresh_line_tables();
 }
 
-ssize Buffer_View::seek_dir(bool left) const {
+void Buffer_View::update_column_info(bool update_desired_col) {
 	Buffer* buffer = find_buffer(the_buffer);
 	assert(buffer);
 
-	bool found_letter = false;
-	ssize result = cursor + (!left * 2);
-	if (left) {
-		for (; result > -1; result -= 1) {
-			const char c = buffer->gap_buffer[result];
-			if ((ch::is_symbol(c) || ch::is_whitespace(c)) && found_letter) {
-				break;
-			} else if (ch::is_letter(c)) {
-				found_letter = true;
-			}
-		}
-	} else {
-		for (; result < (ssize)buffer->gap_buffer.count() - 1; result += 1) {
-			const char c = buffer->gap_buffer[result];
-			if ((ch::is_symbol(c) || ch::is_whitespace(c)) && found_letter) {
-				result -= 1;
-				break;
-			} else if (ch::is_letter(c)) {
-				found_letter = true;
-			}
-		}
+	current_line = buffer->get_line_from_index(cursor);
+	const u64 line_index = buffer->get_index_from_line(current_line);
+
+	u64 column_count = 0;
+	for (u64 i = line_index; i < cursor; i = buffer->find_next_char(i)) {
+		const u32 c = buffer->get_char(i);
+
+		column_count += get_char_column_size(c);
 	}
 
-	return result;
-}
-
-void Buffer_View::update_desired_column() {
-	Buffer* buffer = find_buffer(the_buffer);
-	assert(buffer);
-
-	const u64 current_line = buffer->get_line_from_index(cursor);
-	const u64 line_index = buffer->get_index_from_line(current_line);
-	desired_column = (cursor) - line_index;
+	current_column = column_count;
+	if (update_desired_col) desired_column = column_count;
 }
 
 void Buffer_View::ensure_cursor_in_view() {
@@ -142,7 +113,7 @@ void Buffer_View::on_char_entered(u32 c) {
 	cursor += 1;
 	selection = cursor;
 
-	update_desired_column();
+	update_column_info(true);
 	reset_cursor_timer();
     buffer->syntax_dirty = true;
 }
@@ -192,9 +163,9 @@ void tick_views(f32 dt) {
 
 			view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
 
-			if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == i, view->current_scroll_y, x0, y0, x1, y1)) {
+			if (gui_buffer(*the_buffer, &view->cursor, &view->selection, true, config.show_line_numbers, focused_view == i, view->current_scroll_y, x0, y0, x1, y1)) {
 				view->reset_cursor_timer();
-				view->update_desired_column();
+				view->update_column_info(true);
 				focused_view = i;
 			}
 		}
@@ -209,12 +180,32 @@ void tick_views(f32 dt) {
 			imm_quad(x0, y0, x1, y1, config.foreground_color);
 
 			{
-				const float text_y = y0 + powerline_padding;
+				const f32 text_y = y0 + powerline_padding;
 
-				const float horz_padding = 10.f;
+				const f32 horz_padding = 10.f;
+
+				const usize current_column = view->current_column + 1;
+				const usize current_line = view->current_line + 1;
+				const usize num_lines = the_buffer->eol_table.count;
+
+				u64 total_col = 0;
+				u64 cursor_col = 0;
+				for (usize i = 0; i < the_buffer->line_column_table.count; i += 1) {
+					const u64 col = the_buffer->line_column_table[i];
+
+					if (i == view->current_line) {
+						cursor_col = total_col + view->current_column;
+					}
+
+					total_col += col;
+				}
+				const f32 percent_through_file = total_col ? ((f32)cursor_col / (f32)total_col) * 100.f : 0.f;
+
+				const char* line_ending = get_line_ending_display(the_buffer->line_ending);
+				const char* encoding = get_buffer_encoding_display(the_buffer->encoding);
 
 				char buffer[512];
-				ch::sprintf(buffer, "%s | %s", get_line_ending_display(the_buffer->line_ending), get_buffer_encoding_display(the_buffer->encoding));
+				ch::sprintf(buffer, "%s | %s | %llu:%llu | %.0f%% | %llu lines", line_ending, encoding, current_line, current_column, percent_through_file, num_lines);
 
 				const ch::Vector2 fi_size = get_string_draw_size(buffer, the_font);
 				imm_string(buffer, the_font, x1 - fi_size.x - horz_padding, text_y, config.background_color);

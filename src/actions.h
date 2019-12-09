@@ -10,4 +10,8 @@ void move_cursor_right();
 
 void move_cursor_left();
 
+void move_cursor_up();
+
+void move_cursor_down();
+
 void save_buffer();

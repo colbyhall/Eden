@@ -124,6 +124,8 @@ void setup_default_bindings() {
 
 	bind_action(Key_Bind(KBM_None, CH_KEY_LEFT), move_cursor_left);
 	bind_action(Key_Bind(KBM_None, CH_KEY_RIGHT), move_cursor_right);
+	bind_action(Key_Bind(KBM_None, CH_KEY_UP), move_cursor_up);
+	bind_action(Key_Bind(KBM_None, CH_KEY_DOWN), move_cursor_down);
 
 	bind_action(Key_Bind(KBM_Ctrl, CH_KEY_S), save_buffer);
 }
@@ -134,7 +136,7 @@ void process_input() {
 	ch::mem_zero(mb_released, sizeof(mb_released));
 	current_mouse_scroll_y = 0.f;
 
-	ch::poll_events();
+	ch::wait_events();
 
 	ch::Vector2 u32_mouse_pos;
 	the_window.get_mouse_position(&u32_mouse_pos);

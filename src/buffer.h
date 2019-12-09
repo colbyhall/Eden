@@ -13,6 +13,13 @@ CH_FORCEINLINE u64 hash(Buffer_ID id) {
 	return ch::fnv1_hash(&id, sizeof(Buffer_ID));
 }
 
+/**
+ * Gets the column size of char
+ *
+ * @TODO: Move to somewhere else
+ */
+u32 get_char_column_size(u32 c);
+
 enum Line_Ending {
 	LE_NIX, // \n
 	LE_CRLF // \r\n

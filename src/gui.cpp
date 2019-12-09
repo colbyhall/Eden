@@ -335,20 +335,20 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 				if (peek_c == '\n') {
 					it.advance();
 #if EOL_DEBUG
-					const ch::Vector2 nl_size = push_text("\\r\\n ", old_x, old_y, ch::magenta);
+					const ch::Vector2 nl_size = imm_string("\\r\\n ", the_font, old_x, old_y, ch::magenta);
 					x += nl_size.x;
 #endif
 				}
 #if EOL_DEBUG
 				else {
-					const ch::Vector2 cr_size = push_text("\\r ", old_x, old_y, ch::magenta);
+					const ch::Vector2 cr_size = imm_string("\\r ", the_font, old_x, old_y, ch::magenta);
 					x += cr_size.x;
 				}
 #endif
 			} 
 #if EOL_DEBUG
 			else {
-				const ch::Vector2 nl_size = push_text("\\n ", old_x, old_y, ch::magenta);
+				const ch::Vector2 nl_size = imm_string("\\n ", the_font, old_x, old_y, ch::magenta);
 				x += nl_size.x;
 			}
 #endif
@@ -356,7 +356,7 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 #if LINE_SIZE_DEBUG
 			char temp[100];
 			ch::sprintf(temp, "col: %lu, bytes: %lu", buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
-			imm_string(temp, x, y, ch::magenta);
+			imm_string(temp, the_font, x, y, ch::magenta);
 #endif;
 
 			x = starting_x;
@@ -391,7 +391,7 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 #if LINE_SIZE_DEBUG || EOL_DEBUG
 		if (it.is_on_last()) {
 #if EOL_DEBUG
-			ch::Vector2 eos_size = push_text("0 ", x, y, ch::magenta);
+			ch::Vector2 eos_size = imm_string("0 ", the_font, x, y, ch::magenta);
 			x += eos_size.x;
 #endif
 #if LINE_SIZE_DEBUG
