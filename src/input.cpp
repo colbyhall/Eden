@@ -128,6 +128,8 @@ void setup_default_bindings() {
 	bind_action(Key_Bind(KBM_None, CH_KEY_DOWN), move_cursor_down);
 
 	bind_action(Key_Bind(KBM_Ctrl, CH_KEY_S), save_buffer);
+
+    bind_action(Key_Bind(KBM_Ctrl, CH_KEY_O), open_dialog);
 }
 
 void process_input() {

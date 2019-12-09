@@ -15,3 +15,5 @@ void move_cursor_up();
 void move_cursor_down();
 
 void save_buffer();
+
+void open_dialog();
