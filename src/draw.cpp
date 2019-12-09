@@ -336,24 +336,19 @@ void init_draw() {
 	glUseProgram(global_shader.program_id);
 }
 
-static void frame_begin() {
+void frame_begin() {
 	const ch::Vector2 viewport_size = the_window.get_viewport_size();
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, viewport_size.ux, viewport_size.uy);
+	the_font.bind();
 	render_right_handed();
+	imm_begin();
 }
 
-static void frame_end() {
+void frame_end() {
+	imm_flush();
 	ch::swap_buffers(the_window);
-}
-
-void draw_editor() {
-	frame_begin();
-
-	draw_gui();
-
-	frame_end();
 }
 
 void refresh_shader_transform() {
@@ -380,11 +375,11 @@ void render_right_handed() {
 	refresh_shader_transform();
 }
 
-void immediate_begin() {
+void imm_begin() {
 	imm_vertex_count = 0;
 }
 
-void immediate_flush() {
+void imm_flush() {
 	if (imm_vertex_count == 0) return;
 
 	glBindVertexArray(imm_vao);
@@ -423,10 +418,10 @@ static Vertex* get_next_vertex_ptr() {
 	return (Vertex*)&imm_vertices + imm_vertex_count;
 }
 
-void immediate_vertex(f32 x, f32 y, const ch::Color& color, ch::Vector2 uv, f32 z_index) {
+void imm_vertex(f32 x, f32 y, const ch::Color& color, ch::Vector2 uv, f32 z_index) {
 	if (imm_vertex_count >= MAX_VERTICES) {
-		immediate_flush();
-		immediate_begin();
+		imm_flush();
+		imm_begin();
 	}
 
 	Vertex* vertex = get_next_vertex_ptr();
@@ -442,14 +437,14 @@ void immediate_vertex(f32 x, f32 y, const ch::Color& color, ch::Vector2 uv, f32 
 	imm_vertex_count += 1;
 }
 
-void immediate_quad(f32 x0, f32 y0, f32 x1, f32 y1, const ch::Color& color, f32 z_index) {
-	immediate_vertex(x0, y0, color, ch::Vector2(-1.f, -1.f), z_index);
-	immediate_vertex(x0, y1, color, ch::Vector2(-1.f, -1.f), z_index);
-	immediate_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
+void imm_quad(f32 x0, f32 y0, f32 x1, f32 y1, const ch::Color& color, f32 z_index) {
+	imm_vertex(x0, y0, color, ch::Vector2(-1.f, -1.f), z_index);
+	imm_vertex(x0, y1, color, ch::Vector2(-1.f, -1.f), z_index);
+	imm_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
 
-	immediate_vertex(x0, y1, color, ch::Vector2(-1.f, -1.f), z_index);
-	immediate_vertex(x1, y1, color, ch::Vector2(-1.f, -1.f), z_index);
-	immediate_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
+	imm_vertex(x0, y1, color, ch::Vector2(-1.f, -1.f), z_index);
+	imm_vertex(x1, y1, color, ch::Vector2(-1.f, -1.f), z_index);
+	imm_vertex(x1, y0, color, ch::Vector2(-1.f, -1.f), z_index);
 }
 
 void Font::bind() const {
@@ -461,46 +456,47 @@ void Font::bind() const {
 }
 
 
-void immediate_glyph(const Font_Glyph& glyph, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
+void imm_glyph(const Font_Glyph* glyph, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
 	// @NOTE(CHall): draw glyphs top down
-	y += the_font.size;
+	y += font.size;
+	y -= font.line_gap;
 	
-	const f32 x0 = x + glyph.bearing_x;
-	const f32 y0 = y + glyph.bearing_y;
-	const f32 x1 = x0 + glyph.width;
-	const f32 y1 = y0 + glyph.height;
+	const f32 x0 = x + glyph->bearing_x;
+	const f32 y0 = y + glyph->bearing_y;
+	const f32 x1 = x0 + glyph->width;
+	const f32 y1 = y0 + glyph->height;
 
 	const f32 atlas_w = (f32)font.atlases[font.size].w;
 	const f32 atlas_h = (f32)font.atlases[font.size].h;
 
-	const ch::Vector2 bottom_right = ch::Vector2(glyph.x1 / atlas_w, glyph.y1 / atlas_h);
-	const ch::Vector2 bottom_left = ch::Vector2(glyph.x1 / atlas_w, glyph.y0 / atlas_h);
-	const ch::Vector2 top_right = ch::Vector2(glyph.x0 / atlas_w, glyph.y1 / atlas_h);
-	const ch::Vector2 top_left = ch::Vector2(glyph.x0 / atlas_w, glyph.y0 / atlas_h);
+	const ch::Vector2 bottom_right = ch::Vector2(glyph->x1 / atlas_w, glyph->y1 / atlas_h);
+	const ch::Vector2 bottom_left = ch::Vector2(glyph->x1 / atlas_w, glyph->y0 / atlas_h);
+	const ch::Vector2 top_right = ch::Vector2(glyph->x0 / atlas_w, glyph->y1 / atlas_h);
+	const ch::Vector2 top_left = ch::Vector2(glyph->x0 / atlas_w, glyph->y0 / atlas_h);
 
-	immediate_vertex(x0, y0, color, top_left, z_index);
-	immediate_vertex(x0, y1, color, top_right, z_index);
-	immediate_vertex(x1, y0, color, bottom_left, z_index);
+	imm_vertex(x0, y0, color, top_left, z_index);
+	imm_vertex(x0, y1, color, top_right, z_index);
+	imm_vertex(x1, y0, color, bottom_left, z_index);
 
-	immediate_vertex(x0, y1, color, top_right, z_index);
-	immediate_vertex(x1, y1, color, bottom_right, z_index);
-	immediate_vertex(x1, y0, color, bottom_left, z_index);
+	imm_vertex(x0, y1, color, top_right, z_index);
+	imm_vertex(x1, y1, color, bottom_right, z_index);
+	imm_vertex(x1, y0, color, bottom_left, z_index);
 }
 
-const Font_Glyph* immediate_char(const u32 c, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
+const Font_Glyph* imm_char(const u32 c, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
 	const Font_Glyph* g = font[c];
 	if (!g) {
 		g = font['?'];
 		assert(g);
-		immediate_glyph(*g, font, x, y, ch::magenta, z_index);
+		imm_glyph(g, font, x, y, ch::magenta, z_index);
 		return nullptr;
 	}
 
-	immediate_glyph(*g, font, x, y, color, z_index);
+	imm_glyph(g, font, x, y, color, z_index);
 	return g;
 }
 
-ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
+ch::Vector2 imm_string(const ch::String& s, const Font& font, f32 x, f32 y, const ch::Color& color, f32 z_index /*= 9.f*/) {
 	const f32 font_height = font.size;
 
 	const f32 original_x = x;
@@ -526,7 +522,7 @@ ch::Vector2 immediate_string(const ch::String& s, const Font& font, f32 x, f32 y
 		const Font_Glyph* glyph = font[s[i]];
 
 		if (glyph) {
-			immediate_glyph(*glyph, font, x, y, color, z_index);
+			imm_glyph(glyph, font, x, y, color, z_index);
 
 			x += glyph->advance;
 		}
@@ -580,14 +576,14 @@ ch::Vector2 get_string_draw_size(const ch::String& s, const Font& font) {
 	return ch::Vector2(largest_x, largest_y + font_height);
 }
 
-void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index /*= 9.f*/)
+void imm_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const ch::Color& color, f32 z_index /*= 9.f*/)
 {
 	{
 		const f32 _x0 = x0;
 		const f32 _y0 = y0;
 		const f32 _x1 = _x0 + thickness;
 		const f32 _y1 = y1;
-		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+		imm_quad(_x0, _y0, _x1, _y1, color, z_index);
 	}
 
 	{
@@ -595,7 +591,7 @@ void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const 
 		const f32 _y0 = y0;
 		const f32 _x1 = _x0 + thickness;
 		const f32 _y1 = y1;
-		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+		imm_quad(_x0, _y0, _x1, _y1, color, z_index);
 	}
 
 	{
@@ -603,7 +599,7 @@ void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const 
 		const f32 _y0 = y0;
 		const f32 _x1 = x1;
 		const f32 _y1 = _y0 + thickness;
-		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+		imm_quad(_x0, _y0, _x1, _y1, color, z_index);
 	}
 
 	{
@@ -611,6 +607,6 @@ void immediate_border_quad(f32 x0, f32 y0, f32 x1, f32 y1, f32 thickness, const 
 		const f32 _y0 = y1 - thickness;
 		const f32 _x1 = x1;
 		const f32 _y1 = _y0 + thickness;
-		immediate_quad(_x0, _y0, _x1, _y1, color, z_index);
+		imm_quad(_x0, _y0, _x1, _y1, color, z_index);
 	}
 }
