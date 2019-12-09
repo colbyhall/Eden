@@ -69,7 +69,7 @@ static const u8 lex_table[] = {
     DFA_NEWLINE,       // DFA_WHITE
     DFA_WHITE,         // DFA_WHITE_BS
     DFA_NEWLINE,       // DFA_NEWLINE
-    DFA_NEWLINE,       // DFA_STRINGLIT
+    DFA_STRINGLIT,     // DFA_STRINGLIT
     DFA_STRINGLIT,     // DFA_STRINGLIT_BS
     DFA_NEWLINE,       // DFA_CHARLIT
     DFA_CHARLIT,       // DFA_CHARLIT_BS
