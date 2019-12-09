@@ -24,9 +24,11 @@ int num_vertices_total;
 
 #define DEBUG_PERF 0
 #define DEBUG_UTF8_FILE 0
-#define DEBUG_LARGE_FILE 1
+#define DEBUG_LARGE_FILE 0
 
 void tick_editor(f32 dt) {
+	frame_begin();
+
 	tick_views(dt);
 #if DEBUG_PERF
     {
@@ -50,6 +52,8 @@ void tick_editor(f32 dt) {
         }
 	}
 #endif
+
+	frame_end();
 }
 
 #if CH_PLATFORM_WINDOWS
@@ -116,7 +120,6 @@ int main() {
 
     the_window.on_sizing = [](const ch::Window& window) {
         tick_editor(1.0f);
-	    draw_editor();
     };
 
 	init_draw();
@@ -165,7 +168,6 @@ int main() {
 
 		process_input();
 		tick_editor(dt);
-		draw_editor();
 		try_refresh_config();
 
         ch::get_time_in_seconds();
