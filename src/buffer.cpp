@@ -19,6 +19,8 @@ Buffer::Buffer(Buffer_ID _id) : id(_id) {
 
 	eol_table.push(0);
 	line_column_table.push(0);
+
+	name = ch::make_stack_string("empty buffer");
 }
 
 bool Buffer::load_file_into_buffer(const ch::Path& path) {
@@ -79,6 +81,8 @@ bool Buffer::load_file_into_buffer(const ch::Path& path) {
 	// @TODO(CHall): Ensure that is full path
 	f.get_full_path(&full_path);
 	const ch::String filename = full_path.get_filename();
+
+	if (name) name.free();
 	name = filename.copy(ch::get_heap_allocator());
 
 	return true;
