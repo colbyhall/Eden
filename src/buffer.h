@@ -15,7 +15,7 @@ CH_FORCEINLINE u64 hash(Buffer_ID id) {
 
 enum Line_Ending {
 	LE_NIX, // \n
-	LE_CLRF // \r\n
+	LE_CRLF // \r\n
 };
 
 /** Encoding of the loaded buffer. Default for buffers will be user defined. As more encodings are added this needs to be updated. */
@@ -37,6 +37,9 @@ struct Buffer {
 
 	/** Absolute path to the file this buffer will save to. */
 	ch::Path full_path;
+
+	/** Name used for powerline display and buffer lookup. */
+	ch::String name;
 
 	/**
 	 * Linear table where index is line index and value is the size of the line with eol characters in bytes

@@ -73,8 +73,13 @@ bool Buffer::load_file_into_buffer(const ch::Path& path) {
 	line_column_table.push(col_count);
 
 	if (!num_nix && num_clrf) {
-		line_ending = LE_CLRF;
+		line_ending = LE_CRLF;
 	}
+
+	// @TODO(CHall): Ensure that is full path
+	f.get_full_path(&full_path);
+	const ch::String filename = full_path.get_filename();
+	name = filename.copy(ch::get_heap_allocator());
 
 	return true;
 }

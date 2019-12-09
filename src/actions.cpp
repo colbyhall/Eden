@@ -9,7 +9,7 @@ void newline() {
 	assert(buffer);
 
 	view->remove_selection();
-	if (buffer->line_ending == LE_CLRF) {
+	if (buffer->line_ending == LE_CRLF) {
 		buffer->add_char('\r', view->cursor);
 		view->cursor += 1;
 	}

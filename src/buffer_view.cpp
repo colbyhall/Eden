@@ -176,21 +176,51 @@ void tick_views(f32 dt) {
 			}
 		}
 
-		const f32 x0 = x;
-		const f32 y0 = 0.f;
-		const f32 x1 = x0 + get_view_width(viewport_width, i);
-		const f32 y1 = viewport_height;
+		parsing::parse_cpp(the_buffer);
 
-		if (is_point_in_rect(mouse_pos, x0, y0, x1, y1) && !(view->target_scroll_y == 0.f && current_mouse_scroll_y > 0.f)) view->target_scroll_y -= current_mouse_scroll_y;
+		const float powerline_padding = 2.f;
+		const float powerline_height = (float)the_font.size + the_font.line_gap;
 
-		view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
+		// @NOTE(CHall): Draw buffer
+		{
+			const f32 x0 = x;
+			const f32 y0 = 0.f;
+			const f32 x1 = x0 + get_view_width(viewport_width, i);
+			const f32 y1 = viewport_height - (powerline_height + powerline_padding * 2.f);
 
-        parsing::parse_cpp(find_buffer(view->the_buffer));
+			if (is_point_in_rect(mouse_pos, x0, y0, x1, y1) && !(view->target_scroll_y == 0.f && current_mouse_scroll_y > 0.f)) view->target_scroll_y -= current_mouse_scroll_y;
 
-		if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == i, view->current_scroll_y, x0, y0, x1, y1)) {
-		    view->reset_cursor_timer();
-		    view->update_desired_column();
-            focused_view = i;
+			view->current_scroll_y = ch::interp_to(view->current_scroll_y, view->target_scroll_y, dt, config.scroll_speed);
+
+			if (gui_buffer(*the_buffer, &view->cursor, &view->selection, view->show_cursor, config.show_line_numbers, focused_view == i, view->current_scroll_y, x0, y0, x1, y1)) {
+				view->reset_cursor_timer();
+				view->update_desired_column();
+				focused_view = i;
+			}
+		}
+
+		// @NOTE(CHall): Draw powerline
+		{
+			const f32 x0 = x;
+			const f32 y0 = viewport_height - powerline_height - powerline_padding;
+			const f32 x1 = x0 + get_view_width(viewport_width, i);
+			const f32 y1 = y0 + powerline_height + powerline_padding;
+
+			imm_quad(x0, y0, x1, y1, config.foreground_color);
+
+			{
+				const float text_y = y0 + powerline_padding;
+
+				const float horz_padding = 10.f;
+
+				char buffer[512];
+				ch::sprintf(buffer, "%s | %s", (the_buffer->line_ending == LE_NIX ? "unix" : "crlf"), (the_buffer->encoding == BE_ANSI ? "ansi" : "utf-8"));
+
+				const ch::Vector2 fi_size = get_string_draw_size(buffer, the_font);
+				imm_string(buffer, the_font, x1 - fi_size.x - horz_padding, text_y, config.background_color);
+
+				imm_string(the_buffer->name, the_font, x0 + horz_padding, text_y, config.background_color);
+			}
 		}
 
 		// @TODO(CHall): Calculate max buffer size
