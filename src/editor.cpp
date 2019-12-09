@@ -25,6 +25,7 @@ int num_vertices_total;
 #define DEBUG_PERF 0
 #define DEBUG_UTF8_FILE 0
 #define DEBUG_LARGE_FILE 0
+#define DEBUG_AVERAGE_FILE 1
 
 void tick_editor(f32 dt) {
 	frame_begin();
@@ -128,13 +129,15 @@ int main() {
 	Buffer_ID buffer = create_buffer();
 	push_view(buffer);
 
-#if DEBUG_UTF8_FILE || DEBUG_LARGE_FILE
+#if DEBUG_UTF8_FILE || DEBUG_LARGE_FILE || DEBUG_AVERAGE_FILE
     {
         Buffer* const b = find_buffer(buffer);
 #if DEBUG_UTF8_FILE
 		const ch::Path path = "../test_files/utf8_test_file.txt";
-#else
+#elif DEBUG_LARGE_FILE
 		const ch::Path path = "../test_files/10mb_file.h";
+#else
+		const ch::Path path = "../src/draw.cpp";
 #endif
 		b->load_file_into_buffer(path);
 #if DEBUG_UTF8_FILE
