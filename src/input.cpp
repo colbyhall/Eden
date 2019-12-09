@@ -124,6 +124,8 @@ void setup_default_bindings() {
 
 	bind_action(Key_Bind(KBM_None, CH_KEY_LEFT), move_cursor_left);
 	bind_action(Key_Bind(KBM_None, CH_KEY_RIGHT), move_cursor_right);
+
+	bind_action(Key_Bind(KBM_Ctrl, CH_KEY_S), save_buffer);
 }
 
 void process_input() {

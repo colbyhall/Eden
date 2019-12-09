@@ -9,3 +9,5 @@ void backspace();
 void move_cursor_right();
 
 void move_cursor_left();
+
+void save_buffer();

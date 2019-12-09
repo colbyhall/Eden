@@ -26,7 +26,6 @@ Buffer::Buffer(Buffer_ID _id) : id(_id) {
 bool Buffer::load_file_into_buffer(const ch::Path& path) {
 	if (gap_buffer) return false;
 
-
 	ch::File f;
 	if (!f.open(path, ch::FO_Read | ch::FO_Binary)) return false;
 	defer(f.close());
@@ -80,10 +79,27 @@ bool Buffer::load_file_into_buffer(const ch::Path& path) {
 
 	// @TODO(CHall): Ensure that is full path
 	f.get_full_path(&full_path);
-	const ch::String filename = full_path.get_filename();
+	const ch::String filename = full_path.get_filename(true);
 
 	if (name) name.free();
 	name = filename.copy(ch::get_heap_allocator());
+
+	return true;
+}
+
+bool Buffer::save_file_to_path() {
+	if (!full_path) return false;
+
+	ch::File f;
+	if (!f.open(full_path, ch::FO_Write | ch::FO_Binary)) return false;
+
+	// Move gap to the end
+	gap_buffer.move_gap_to_index(gap_buffer.count());
+
+	f.seek_top();
+	f.write_raw(gap_buffer.data, gap_buffer.count());
+	f.set_end_of_file();
+	f.close();
 
 	return true;
 }

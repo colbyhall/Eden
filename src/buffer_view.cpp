@@ -214,7 +214,7 @@ void tick_views(f32 dt) {
 				const float horz_padding = 10.f;
 
 				char buffer[512];
-				ch::sprintf(buffer, "%s | %s", (the_buffer->line_ending == LE_NIX ? "unix" : "crlf"), (the_buffer->encoding == BE_ANSI ? "ansi" : "utf-8"));
+				ch::sprintf(buffer, "%s | %s", get_line_ending_display(the_buffer->line_ending), get_buffer_encoding_display(the_buffer->encoding));
 
 				const ch::Vector2 fi_size = get_string_draw_size(buffer, the_font);
 				imm_string(buffer, the_font, x1 - fi_size.x - horz_padding, text_y, config.background_color);

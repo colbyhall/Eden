@@ -65,3 +65,11 @@ void move_cursor_left() {
 	view->update_desired_column();
 	view->reset_cursor_timer();
 }
+
+void save_buffer() {
+	Buffer_View* const view = get_focused_view();
+	Buffer* const buffer = find_buffer(view->the_buffer);
+	assert(buffer);
+
+	buffer->save_file_to_path();
+}

@@ -18,11 +18,31 @@ enum Line_Ending {
 	LE_CRLF // \r\n
 };
 
+CH_FORCEINLINE const char* get_line_ending_display(Line_Ending ending) {
+	switch (ending) {
+		case LE_NIX:
+			return "unix";
+		case LE_CRLF:
+			return "crlf";
+	}
+	return nullptr;
+}
+
 /** Encoding of the loaded buffer. Default for buffers will be user defined. As more encodings are added this needs to be updated. */
 enum Buffer_Encoding {
 	BE_ANSI,
 	BE_UTF8
 };
+
+CH_FORCEINLINE const char* get_buffer_encoding_display(Buffer_Encoding encoding) {
+	switch (encoding) {
+		case BE_ANSI: 
+			return "ansi";
+		case BE_UTF8:
+			return "utf-8";
+	}
+	return nullptr;
+}
 
 /**
  * Wrapper around gap buffer that keeps cached data about the contents of the gap buffer
@@ -71,7 +91,7 @@ struct Buffer {
 	 */
 	Buffer_Encoding encoding = BE_UTF8;
 
-	bool disable_parse = true;
+	bool disable_parse = false;
     bool syntax_dirty = true;
     ch::Array<parsing::Lexeme> lexemes;
     f64 lex_time = 0;
@@ -88,6 +108,13 @@ struct Buffer {
 	 * @returns true if the file was loaded
 	 */
 	bool load_file_into_buffer(const ch::Path& path);
+
+	/**
+	 * Saves to a file at the listed path.
+	 *
+	 * @returns true if save was successful
+	 */
+	bool save_file_to_path();
 
 	/** Empties the gap buffer and resets all cached state. */
     void empty();
@@ -108,9 +135,30 @@ struct Buffer {
 	 */
 	void refresh_line_tables();
 
+	/**
+	 * Finds the next codepoint based on file encoding
+	 * Returns gap_buffer.count() for end of buffer
+	 *
+	 * @param index is the location to start searching at
+	 * @return is the found "next" index
+	 */
 	usize find_next_char(usize index);
+
+	/**
+	 * Finds prev codepoint based on file encoding
+	 * Returns 0 for beginning of buffer
+	 *
+	 * @param index is the location to start searching at
+	 * @return is the found "prev" index
+	 */
 	usize find_prev_char(usize index);
 
+	/**
+	 * Decodes character at codepoint index
+	 *
+	 * @param index is the char codepoint
+	 * @returns decoded char based on file encoding
+	 */
 	u32 get_char(usize index);
 
 	u64 get_index_from_line(u64 line) const;
