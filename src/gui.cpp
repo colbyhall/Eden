@@ -168,6 +168,10 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
     const parsing::Lexeme* lexeme = lexemes_begin;
 
 	if (show_line_numbers) imm_line_number(line_number, num_lines, &x, y);
+
+	// @HACK: We have to do this until we move away from wait for events
+	bool found_new_cursor_pos = false;
+	const bool mouse_over = is_point_in_rect(mouse_pos, x0, y0, x1, y1);
 	
 	for (ch::UTF8_Iterator<const ch::Gap_Buffer<u8>> it(gap_buffer, gap_buffer.count(), starting_index); it.can_advance(); it.advance()) {
 		const u32 c = it.get();
@@ -303,22 +307,25 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 
 		const bool mouse_on_line = ((c == '\n' || c == '\r' || it.is_on_last()) && mouse_pos.y >= old_y && mouse_pos.y <= old_y + font_height + the_font.line_gap);
 		const bool mouse_past_eol = mouse_pos.x >= old_x;
-		if (is_point_in_rect(mouse_pos, old_x, old_y, x, old_y + font_height + the_font.line_gap) || (mouse_on_line && mouse_past_eol)) {
+		if ((is_point_in_rect(mouse_pos, old_x, old_y, x, old_y + font_height + the_font.line_gap) || (mouse_on_line && mouse_past_eol)) && mouse_over) {
 			const usize new_cursor = it.is_on_last() ? it.index + 1 : it.index;
 			if (was_lmb_pressed) {
 				*cursor = new_cursor;
 				*selection = *cursor;
+				found_new_cursor_pos = true;
 			} else if (is_lmb_down) {
 				*cursor = new_cursor;
 			}
 		}
 
-		const bool is_in_selection = (orig_cursor > orig_selection && i >= orig_selection && i < orig_cursor) || (orig_cursor < orig_selection && i < orig_selection && i >= orig_cursor);
+		const bool should_draw_selection_or_cursor = ((mouse_over && was_lmb_pressed && found_new_cursor_pos) || !was_lmb_pressed || (was_lmb_pressed && !mouse_over));
+
+		const bool is_in_selection = ((orig_cursor > orig_selection && i >= orig_selection && i < orig_cursor) || (orig_cursor < orig_selection && i < orig_selection && i >= orig_cursor)) && should_draw_selection_or_cursor;
 		if (is_in_selection && edit_mode) {
 			imm_quad(old_x, old_y, x, old_y + font_height + the_font.line_gap, config.selection_color);
 		}
 
-		const bool is_in_cursor = *cursor == i;
+		const bool is_in_cursor = *cursor == i && should_draw_selection_or_cursor;
 		if (is_in_cursor) {
 			if (show_cursor || !edit_mode) {
 				imm_cursor(edit_mode, g, old_x, old_y, config.cursor_color);

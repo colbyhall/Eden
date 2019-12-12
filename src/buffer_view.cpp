@@ -46,21 +46,21 @@ void Buffer_View::remove_selection() {
 	assert(buffer);
 
 	if (cursor > selection) {
-		for (usize i = cursor; i > selection; i--) {
-			buffer->gap_buffer.remove_at_index(i);
+		for (usize i = selection; i < cursor; i = buffer->find_next_char(i)) {
+			buffer->gap_buffer.remove_at_index(selection);
 		}
 		cursor = selection;
-	}
-	else {
-		for (usize i = selection; i > cursor; i--) {
+	} else {
+		for (usize i = cursor; i <= buffer->find_prev_char(selection); i = buffer->find_next_char(i)) {
 			if (i < buffer->gap_buffer.count()) {
-				buffer->gap_buffer.remove_at_index(i);
+				buffer->gap_buffer.remove_at_index(cursor);
 			}
 		}
 		selection = cursor;
 	}
 
 	buffer->refresh_line_tables();
+	update_column_info(true);
 }
 
 void Buffer_View::update_column_info(bool update_desired_col) {

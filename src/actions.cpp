@@ -31,7 +31,10 @@ void backspace() {
 	Buffer* const buffer = find_buffer(view->the_buffer);
 	assert(buffer);
 
-	view->remove_selection();
+	if (view->has_selection()) {
+		view->remove_selection();
+		return;
+	}
 
 	if (view->cursor <= 0) return;
 
@@ -55,7 +58,7 @@ void backspace() {
 	view->reset_cursor_timer();
 }
 
-void move_cursor_right() {
+void move_cursor_right(bool move_selection) {
 	Buffer_View* const view = get_focused_view();
 	Buffer* const buffer = find_buffer(view->the_buffer);
 	assert(buffer);
@@ -72,12 +75,12 @@ void move_cursor_right() {
 	}
 
 	view->cursor = buffer->find_next_char(view->cursor);
-	view->selection = view->cursor;
+	if (move_selection) view->selection = view->cursor;
 	view->update_column_info(true);
 	view->reset_cursor_timer();
 }
 
-void move_cursor_left() {
+void move_cursor_left(bool move_selection) {
 	Buffer_View* const view = get_focused_view();
 	Buffer* const buffer = find_buffer(view->the_buffer);
 	assert(buffer);
@@ -95,12 +98,12 @@ void move_cursor_left() {
 		}
 	}
 
-	view->selection = view->cursor;
+	if (move_selection) view->selection = view->cursor;
 	view->update_column_info(true);
 	view->reset_cursor_timer();
 }
 
-void move_cursor_up() {
+void move_cursor_up(bool move_selection) {
 	Buffer_View* const view = get_focused_view();
 	Buffer* const buffer = find_buffer(view->the_buffer);
 	assert(buffer);
@@ -121,13 +124,13 @@ void move_cursor_up() {
 	}
 
 	view->cursor = i;
-	view->selection = i;
+	if (move_selection) view->selection = i;
 
 	view->update_column_info();
 	view->reset_cursor_timer();
 }
 
-void move_cursor_down() {
+void move_cursor_down(bool move_selection) {
 	Buffer_View* const view = get_focused_view();
 	Buffer* const buffer = find_buffer(view->the_buffer);
 	assert(buffer);
@@ -150,7 +153,7 @@ void move_cursor_down() {
 	}
 
 	view->cursor = i;
-	view->selection = i;
+	if (move_selection) view->selection = i;
 
 	view->update_column_info();
 	view->reset_cursor_timer();

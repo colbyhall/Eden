@@ -122,10 +122,17 @@ void setup_default_bindings() {
 	bind_action(Key_Bind(KBM_None, CH_KEY_ENTER), newline);
 	bind_action(Key_Bind(KBM_Shift, CH_KEY_ENTER), newline);
 
-	bind_action(Key_Bind(KBM_None, CH_KEY_LEFT), move_cursor_left);
-	bind_action(Key_Bind(KBM_None, CH_KEY_RIGHT), move_cursor_right);
-	bind_action(Key_Bind(KBM_None, CH_KEY_UP), move_cursor_up);
-	bind_action(Key_Bind(KBM_None, CH_KEY_DOWN), move_cursor_down);
+	bind_action(Key_Bind(KBM_None, CH_KEY_LEFT), []() { move_cursor_left(true); });
+	bind_action(Key_Bind(KBM_Shift, CH_KEY_LEFT), []() { move_cursor_left(false); });
+	
+	bind_action(Key_Bind(KBM_None, CH_KEY_RIGHT), []() { move_cursor_right(true); });
+	bind_action(Key_Bind(KBM_Shift, CH_KEY_RIGHT), []() { move_cursor_right(false); });
+
+	bind_action(Key_Bind(KBM_None, CH_KEY_UP), []() { move_cursor_up(true); });
+	bind_action(Key_Bind(KBM_Shift, CH_KEY_UP), []() { move_cursor_up(false); });
+
+	bind_action(Key_Bind(KBM_None, CH_KEY_DOWN), []() { move_cursor_down(true); });
+	bind_action(Key_Bind(KBM_Shift, CH_KEY_DOWN), []() { move_cursor_down(false); });
 
 	bind_action(Key_Bind(KBM_Ctrl, CH_KEY_S), save_buffer);
 

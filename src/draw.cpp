@@ -348,6 +348,7 @@ void frame_begin() {
 
 void frame_end() {
 	imm_flush();
+
 	ch::swap_buffers(the_window);
 }
 

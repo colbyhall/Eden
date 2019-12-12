@@ -11,6 +11,7 @@ Config default_config;
 static const ch::Path config_path = ".edenconfig";
 
 const Config& get_config() {
+	if (loaded_config) return *loaded_config;
 	return default_config;
 }
 
@@ -139,8 +140,6 @@ static void export_config(const Config& config, const ch::Path& path = config_pa
 }
 
 void init_config() {
-	return;
-
 	Config* new_conf = ch_new Config;
 	*new_conf = default_config;
 	
