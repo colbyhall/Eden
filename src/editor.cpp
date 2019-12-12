@@ -22,37 +22,15 @@ Font the_font;
 
 int num_vertices_total;
 
-#define DEBUG_PERF 0
 #define DEBUG_UTF8_FILE 0
 #define DEBUG_LARGE_FILE 0
 #define DEBUG_AVERAGE_FILE 1
 
 void tick_editor(f32 dt) {
 	frame_begin();
-
+	
+	tick_gui();
 	tick_views(dt);
-#if DEBUG_PERF
-    {
-		const ch::Vector2 viewport_size = the_window.get_viewport_size();
-		Vertical_Layout debug_layout((f32)viewport_size.ux - 300.f, 0.f, (f32)get_config().font_size + 5.f);
-		char temp[100];
-		ch::sprintf(temp, "FPS: %f", 1.f / dt);
-		gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
-		debug_layout.row();
-
-		for (const ch::Scoped_Timer& it : ch::scoped_timer_manager.entries) {
-			ch::sprintf(temp, "%s: %f", it.name, it.get_gap());
-			gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
-			debug_layout.row();
-		}
-        {
-            ch::sprintf(temp, "%d vertices", num_vertices_total);
-            num_vertices_total = 0;
-            gui_label(temp, ch::magenta, debug_layout.at_x, debug_layout.at_y);
-            debug_layout.row();
-        }
-	}
-#endif
 
 	frame_end();
 }
