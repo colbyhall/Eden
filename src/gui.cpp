@@ -63,19 +63,19 @@ static bool is_point_in_glyph(ch::Vector2 p, const Font_Glyph* g, f32 x, f32 y) 
 	return is_point_in_rect(p, x0, y0, x1, y1);
 }
 
-static const f32 line_number_padding = 3.f;
-
 static void imm_line_number(u64 current_line_number, u64 max_line_number, f32* x, f32 y) {
 	const Font_Glyph* space_glyph = the_font[' '];
 
-	const u8 spaces_needed = (ch::get_num_digits(max_line_number) + 1) - ch::get_num_digits(current_line_number);
+	const u8 spaces_needed = ch::get_num_digits(max_line_number) - ch::get_num_digits(current_line_number) + 1;
 
 	char temp_buffer[16];
 	ch::sprintf(temp_buffer, "%llu", current_line_number);
 
 	*x += space_glyph->advance * spaces_needed; 
 	const ch::Vector2 text_draw_size = imm_string(temp_buffer, the_font, *x, y, get_config().line_number_text_color);
-	*x += text_draw_size.x + line_number_padding;
+	*x += text_draw_size.x;
+
+	*x += space_glyph->advance;
 }
 
 static void imm_cursor(bool edit_mode, const Font_Glyph* g, float x, float y, const ch::Color& color) {
@@ -123,14 +123,14 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 
 	f32 line_number_quad_width = 0.f;
 
-    const u32 line_number_columns = ch::get_num_digits(num_lines) + 1;
+    const u32 line_number_columns = ch::get_num_digits(num_lines) + 2;
 
     if (line_number_columns * space_glyph->advance >= width) {
         show_line_numbers = false;
     }
 
 	if (show_line_numbers) {
-		line_number_quad_width = (line_number_columns * space_glyph->advance) + line_number_padding;
+		line_number_quad_width = (line_number_columns * space_glyph->advance);
 		const f32 ln_x0 = x0;
 		const f32 ln_y0 = y0;
 		const f32 ln_x1 = ln_x0 + line_number_quad_width;
@@ -182,14 +182,8 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 
 		if (!buffer.syntax_dirty && !buffer.disable_parse)
         {
-            // Obtain the current lexeme based on the current index
-
-            while (lexeme + 1 < lexemes_end &&
-                   // @TEMPORARY @HACK @@@
-                   ((ch::Gap_Buffer<u8>&)gap_buffer).get_index_as_cursor(it.index + 1) - 1 >= (const u8*)lexeme[1].i
-                   ) {
-                lexeme++;
-                //push_glyph(the_font['_'], x, y, ch::magenta); // @Debug
+            while (lexeme + 1 < lexemes_end && ((ch::Gap_Buffer<u8>&)gap_buffer).get_index_as_cursor(it.index + 1) - 1 >= (const u8*)lexeme[1].i) {
+                lexeme += 1;
             }
 
             assert(lexeme < lexemes_end);
@@ -383,8 +377,9 @@ bool gui_buffer(const Buffer& buffer, usize* cursor, usize* selection, bool show
 			y += font_height + the_font.line_gap;
 
 			if (show_line_numbers) {
-                x += space_glyph->advance * (ch::get_num_digits(num_lines) + 1) + line_number_padding;
+                x += space_glyph->advance * (ch::get_num_digits(num_lines) + 2);
             }
+
 		}
 
 		if (is_in_selection && (!is_in_cursor || !show_cursor)) color = config.selected_text_color;
