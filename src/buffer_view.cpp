@@ -488,6 +488,7 @@ void Buffer_View::remove_selection() {
 
 	buffer->refresh_line_tables();
 	update_column_info(true);
+	buffer->mark_file_dirty();
 }
 
 void Buffer_View::update_column_info(bool update_desired_col) {
@@ -543,6 +544,8 @@ void Buffer_View::on_char_entered(u32 c) {
 	update_column_info(true);
 	reset_cursor_timer();
     buffer->syntax_dirty = true;
+
+	buffer->mark_file_dirty();
 }
 
 void tick_views(f32 dt) {
@@ -629,13 +632,15 @@ void tick_views(f32 dt) {
 				const char* line_ending = get_line_ending_display(the_buffer->line_ending);
 				const char* encoding = get_buffer_encoding_display(the_buffer->encoding);
 
+				const bool is_read_only = (the_buffer->flags & BF_ReadOnly) == BF_ReadOnly;
 				char buffer[512];
-				ch::sprintf(buffer, "%s | %s | %llu:%llu | %.0f%% | %llu lines", line_ending, encoding, current_line, current_column, percent_through_file, num_lines);
+				ch::sprintf(buffer, "%s | %s | %llu:%llu | %.0f%% | %llu lines%s", line_ending, encoding, current_line, current_column, percent_through_file, num_lines, is_read_only ? " | read-only" : "");
 
 				const ch::Vector2 fi_size = get_string_draw_size(buffer, the_font);
 				imm_string(buffer, the_font, x1 - fi_size.x - horz_padding, text_y, config.background_color);
 
-				imm_string(the_buffer->name, the_font, x0 + horz_padding, text_y, config.background_color);
+				ch::sprintf(buffer, "%.*s%s", the_buffer->name.count, the_buffer->name.data, the_buffer->is_dirty ? "*" : "");
+				imm_string(buffer, the_font, x0 + horz_padding, text_y, config.background_color);
 			}
 		}
 

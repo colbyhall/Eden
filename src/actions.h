@@ -14,6 +14,10 @@ void move_cursor_up(bool move_selection);
 
 void move_cursor_down(bool move_selection);
 
+void seek_cursor_left(bool move_selection);
+
+void seek_cursor_right(bool move_selection);
+
 void save_buffer();
 
 void open_dialog();

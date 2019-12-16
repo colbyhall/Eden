@@ -84,6 +84,12 @@ bool Buffer::load_file_into_buffer(const ch::Path& path) {
 	if (name) name.free();
 	name = filename.copy(ch::get_heap_allocator());
 
+	flags |= BF_File;
+	if (f.is_read_only) {
+		flags |= BF_ReadOnly;
+	}
+
+
 	return true;
 }
 
@@ -93,6 +99,8 @@ bool Buffer::save_file_to_path() {
 	ch::File f;
 	if (!f.open(absolute_path, ch::FO_Write | ch::FO_Binary)) return false;
 
+	if ((flags & BF_ReadOnly) == BF_ReadOnly) return false;
+
 	// Move gap to the end
 	gap_buffer.move_gap_to_index(gap_buffer.count());
 
@@ -100,6 +108,8 @@ bool Buffer::save_file_to_path() {
 	f.write_raw(gap_buffer.data, gap_buffer.count());
 	f.set_end_of_file();
 	f.close();
+
+	is_dirty = false;
 
 	return true;
 }
@@ -266,6 +276,12 @@ u64 Buffer::get_wrapped_line_from_index(u64 index, u64 max_line_width) const {
 	}
 
 	return num_lines;
+}
+
+void Buffer::mark_file_dirty() {
+	if ((flags & BF_Scratch) == BF_Scratch) return;
+
+	is_dirty = true;
 }
 
 static ch::Hash_Table<Buffer_ID, Buffer> the_buffers;

@@ -24,6 +24,8 @@ void newline() {
 	buffer->syntax_dirty = true;
 
 	view->reset_cursor_timer();
+
+	buffer->mark_file_dirty();
 }
 
 void backspace() {
@@ -54,8 +56,9 @@ void backspace() {
 	view->selection = view->cursor;
 	buffer->syntax_dirty = true;
 	view->update_column_info();
-
 	view->reset_cursor_timer();
+
+	buffer->mark_file_dirty();
 }
 
 void move_cursor_right(bool move_selection) {
@@ -158,6 +161,52 @@ void move_cursor_down(bool move_selection) {
 	view->update_column_info();
 	view->reset_cursor_timer();
 
+}
+
+void seek_cursor_left(bool move_selection) {
+	Buffer_View* const view = get_focused_view();
+	Buffer* const buffer = find_buffer(view->the_buffer);
+	assert(buffer);
+
+	if (view->cursor <= 0) return;
+
+	bool found_char = false;
+	for (usize i = buffer->find_prev_char(view->cursor); i >= 0; i = buffer->find_prev_char(i)) {
+		const u32 c = buffer->get_char(i);
+
+		view->cursor = i;
+
+		if ((ch::is_whitespace(c) || ch::is_symbol(c)) && found_char) break; 
+
+		if (!ch::is_whitespace(c)) found_char = true;
+	}
+
+	if (move_selection) view->selection = view->cursor;
+	view->update_column_info();
+	view->reset_cursor_timer();
+}
+
+void seek_cursor_right(bool move_selection) {
+	Buffer_View* const view = get_focused_view();
+	Buffer* const buffer = find_buffer(view->the_buffer);
+	assert(buffer);
+
+	if (view->cursor >= buffer->gap_buffer.count()) return;
+
+	bool found_char = false;
+	for (usize i = buffer->find_next_char(view->cursor); i >= 0; i = buffer->find_next_char(i)) {
+		const u32 c = buffer->get_char(i);
+
+		view->cursor = i;
+
+		if ((ch::is_whitespace(c) || ch::is_symbol(c)) && found_char) break;
+
+		if (!ch::is_whitespace(c)) found_char = true;
+	}
+
+	if (move_selection) view->selection = view->cursor;
+	view->update_column_info();
+	view->reset_cursor_timer();
 }
 
 void save_buffer() {

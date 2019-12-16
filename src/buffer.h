@@ -51,6 +51,12 @@ CH_FORCEINLINE const char* get_buffer_encoding_display(Buffer_Encoding encoding)
 	return nullptr;
 }
 
+enum Buffer_Flags {
+	BF_File = 1,
+	BF_Scratch = 1 << 1,
+	BF_ReadOnly = 1 << 2,
+};
+
 /**
  * Wrapper around gap buffer that keeps cached data about the contents of the gap buffer
  *
@@ -97,6 +103,20 @@ struct Buffer {
 	 * @see load_file_into_buffer
 	 */
 	Buffer_Encoding encoding = BE_UTF8;
+
+	/**
+	 * Attributes to give details about what type of buffer this is.
+	 *
+	 * @see Buffer_Flags
+	 */
+	u8 flags = 0;
+
+	/**
+	 * Keeps track if file is dirty
+	 * 
+	 * @temp until we have undo/redo
+	 */
+	bool is_dirty = false;
 
 	bool disable_parse = false;
     bool syntax_dirty = true;
@@ -171,6 +191,9 @@ struct Buffer {
 	u64 get_index_from_line(u64 line) const;
 	u64 get_line_from_index(u64 index) const;
     u64 get_wrapped_line_from_index(u64 index, u64 max_line_width) const;
+
+	/** @temp */
+	void mark_file_dirty();
 };
 
 /** Creates a new buffer and @returns the new buffer's id. */
