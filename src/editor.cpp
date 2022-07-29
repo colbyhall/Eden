@@ -23,8 +23,8 @@ Font the_font;
 int num_vertices_total;
 
 #define DEBUG_UTF8_FILE 0
-#define DEBUG_LARGE_FILE 0
-#define DEBUG_AVERAGE_FILE 1
+#define DEBUG_LARGE_FILE 1
+#define DEBUG_AVERAGE_FILE 0
 
 void tick_editor(f32 dt) {
 	frame_begin();

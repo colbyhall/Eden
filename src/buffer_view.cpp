@@ -79,7 +79,7 @@ static void imm_cursor(bool edit_mode, const Font_Glyph* g, float x, float y, co
 	}
 }
 
-#define PARSE_SPEED_DEBUG 0
+#define PARSE_SPEED_DEBUG 1
 #define LINE_SIZE_DEBUG 0
 #define EOL_DEBUG 0
 
@@ -368,7 +368,7 @@ static void gui_buffer_view(UI_ID id, Buffer_View* view, f32 x0, f32 y0, f32 x1,
 
 #if LINE_SIZE_DEBUG
 			char temp[100];
-			ch::sprintf(temp, "col: %lu, bytes: %lu", buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
+			ch::sprintf(temp, "col: %lu, bytes: %lu", buffer->line_column_table[line_number - 1], buffer->eol_table[line_number - 1]);
 			imm_string(temp, the_font, x, y, ch::magenta);
 #endif;
 
@@ -417,7 +417,7 @@ static void gui_buffer_view(UI_ID id, Buffer_View* view, f32 x0, f32 y0, f32 x1,
 #endif
 #if LINE_SIZE_DEBUG
 			char temp[100];
-			ch::sprintf(temp, "col: %lu, bytes: %lu", buffer.line_column_table[line_number - 1], buffer.eol_table[line_number - 1]);
+			ch::sprintf(temp, "col: %lu, bytes: %lu", buffer->line_column_table[line_number - 1], buffer->eol_table[line_number - 1]);
 			imm_string(temp, the_font, x, y, ch::magenta);
 #endif
 		}
@@ -425,18 +425,18 @@ static void gui_buffer_view(UI_ID id, Buffer_View* view, f32 x0, f32 y0, f32 x1,
 	}
 
 #if PARSE_SPEED_DEBUG
-	if (!buffer.syntax_dirty && !buffer.disable_parse) {
+	if (!buffer->syntax_dirty && !buffer->disable_parse) {
 		char temp[1024];
 
-		u64 num_chars = buffer.gap_buffer.count();
-		u64 num_lexemes = buffer.lexemes.count;
-		u64 num_lines = buffer.eol_table.count;
+		u64 num_chars = buffer->gap_buffer.count();
+		u64 num_lexemes = buffer->lexemes.count;
+		u64 num_lines = buffer->eol_table.count;
 
 		f64 gibi = 1024 * 1024 * 1024;
 		f64 million = 1000 * 1000;
 
-		f64 lex_time = buffer.lex_time / buffer.lex_parse_count;
-		f64 parse_time = buffer.parse_time / buffer.lex_parse_count;
+		f64 lex_time = buffer->lex_time / buffer->lex_parse_count;
+		f64 parse_time = buffer->parse_time / buffer->lex_parse_count;
 		f64 total_time = lex_time + parse_time;
 
 		ch::sprintf(temp,
